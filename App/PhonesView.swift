@@ -1,11 +1,11 @@
 import SwiftUI
 
-/// Headphone settings: off, or split (the room in the left ear, the cued record in the right),
+/// Headphone settings: off, split (the room in the left ear, the cued record in the right), or
+/// two outputs (the room on the phone's speaker, the headphones on a plugged-in sound card);
 /// how much of the room is mixed into the headphones, and where the sound is going.
 struct PhonesView: View {
     @EnvironmentObject var game: Game
     let onClose: () -> Void
-    @State private var probe: String?
 
     var body: some View {
         ZStack {
@@ -27,9 +27,10 @@ struct PhonesView: View {
                             .background(Circle().fill(.white.opacity(0.1)))
                     }
                 }
-                HStack(spacing: 10) {
-                    mode("OFF", "The room on both sides.", on: !game.phonesSplit) { game.phonesSplit = false }
-                    mode("SPLIT  L / R", "Left: the room. Right: your headphones.", on: game.phonesSplit) { game.phonesSplit = true }
+                HStack(spacing: 8) {
+                    mode("OFF", "The room on both sides.", on: game.phonesMode == 0) { game.phonesMode = 0 }
+                    mode("SPLIT  L / R", "Left: the room. Right: your headphones.", on: game.phonesMode == 1) { game.phonesMode = 1 }
+                    mode("2 OUTPUTS", "Speaker: the room. Adapter: your headphones.", on: game.phonesMode == 2) { game.phonesMode = 2 }
                 }
                 HStack(spacing: 10) {
                     Text("CUE")
@@ -41,32 +42,30 @@ struct PhonesView: View {
                         .font(.system(size: 10, weight: .heavy)).tracking(2)
                         .foregroundStyle(GroovelineLogo.teal)
                 }
-                .opacity(game.phonesSplit ? 1 : 0.35)
-                .disabled(!game.phonesSplit)
-                Text("Press PHONES on a mixer channel to hear that record in the right ear before the room does. With a splitter cable the left side feeds the speakers and the right side your headphones; with headphones alone you practise with the room in one ear and the next record in the other.")
+                .opacity(game.phonesMode != 0 ? 1 : 0.35)
+                .disabled(game.phonesMode == 0)
+                Text("Press PHONES on a mixer channel to hear that record in your headphones before the room does. SPLIT works with any headphones (room in one ear, the next record in the other) or with a splitter cable. 2 OUTPUTS needs wired headphones or a sound card plugged in: the phone's speaker plays the room.")
                     .font(.system(size: 11.5, weight: .medium))
                     .foregroundStyle(.white.opacity(0.65))
                     .fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: 10) {
-                    Text("SOUND GOES TO: \(probe ?? game.engine.outputs)")
-                        .font(.system(size: 10, weight: .heavy)).tracking(1)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("SOUND GOES TO: \(game.engine.outputs)")
                         .foregroundStyle(.white.opacity(0.5))
-                        .lineLimit(2)
-                    Spacer()
-                    Button {
-                        probe = "AT ONCE: " + game.engine.probeSeveralOutputs()
-                    } label: {
-                        Text("CHECK FOR A SECOND OUTPUT")
-                            .font(.system(size: 9, weight: .heavy)).tracking(1)
-                            .foregroundStyle(.white.opacity(0.8))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(Capsule().stroke(.white.opacity(0.3), lineWidth: 1))
+                    if !game.engine.twoOutputsNote.isEmpty {
+                        Text(game.engine.twoOutputsNote)
+                            .foregroundStyle(Color(Palette.orange))
+                    }
+                    if let problem = game.engine.lastError {
+                        Text("AUDIO OFF: \(problem)")
+                            .foregroundStyle(Color(Palette.red))
                     }
                 }
+                .font(.system(size: 10, weight: .heavy))
+                .tracking(1)
+                .fixedSize(horizontal: false, vertical: true)
             }
             .padding(16)
-            .frame(maxWidth: 560)
+            .frame(maxWidth: 620)
             .background(RoundedRectangle(cornerRadius: 16).fill(Color(Palette.panel)))
             .overlay(RoundedRectangle(cornerRadius: 16).stroke(.white.opacity(0.12), lineWidth: 1))
             .padding(.horizontal, 20)

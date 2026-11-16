@@ -38,7 +38,7 @@ struct BoothView: View {
                 .padding(.top, 8)
                 // Top right: headphones, and in free play the crate.
                 HStack(spacing: 8) {
-                    pill("headphones", game.phonesSplit ? "SPLIT" : "PHONES", lit: game.phonesSplit) { phonesOpen = true }
+                    pill("headphones", ["PHONES", "SPLIT", "2 OUTPUTS"][min(2, max(0, game.phonesMode))], lit: game.phonesMode != 0) { phonesOpen = true }
                     if lessonID == nil {
                         pill("square.stack.fill", "CRATE", lit: false) { crateOpen = true }
                     }

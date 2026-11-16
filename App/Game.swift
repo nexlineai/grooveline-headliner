@@ -19,13 +19,15 @@ final class Game: ObservableObject {
     private var queue: [Screen] = []
     /// The screenshot run starts the app with `-demo 1`: the decks start by themselves.
     let demo: Bool
-    /// Headphones: off (the room on both sides) or split (room left, headphones right).
-    @Published var phonesSplit: Bool {
+    /// Headphones: 0 off (the room on both sides), 1 split (room left, headphones right),
+    /// 2 two outputs (room on the speaker, headphones on a plugged-in output).
+    @Published var phonesMode: Int {
         didSet {
-            engine.split = phonesSplit
-            UserDefaults.standard.set(phonesSplit, forKey: "phonesSplit")
+            engine.phones = PhonesMode(rawValue: phonesMode) ?? .off
+            UserDefaults.standard.set(phonesMode, forKey: "phonesMode")
         }
     }
+    private var routeObserver: NSObjectProtocol?
     /// What the headphones hear: 0 = only the cued records, 1 = only the room.
     @Published var cueMix: Double {
         didSet {
@@ -37,10 +39,14 @@ final class Game: ObservableObject {
     init() {
         let defaults = UserDefaults.standard
         demo = defaults.bool(forKey: "demo")
-        phonesSplit = defaults.bool(forKey: "phonesSplit")
+        phonesMode = defaults.integer(forKey: "phonesMode")
         cueMix = defaults.double(forKey: "cueMix")
-        engine.split = phonesSplit
+        engine.phones = PhonesMode(rawValue: phonesMode) ?? .off
         engine.cueMix = cueMix
+        // Something was plugged in or pulled out: let the screens that show the outputs redraw.
+        routeObserver = NotificationCenter.default.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { self?.objectWillChange.send() }
+        }
         if let url = Bundle.main.url(forResource: "tracks", withExtension: "json"),
            let data = try? Data(contentsOf: url),
            let list = try? JSONDecoder().decode([TrackInfo].self, from: data) {

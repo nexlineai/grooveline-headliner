@@ -102,6 +102,9 @@ public struct MixerShared {
     public var split = false
     /// What the headphones hear: 0 = only the cued decks, 1 = only the room.
     public var cueMix: Float = 0
+    /// Everything that comes out, 0...1 (turned down a little while a coach talks).
+    public var master: Float = 1
+    var masterNow: Float = 1
     public var sampleRate: Double = 48_000
 
     public init() {}
@@ -117,7 +120,9 @@ public enum Mixer {
         return abs(wanted - next) < 0.02 ? wanted : next
     }
 
-    /// Mixes `deckCount` decks into one stereo output.
+    /// Mixes `deckCount` decks into one stereo output, or into two when `phonesLeft` and
+    /// `phonesRight` are given: then `left`/`right` carry the room and the other pair carries
+    /// the headphones, both in stereo (a second sound output), and `split` is ignored.
     /// `scratch` is room for `2 * count` samples; `decks` and `strips` hold `deckCount` entries.
     public static func render(decks: UnsafePointer<UnsafeMutablePointer<DeckShared>>,
                               strips: UnsafePointer<UnsafeMutablePointer<ChannelStrip>>,
@@ -126,12 +131,17 @@ public enum Mixer {
                               scratch: UnsafeMutablePointer<Float>,
                               left outL: UnsafeMutablePointer<Float>,
                               right outR: UnsafeMutablePointer<Float>,
+                              phonesLeft: UnsafeMutablePointer<Float>? = nil,
+                              phonesRight: UnsafeMutablePointer<Float>? = nil,
                               count: Int) {
         let split = mixer.pointee.split
         let cueMix = max(0, min(1, mixer.pointee.cueMix))
         let rate = mixer.pointee.sampleRate
         let tl = scratch, tr = scratch + count
         for i in 0..<count { outL[i] = 0; outR[i] = 0 }
+        if let pl = phonesLeft, let pr = phonesRight {
+            for i in 0..<count { pl[i] = 0; pr[i] = 0 }
+        }
 
         for d in 0..<deckCount {
             let strip = strips[d]
@@ -163,7 +173,19 @@ public enum Mixer {
 
             var fader = strip.pointee.faderNow, cue = strip.pointee.cueNow
             let faderWanted = strip.pointee.fader, cueWanted = strip.pointee.cue
-            if split {
+            if let pl = phonesLeft, let pr = phonesRight {
+                // Two outputs: the room on one, the headphones on the other, both in stereo.
+                for i in 0..<count {
+                    fader += (faderWanted - fader) * 0.004
+                    cue += (cueWanted - cue) * 0.004
+                    let l = tl[i], r = tr[i]
+                    outL[i] += l * fader
+                    outR[i] += r * fader
+                    let heard = cue * (1 - cueMix) + fader * cueMix
+                    pl[i] += l * heard
+                    pr[i] += r * heard
+                }
+            } else if split {
                 // Left: the room, in mono. Right: the headphones, in mono.
                 for i in 0..<count {
                     fader += (faderWanted - fader) * 0.004
@@ -183,6 +205,26 @@ public enum Mixer {
             }
             strip.pointee.faderNow = fader
             strip.pointee.cueNow = cue
+        }
+
+        // Master volume, gliding (about 10 ms) so a change makes no click.
+        var master = mixer.pointee.masterNow
+        let masterWanted = max(0, min(1, mixer.pointee.master))
+        if master != 1 || masterWanted != 1 {
+            if let pl = phonesLeft, let pr = phonesRight {
+                for i in 0..<count {
+                    master += (masterWanted - master) * 0.002
+                    outL[i] *= master; outR[i] *= master
+                    pl[i] *= master; pr[i] *= master
+                }
+            } else {
+                for i in 0..<count {
+                    master += (masterWanted - master) * 0.002
+                    outL[i] *= master; outR[i] *= master
+                }
+            }
+            if abs(master - masterWanted) < 1e-4 { master = masterWanted }
+            mixer.pointee.masterNow = master
         }
     }
 }

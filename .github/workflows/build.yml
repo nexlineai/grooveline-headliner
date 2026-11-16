@@ -18,8 +18,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  ios:
+  # One job, so a push needs one Mac, not two (runs 5 and 7 lost a job waiting for a second one).
+  # It may write, but only the last step does, and only to the `shots` branch: pictures of each
+  # screen, so the game can be looked at from a machine that cannot run it.
+  build:
     runs-on: macos-26
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -33,33 +38,13 @@ jobs:
         run: scripts/ci-build-unsigned.sh
         env:
           BUILD_NUMBER: ${{ github.run_number }}
+      # Uploaded before the screenshots are taken, so the build can be installed without waiting for them.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: grooveline-headliner-unsigned-ipa
           path: build/GroovelineHeadliner-unsigned.ipa
           if-no-files-found: error
           retention-days: 7
-      # Raw logs need a token; annotations don't. On failure, surface the last log lines.
-      - name: Log tails
-        if: failure()
-        run: |
-          for f in build/*.log; do
-            [ -f "$f" ] || continue
-            tail -n 4 "$f" | sed -e 's/%/%25/g' -e "s#^#::error title=$(basename "$f")::#"
-          done
-
-  # The only job that may write, and only to the `shots` branch: pictures of each screen, so the
-  # game can be looked at from a machine that cannot run it.
-  shots:
-    runs-on: macos-26
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-      - name: Generate the Xcode project
-        run: brew install xcodegen && xcodegen generate
       - name: Simulator screenshots
         run: scripts/ci-shots.sh
         env:
@@ -74,6 +59,7 @@ jobs:
           git add -A
           git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "shots: run ${{ github.run_number }} (${{ github.sha }})"
           git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" shots
+      # Raw logs need a token; annotations don't. On failure, surface the last log lines.
       - name: Log tails
         if: failure()
         run: |

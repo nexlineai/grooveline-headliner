@@ -18,9 +18,9 @@ Design, story, decisions and the build log are in the vault:
 ## Build
 - Nothing builds on Omarchy (no Xcode, no room for a Swift toolchain). CI is the compiler:
   `.github/workflows/build.yml` on every push to `main`.
-  - `ios` job: package tests + unsigned IPA artifact for iloader.
-  - `shots` job: runs the app in the iOS Simulator and force-pushes screenshots + the app's log to
-    the `shots` branch. Look at them with:
+  - One job `build` (one Mac per push; a newer push cancels an older run): package tests,
+    unsigned IPA artifact for iloader, then the app runs in the iOS Simulator and screenshots +
+    the app's log are force-pushed to the `shots` branch. Look at them with:
     `git fetch origin shots && git show origin/shots:booth.png > /tmp/booth.png` (then Read it).
   - On failure, read the annotations without a token:
     `curl -s https://api.github.com/repos/nexlineai/grooveline-headliner/commits/main/check-runs`
@@ -42,9 +42,13 @@ Design, story, decisions and the build log are in the vault:
   `ChannelStrip`, plain memory shared with the audio thread, no locks) and `DeckEngine` (ONE
   source node that calls `Mixer.render`; restarts itself when the output changes, e.g. headphones
   plugged in). No system audio units: what the tests check is what the phone plays.
-- Headphones (`PhonesView`, `Game.phonesSplit` / `cueMix`, PHONES buttons on the mixer): split
-  L/R as in the Record Store. A true second output (speaker + sound card at once) is NOT built;
-  `DeckEngine.probeSeveralOutputs()` (button in the panel) reports what iOS offers with a given adapter.
+- Headphones (`PhonesView`, `Game.phonesMode` / `cueMix`, PHONES buttons on the mixer), as in the
+  Record Store: OFF, SPLIT L/R, or 2 OUTPUTS. `DeckEngine.phones = .twoOutputs` switches the audio
+  session to `.multiRoute`, connects the source node straight to the output node in the
+  hardware's own multi-channel format and writes the room to the speaker's channels and the
+  headphone bus to the plugged-in output's channels (`planTwoOutputs`); with one output it falls
+  back to the room only and says so (`twoOutputsNote`). Only a real phone with an adapter can
+  test this; the simulator always takes the fallback.
 - `App/`: SwiftUI shell (`Game`, `TitleView`, `BoothView`) and the SpriteKit booth
   (`BoothScene` holds settings and touch handling, `BoothNodes` draws the gear).
 - Moving through a record: pick up the headshell and carry it (`Kind.needle`), or touch the strip
