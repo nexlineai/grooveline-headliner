@@ -156,6 +156,18 @@ final class VinylTests: XCTestCase {
         s.deinitialize(count: 1); s.deallocate()
     }
 
+    func testOverviewShowsTheQuietPart() {
+        // Loud, then a quiet middle, then loud again.
+        var samples = [Float](repeating: 0.8, count: 3000)
+        for i in 1000..<2000 { samples[i] = 0.2 }
+        let bins = samples.withUnsafeBufferPointer { Vinyl.overview($0.baseAddress!, count: 3000, bins: 3, stride: 1) }
+        XCTAssertEqual(bins.count, 3)
+        XCTAssertEqual(bins[0], 1, accuracy: 1e-4)
+        XCTAssertEqual(bins[1], 0.25, accuracy: 1e-4)
+        XCTAssertEqual(bins[2], 1, accuracy: 1e-4)
+        XCTAssertTrue(Vinyl.overview(samples, count: 0, bins: 4).isEmpty)
+    }
+
     func testFirstOnset() {
         var x = [Float](repeating: 0, count: 100)
         x[40] = 0.01; x[41] = 0.2

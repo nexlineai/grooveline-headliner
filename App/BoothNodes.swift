@@ -230,6 +230,38 @@ enum Draw {
         return SKTexture(image: image)
     }
 
+    /// The record's loudness along its length, mirrored round the middle line like a waveform.
+    /// `ticks` (0...1 along the strip) mark where each sixteen-bar phrase starts.
+    static func waveform(_ levels: [Float], size: CGSize, tint: UIColor, ticks: [CGFloat]) -> SKTexture {
+        let image = UIGraphicsImageRenderer(size: size).image { context in
+            let c = context.cgContext
+            let mid = size.height / 2
+            if levels.count > 1 {
+                let step = size.width / CGFloat(levels.count - 1)
+                c.move(to: CGPoint(x: 0, y: mid))
+                for (i, level) in levels.enumerated() {
+                    let h = max(0.6, CGFloat(level) * (mid - 1))
+                    c.addLine(to: CGPoint(x: CGFloat(i) * step, y: mid - h))
+                }
+                for (i, level) in levels.enumerated().reversed() {
+                    let h = max(0.6, CGFloat(level) * (mid - 1))
+                    c.addLine(to: CGPoint(x: CGFloat(i) * step, y: mid + h))
+                }
+                c.closePath()
+                c.setFillColor(tint.withAlphaComponent(0.85).cgColor)
+                c.fillPath()
+            } else {
+                c.setFillColor(Palette.dim.cgColor)
+                c.fill(CGRect(x: 0, y: mid - 0.5, width: size.width, height: 1))
+            }
+            c.setFillColor(UIColor.white.withAlphaComponent(0.55).cgColor)
+            for tick in ticks {
+                c.fill(CGRect(x: tick * size.width - 0.5, y: size.height - 3, width: 1, height: 3))
+            }
+        }
+        return SKTexture(image: image)
+    }
+
     /// Light lying across the grooves. It stays still while the record turns under it.
     static func sheen(radius r: CGFloat) -> SKTexture {
         let size = CGSize(width: r * 2, height: r * 2)

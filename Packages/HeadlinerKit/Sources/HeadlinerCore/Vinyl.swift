@@ -90,6 +90,33 @@ public enum Vinyl {
         if peak > s.pointee.peak { s.pointee.peak = peak }
     }
 
+    /// The whole record at a glance: how loud each of `bins` equal slices is, 0...1 against the
+    /// loudest slice. Quiet stretches (intros, breakdowns) show as dips.
+    public static func overview(_ p: UnsafePointer<Float>, count: Int, bins: Int, stride step: Int = 8) -> [Float] {
+        guard count > 0, bins > 0 else { return [] }
+        var out = [Float](repeating: 0, count: bins)
+        var loudest: Float = 0
+        for b in 0..<bins {
+            let from = count * b / bins
+            let to = max(from + 1, count * (b + 1) / bins)
+            var sum: Float = 0
+            var n: Float = 0
+            var i = from
+            while i < to && i < count {
+                sum += p[i] * p[i]
+                n += 1
+                i += step
+            }
+            let level = n > 0 ? (sum / n).squareRoot() : 0
+            out[b] = level
+            if level > loudest { loudest = level }
+        }
+        if loudest > 0 {
+            for b in 0..<bins { out[b] /= loudest }
+        }
+        return out
+    }
+
     /// Frame of the first sample louder than `threshold`: where the first kick starts.
     public static func firstOnset(_ p: UnsafePointer<Float>, count: Int, threshold: Float = 0.05) -> Int {
         for i in 0..<count where abs(p[i]) > threshold { return i }

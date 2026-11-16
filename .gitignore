@@ -16,3 +16,4 @@ xcuserdata/
 *.cer
 *.mobileprovision
 .env*
+*.job

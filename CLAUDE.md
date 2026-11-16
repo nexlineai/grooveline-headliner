@@ -38,6 +38,16 @@ Design, story, decisions and the build log are in the vault:
   with the audio thread, no locks) and `DeckEngine` (two decks -> 3-band EQ each -> output).
 - `App/`: SwiftUI shell (`Game`, `TitleView`, `BoothView`) and the SpriteKit booth
   (`BoothScene` holds settings and touch handling, `BoothNodes` draws the gear).
+- Moving through a record: pick up the headshell and carry it (`Kind.needle`), or touch the strip
+  above the platter (`Kind.wave`). Both lift the needle (`Deck.lifted`, silent, platter keeps
+  turning) and drop it on release. The rim wins over the strip where they overlap.
+- Story (`Story.swift`, `StoryView.swift`, `App/Story/scenes.json`): scenes play by themselves,
+  a tap skips a line. A line is either a `clip` (mp4 in which the character says the line; voice
+  and lips are made together by the video model, so they match) or a `voice` (m4a over the still
+  picture, no mouth movement). Never pair a separate voice file with a "talking" loop: Zé saw
+  that on the phone and the lips were wrong.
+- The Grooveline name is always the site's mark: `GroovelineLogo` (bars + Orbitron Bold, teal
+  `#00d4c8`). Fonts in `App/Fonts/` (Orbitron, OFL).
 - Turntable conventions Zé asked for in the Record Store apply here too: pitch fader up = slower,
   CUE like a club deck (stopped: set the mark; playing: back to the mark and stop), crossfader
   full until the middle.
@@ -47,5 +57,11 @@ Design, story, decisions and the build log are in the vault:
   Every track starts on a kick at sample 0; the app finds it at load and starts the grid there.
 - `tools/art/imagine.py OUT.jpg "prompt" [--aspect 16:9]`: illustrations in the house style.
   Style tests in `art/style-tests/`; pictures the app uses in `App/Art/`.
-- `tools/voice/say.sh OUT.m4a VOICE "text"`: spoken lines. `voice/casting/` has every voice
+- `tools/art/animate.py IN.jpg OUT.mp4 "what moves" [--voice ID] [--return] [--silent]`: clips.
+  `--voice` + the line in quotes in the prompt = lip-synced speech in a cast voice; `--return`
+  makes the clip end on the picture it started from (use this, not the forwards-backwards
+  `--loop`, for anything that looks wrong in reverse). `tools/art/story-lines.sh` holds the
+  prompts of every spoken line. Check the words of each clip with `voxtype transcribe`.
+  Work files go in `/data/headliner-work/` (root disk is nearly full), only finished clips in git.
+- `tools/voice/say.sh OUT.m4a VOICE "text"`: spoken lines without a picture. `voice/casting/` has every voice
   saying one line, for Zé to cast by ear.

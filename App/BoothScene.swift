@@ -10,6 +10,7 @@ import HeadlinerAudio
 final class BoothScene: SKScene {
     private enum Kind: Equatable {
         case platter(Int), rim(Int), pitch(Int), channel(Int), cross, eq(Int, Int), play(Int), cue(Int), sync(Int)
+        case needle(Int), wave(Int)
     }
 
     private struct Grab {
@@ -42,6 +43,8 @@ final class BoothScene: SKScene {
     private var handSpeed = [0.0, 0.0]
     private var rimTravel: [CGFloat] = [0, 0]
     private var rimSpeed = [0.0, 0.0]
+    /// While a needle is in the air: where on the record it will come down, 0...1.
+    private var dropAt: [Double?] = [nil, nil]
 
     // Gear on screen.
     private var needsBuild = true
@@ -55,6 +58,9 @@ final class BoothScene: SKScene {
     private var phaseWidth: CGFloat = 100
     private var armPivotAngle: CGFloat = 0
     private var armLength: CGFloat = 100
+    private var armPivot: [CGPoint] = [.zero, .zero]
+    private var needleReach: CGFloat = 20
+    private var waveRect: [CGRect] = [.zero, .zero]
 
     private var record: [SKSpriteNode] = []
     private var arm: [SKNode] = []
@@ -70,6 +76,11 @@ final class BoothScene: SKScene {
     private var bpmLabel: [SKLabelNode] = []
     private var pitchLabel: [SKLabelNode] = []
     private var beatDots: [[SKShapeNode]] = []
+    private var wavePlayed: [SKSpriteNode] = []
+    private var wavePlayhead: [SKSpriteNode] = []
+    private var waveCue: [SKSpriteNode] = []
+    private var waveDrop: [SKSpriteNode] = []
+    private var timeLabel: [SKLabelNode] = []
     private var verdict: SKLabelNode?
     private var phaseDot: SKShapeNode?
     private var roomGlow: SKSpriteNode?
@@ -112,6 +123,7 @@ final class BoothScene: SKScene {
         record = []; arm = []; pitchNode = []; channelNode = []; knob = []
         playButton = []; cueButton = []; syncButton = []; meter = []
         bpmLabel = []; pitchLabel = []; beatDots = []
+        wavePlayed = []; wavePlayhead = []; waveCue = []; waveDrop = []; timeLabel = []
 
         let W = size.width, H = size.height
         guard W > 200, H > 200 else { return }
@@ -204,8 +216,9 @@ final class BoothScene: SKScene {
         let tint = d == 0 ? Palette.teal : Palette.magenta
         addChild(panel(rect, radius: 10 * u))
 
-        // Platter: as big as the panel allows, with a title row above and buttons below.
-        let outer = min((rect.height - 56 * u) / 2, (rect.width - 86 * u) / 2)
+        // Platter: as big as the panel allows, with the title and the record's strip above and
+        // buttons below.
+        let outer = min((rect.height - 64 * u) / 2, (rect.width - 86 * u) / 2)
         let r = outer / 1.07
         let centre = CGPoint(x: rect.minX + 8 * u + outer, y: rect.minY + 34 * u + outer)
         platterCentre[d] = centre
@@ -228,6 +241,8 @@ final class BoothScene: SKScene {
 
         // Tonearm: pivot behind the platter on the right, needle travelling in as the record plays.
         let pivot = CGPoint(x: centre.x + r * 0.98, y: centre.y + r * 0.86)
+        armPivot[d] = pivot
+        needleReach = max(20, 20 * u)
         armLength = hypot(pivot.x - centre.x, pivot.y - centre.y)
         armPivotAngle = atan2(centre.y - pivot.y, centre.x - pivot.x)
         let tonearm = makeTonearm(length: armLength, unit: u)
@@ -236,24 +251,35 @@ final class BoothScene: SKScene {
         addChild(tonearm)
         arm.append(tonearm)
 
-        // Title, and four lamps that count the bar.
+        // Top row: title, time left on the record, and four lamps that count the bar.
         let info = decks[d].info
-        let title = gearLabel(info.map { "\($0.artist.uppercased())  ·  \($0.title.uppercased())" } ?? "NO RECORD", size: 9.5 * u, color: Palette.ink)
+        let rowY = rect.maxY - 8 * u
+        let title = gearLabel(info.map { "\($0.artist.uppercased())  ·  \($0.title.uppercased())" } ?? "NO RECORD", size: 8.5 * u, color: Palette.ink)
         title.horizontalAlignmentMode = .left
-        title.position = CGPoint(x: rect.minX + 10 * u, y: rect.maxY - 11 * u)
+        title.position = CGPoint(x: rect.minX + 10 * u, y: rowY)
         addChild(title)
         var dots: [SKShapeNode] = []
         for i in 0..<4 {
-            let dot = SKShapeNode(circleOfRadius: 3 * u)
+            let dot = SKShapeNode(circleOfRadius: 2.6 * u)
             dot.fillColor = tint
             dot.strokeColor = .clear
             dot.alpha = 0.15
-            let dotX = rect.maxX - 52 * u - CGFloat(3 - i) * 10 * u
-            dot.position = CGPoint(x: dotX, y: rect.maxY - 11 * u)
+            let dotX = rect.maxX - 52 * u - CGFloat(3 - i) * 9 * u
+            dot.position = CGPoint(x: dotX, y: rowY)
             addChild(dot)
             dots.append(dot)
         }
         beatDots.append(dots)
+        let time = gearLabel("", size: 8.5 * u, color: Palette.dim, mono: true)
+        time.horizontalAlignmentMode = .right
+        time.position = CGPoint(x: rect.maxX - 88 * u, y: rowY)
+        addChild(time)
+        timeLabel.append(time)
+        // A long title makes room for the time.
+        let titleRoom = time.position.x - 34 * u - title.position.x
+        if title.frame.width > titleRoom, title.frame.width > 0 { title.setScale(titleRoom / title.frame.width) }
+
+        buildWave(d, in: CGRect(x: rect.minX + 10 * u, y: rect.maxY - 27 * u, width: rect.width - 58 * u, height: 12 * u), tint: tint)
 
         // Buttons.
         let buttonSize = CGSize(width: 46 * u, height: 22 * u)
@@ -288,6 +314,61 @@ final class BoothScene: SKScene {
         readout.position = CGPoint(x: fader.position.x - 6 * u, y: rect.minY + 13 * u)
         addChild(readout)
         pitchLabel.append(readout)
+    }
+
+    /// The record at a glance: loud and quiet stretches, a line where the needle is, an orange
+    /// mark at the cue point. Touch it to lift the needle, let go to drop it there.
+    private func buildWave(_ d: Int, in rect: CGRect, tint: UIColor) {
+        waveRect[d] = rect
+        let slot = SKShapeNode(rect: rect.insetBy(dx: -2, dy: -2), cornerRadius: 3)
+        slot.fillColor = Palette.slot
+        slot.strokeColor = Palette.edge
+        slot.lineWidth = 1
+        slot.zPosition = 3
+        addChild(slot)
+
+        let deck = decks[d]
+        let beatsPerPhrase = 64.0 // sixteen bars
+        var ticks: [CGFloat] = []
+        if deck.duration > 0 {
+            var beat = 0.0
+            while true {
+                let at = deck.grid.seconds(atBeat: beat) / deck.duration
+                if at >= 1 { break }
+                ticks.append(CGFloat(at))
+                beat += beatsPerPhrase
+            }
+        }
+        let picture = SKSpriteNode(texture: Draw.waveform(deck.overview, size: rect.size, tint: tint, ticks: ticks))
+        picture.size = rect.size
+        picture.position = CGPoint(x: rect.midX, y: rect.midY)
+        picture.zPosition = 4
+        addChild(picture)
+
+        let played = SKSpriteNode(color: UIColor(white: 0, alpha: 0.55), size: CGSize(width: 1, height: rect.height))
+        played.anchorPoint = CGPoint(x: 0, y: 0.5)
+        played.position = CGPoint(x: rect.minX, y: rect.midY)
+        played.zPosition = 5
+        addChild(played)
+        wavePlayed.append(played)
+
+        func line(_ colour: UIColor, width: CGFloat, taller: CGFloat) -> SKSpriteNode {
+            let node = SKSpriteNode(color: colour, size: CGSize(width: width, height: rect.height + taller))
+            node.position = CGPoint(x: rect.minX, y: rect.midY)
+            node.zPosition = 6
+            addChild(node)
+            return node
+        }
+        waveCue.append(line(Palette.orange, width: 1.5, taller: 0))
+        wavePlayhead.append(line(.white, width: 1.5, taller: 4))
+        let drop = line(tint, width: 2.5, taller: 6)
+        drop.zPosition = 7
+        drop.isHidden = true
+        waveDrop.append(drop)
+
+        // Easy to hit with a thumb: the touch area is much taller than the strip, upwards.
+        let reach = CGRect(x: rect.minX - 8, y: rect.minY - 1, width: rect.width + 16, height: rect.height + 30)
+        hits.insert((Kind.wave(d), reach), at: 0)
     }
 
     private func buildMixer(in rect: CGRect, unit u: CGFloat) {
@@ -373,8 +454,33 @@ final class BoothScene: SKScene {
 
     // MARK: - Hands
 
+    /// Where the needle sits on screen right now.
+    private func needleTip(_ d: Int) -> CGPoint {
+        guard d < arm.count else { return .zero }
+        let a = arm[d].zRotation
+        return CGPoint(x: armPivot[d].x + cos(a) * armLength, y: armPivot[d].y + sin(a) * armLength)
+    }
+
+    /// How far through the record a needle is that sits `distance` from the spindle.
+    private func progress(atNeedle distance: CGFloat) -> Double {
+        let ratio = Double(distance / max(1, platterRadius))
+        return min(1, max(0, (0.93 - ratio) / 0.5))
+    }
+
     private func control(at p: CGPoint) -> Kind? {
+        // The headshell first: it lies on the record, and picking it up must not grab the record.
+        for d in 0..<2 where d < arm.count && decks[d].isLoaded {
+            let tip = needleTip(d)
+            if hypot(p.x - tip.x, p.y - tip.y) <= needleReach { return .needle(d) }
+        }
         for hit in hits where hit.rect.contains(p) {
+            if case .wave(let d) = hit.kind {
+                // The top of the platter's rim reaches into the strip's touch area; the rim wins there,
+                // so a nudge at twelve o'clock never throws the needle across the record.
+                let dist = hypot(p.x - platterCentre[d].x, p.y - platterCentre[d].y)
+                if dist <= platterRadius * 1.13 || !decks[d].isLoaded { continue }
+                return hit.kind
+            }
             if case .platter(let d) = hit.kind {
                 // On the record the hand grabs it; on the dotted rim it only pushes or drags.
                 let dist = hypot(p.x - platterCentre[d].x, p.y - platterCentre[d].y)
@@ -431,6 +537,16 @@ final class BoothScene: SKScene {
                 grab.angle = angle(p, on: d)
                 rimTravel[d] = 0
                 rimSpeed[d] = 0
+            case .needle(let d):
+                // Remember where on the headshell the finger sits, so the arm does not jump to it.
+                grab.angle = atan2(p.y - armPivot[d].y, p.x - armPivot[d].x) - arm[d].zRotation
+                tap.impactOccurred()
+                decks[d].lifted = true
+                dropAt[d] = decks[d].progress
+            case .wave(let d):
+                tap.impactOccurred()
+                decks[d].lifted = true
+                dropAt[d] = waveProgress(p, on: d)
             case .play(let d):
                 tap.impactOccurred()
                 if !decks[d].motorOn && decks[d].progress > 0.995 { decks[d].seek(to: decks[d].cuePoint) }
@@ -462,6 +578,15 @@ final class BoothScene: SKScene {
                 let a = angle(p, on: d)
                 rimTravel[d] += turned(from: grab.angle, to: a)
                 grab.angle = a
+            case .needle(let d):
+                // The arm swings round its pivot after the finger; the needle stays on the grooves.
+                var swing = atan2(p.y - armPivot[d].y, p.x - armPivot[d].x) - grab.angle - armPivotAngle
+                while swing > .pi { swing -= 2 * .pi }
+                while swing < -.pi { swing += 2 * .pi }
+                let distance = 2 * armLength * sin(max(0, swing) / 2)
+                dropAt[d] = progress(atNeedle: distance)
+            case .wave(let d):
+                dropAt[d] = waveProgress(p, on: d)
             case .pitch(let d):
                 var v = min(1, max(0, grab.startValue + Double((p.y - grab.start.y) / pitchTravel)))
                 if abs(v - 0.5) < 0.012 {
@@ -504,10 +629,31 @@ final class BoothScene: SKScene {
                 if !holds(.platter(d)) { decks[d].held = false }
             case .rim(let d):
                 if !holds(.rim(d)) && !sync[d] { decks[d].bend = 0 }
+            case .needle(let d), .wave(let d):
+                if !holds(.needle(d)) && !holds(.wave(d)) { dropNeedle(d) }
             default:
                 break
             }
         }
+    }
+
+    private func waveProgress(_ p: CGPoint, on d: Int) -> Double {
+        let rect = waveRect[d]
+        guard rect.width > 0 else { return 0 }
+        return Double(min(1, max(0, (p.x - rect.minX) / rect.width)))
+    }
+
+    /// The needle comes down where it was carried to. The record never stopped turning.
+    private func dropNeedle(_ d: Int) {
+        let deck = decks[d]
+        if let at = dropAt[d] {
+            // Not past the last groove; and at the very start, on the first beat.
+            let seconds = min(max(deck.grid.firstBeat, at * deck.duration), max(0, deck.duration - 0.25))
+            deck.seek(to: seconds)
+            tap.impactOccurred()
+        }
+        dropAt[d] = nil
+        deck.lifted = false
     }
 
     private func releaseAllHands() {
@@ -515,6 +661,9 @@ final class BoothScene: SKScene {
         for d in 0..<2 {
             decks[d].held = false
             if !sync[d] { decks[d].bend = 0 }
+            // A needle left in the air goes back where it was.
+            dropAt[d] = nil
+            decks[d].lifted = false
         }
     }
 
@@ -555,6 +704,9 @@ final class BoothScene: SKScene {
         demoStarted = true
         guard decks[0].isLoaded, decks[1].isLoaded else { return }
         sync[1] = true
+        // Needles some way into the records, so the strips show something.
+        decks[0].seek(to: decks[0].duration * 0.36)
+        decks[1].seek(to: decks[1].duration * 0.12)
         decks[0].motorOn = true
         decks[1].motorOn = true
     }
@@ -588,7 +740,7 @@ final class BoothScene: SKScene {
                 pitchFader[d] = 0.5 - p / (2 * Self.pitchRange)
                 if d < pitchNode.count { pitchNode[d].value = pitchFader[d] }
             }
-            if deck.motorOn && !deck.held && deck.rate > 0.5 && other.rate > 0.5 {
+            if deck.motorOn && !deck.held && !deck.lifted && deck.rate > 0.5 && other.rate > 0.5 {
                 let behind = MixMath.phaseOffset(other.beat, deck.beat)
                 deck.bend = max(-0.06, min(0.06, behind * 0.8))
             } else if deck.bend != 0 {
@@ -597,17 +749,42 @@ final class BoothScene: SKScene {
         }
     }
 
+    private func clock(_ seconds: Double) -> String {
+        let whole = Int(max(0, seconds))
+        return String(format: "%d:%02d", whole / 60, whole % 60)
+    }
+
     private func refresh(_ dt: Double) {
-        guard record.count == 2, meter.count == 2, beatDots.count == 2 else { return }
+        guard record.count == 2, meter.count == 2, beatDots.count == 2, wavePlayhead.count == 2, timeLabel.count == 2 else { return }
         var snapshots: [DeckSnapshot] = []
         let fade = MixMath.crossfade(cross)
         for d in 0..<2 {
             let deck = decks[d]
             let seconds = deck.seconds
             record[d].zRotation = CGFloat(-seconds * Self.turn)
-            // The needle rides from the outer groove to the label as the record plays.
-            let needle = platterRadius * CGFloat(0.93 - 0.5 * deck.progress)
+            // The needle rides from the outer groove to the label as the record plays; in the air
+            // it follows the hand.
+            let needle = platterRadius * CGFloat(0.93 - 0.5 * (dropAt[d] ?? deck.progress))
             arm[d].zRotation = armPivotAngle + 2 * asin(min(1, needle / (2 * armLength)))
+            arm[d].setScale(deck.lifted ? 1.05 : 1)
+
+            // The strip: played part darker, a line at the needle, the cue mark, and the landing spot.
+            let strip = waveRect[d]
+            let at = strip.minX + strip.width * CGFloat(deck.progress)
+            wavePlayhead[d].position.x = at
+            wavePlayed[d].size.width = max(0.5, at - strip.minX)
+            waveCue[d].position.x = strip.minX + strip.width * CGFloat(deck.duration > 0 ? deck.cuePoint / deck.duration : 0)
+            waveCue[d].isHidden = !deck.isLoaded
+            if let drop = dropAt[d] {
+                waveDrop[d].isHidden = false
+                waveDrop[d].position.x = strip.minX + strip.width * CGFloat(drop)
+                timeLabel[d].text = clock(drop * deck.duration)
+                timeLabel[d].fontColor = Palette.ink
+            } else {
+                waveDrop[d].isHidden = true
+                timeLabel[d].text = deck.isLoaded ? "-" + clock(max(0, deck.duration - seconds)) : ""
+                timeLabel[d].fontColor = Palette.dim
+            }
 
             let moving = abs(deck.rate) > 0.3
             let beatNow = deck.grid.beatInBar(at: seconds)
@@ -625,8 +802,9 @@ final class BoothScene: SKScene {
             syncButton[d].lit = sync[d]
             cueButton[d].lit = !deck.motorOn && abs(seconds - deck.cuePoint) < 0.02
 
+            let heardGain = deck.lifted ? 0 : MixMath.faderGain(channel[d]) * (d == 0 ? fade.a : fade.b)
             snapshots.append(DeckSnapshot(playing: moving,
-                                          gain: MixMath.faderGain(channel[d]) * (d == 0 ? fade.a : fade.b),
+                                          gain: heardGain,
                                           bpm: deck.bpm, beat: deck.beat, low: eq[d][0]))
         }
 

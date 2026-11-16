@@ -55,8 +55,9 @@ shot() { # name, seconds to wait, launch arguments...
 }
 shot title 6
 shot booth 9 -screen booth -demo 1
-shot story-nuno 7 -screen story -scene cold-open
-shot story-lia 7 -screen story -scene white-label
+shot story-nuno 5 -screen story -scene cold-open
+# Four seconds in, Lia is in the middle of her first line (a clip with her voice in it).
+shot story-lia 4 -screen story -scene white-label
 
 # What the app logged (audio engine, track loading), for reading next to the pictures.
 xcrun simctl spawn "$udid" log show --last 3m --style compact --info --debug \

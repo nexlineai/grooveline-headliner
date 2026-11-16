@@ -18,13 +18,11 @@ struct TitleView: View {
     var body: some View {
         VStack(spacing: 4) {
             Spacer()
-            Text("GROOVELINE")
-                .font(.system(size: 20, weight: .heavy))
-                .tracking(12)
-                .foregroundStyle(Color(Palette.teal))
+            GroovelineLogo(height: 30)
+                .padding(.bottom, 6)
             Text("HEADLINER")
-                .font(.system(size: 66, weight: .black))
-                .tracking(3)
+                .font(.custom("Orbitron-Black", size: 58))
+                .tracking(4)
                 .foregroundStyle(.white)
                 .shadow(color: Color(Palette.magenta).opacity(0.9), radius: 16)
             Text("From the bedroom to the main stage")

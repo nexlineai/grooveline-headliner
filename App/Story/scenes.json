@@ -4,7 +4,6 @@
     "shots": [
       {
         "art": "scene-backstage",
-        "clip": "scene-backstage",
         "lines": [
           { "who": "NUNO", "voice": "vo-cold-open-01", "text": "Sixty thousand people out there. They have been waiting for you all day." },
           { "who": "NUNO", "voice": "vo-cold-open-02", "text": "Your bag. I counted them twice. They're all there." },
@@ -25,9 +24,8 @@
     "shots": [
       {
         "art": "scene-shop-lia",
-        "clip": "scene-shop-lia",
         "lines": [
-          { "who": "LIA", "voice": "vo-white-label-01", "text": "You've been at that listening station for an hour. I close in ten minutes." },
+          { "who": "LIA", "clip": "white-label-01", "text": "You've been at that listening station for an hour. I close in ten minutes." },
           { "who": "LIA", "voice": "vo-white-label-02", "text": "So you mix. On a laptop. With the sync button. Mm." },
           { "who": "LIA", "voice": "vo-white-label-03", "text": "Sync is training wheels, kid. One day you take them off." },
           { "who": "LIA", "voice": "vo-white-label-04", "text": "Here. White label. No name, no artist, nothing." },

@@ -35,7 +35,11 @@ public final class Deck {
     /// Speed of the hand, in record speeds (1 = normal play, 0 = holding still, negative = pulling back).
     public var handRate: Double = 0 { didSet { apply() } }
     /// Channel fader and crossfader combined, 0...1.
-    public var volume: Double = 1 { didSet { shared.pointee.targetGain = Float(volume) } }
+    public var volume: Double = 1 { didSet { applyGain() } }
+    /// The needle is off the record (being carried to another spot): the platter keeps turning, no sound.
+    public var lifted = false { didSet { applyGain() } }
+    /// How loud the record is along its length, 0...1 per slice (for the strip above the platter).
+    public private(set) var overview: [Float] = []
     /// Where CUE returns to, in seconds.
     public var cuePoint: Double = 0
 
@@ -48,6 +52,10 @@ public final class Deck {
     deinit {
         shared.deinitialize(count: 1)
         shared.deallocate()
+    }
+
+    private func applyGain() {
+        shared.pointee.targetGain = lifted ? 0 : Float(volume)
     }
 
     private func apply() {
@@ -92,7 +100,9 @@ public final class Deck {
         let onset = Vinyl.firstOnset(left, count: min(frames, Int(fileRate * 2)))
         grid = BeatGrid(bpm: track.bpm, firstBeat: Double(onset) / fileRate)
         cuePoint = grid.firstBeat
+        overview = Vinyl.overview(left, count: frames, bins: 240)
         info = track
+        lifted = false
         pitch = 0; bend = 0
         shared.pointee.left = left
         shared.pointee.right = right
@@ -116,7 +126,7 @@ public final class Deck {
 
     /// Lifts the needle and drops it at `seconds`.
     public func seek(to seconds: Double) {
-        shared.pointee.seekTo = max(1, seconds * fileRate)
+        shared.pointee.seekTo = max(1, min(duration, seconds) * fileRate)
     }
 
     /// Loudest output sample since the last call (for the meters).

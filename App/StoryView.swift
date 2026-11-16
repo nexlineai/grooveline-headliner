@@ -30,7 +30,7 @@ struct StoryView: View {
         .onDisappear { player.stop() }
     }
 
-    /// The still picture, and on top of it the same picture in motion once the clip has a frame.
+    /// The still picture, and on top of it the clip of the line being spoken.
     private var backdrop: some View {
         Color.black
             .overlay {
@@ -40,7 +40,7 @@ struct StoryView: View {
             }
             .overlay {
                 if let video = player.video {
-                    LoopVideo(player: video)
+                    ClipView(player: video)
                 }
             }
             .clipped()
@@ -48,17 +48,10 @@ struct StoryView: View {
 
     private func caption(_ line: StoryLine) -> some View {
         VStack(alignment: .leading, spacing: 5) {
-            HStack {
-                Text(line.who)
-                    .font(.system(size: 12, weight: .heavy))
-                    .tracking(3)
-                    .foregroundStyle(Color(Palette.teal))
-                Spacer()
-                Text("TAP")
-                    .font(.system(size: 10, weight: .heavy))
-                    .tracking(2)
-                    .foregroundStyle(.white.opacity(player.speaking ? 0 : 0.6))
-            }
+            Text(line.who)
+                .font(.system(size: 12, weight: .heavy))
+                .tracking(3)
+                .foregroundStyle(Color(Palette.teal))
             Text(line.text)
                 .font(.system(size: 19, weight: .semibold))
                 .foregroundStyle(.white)
