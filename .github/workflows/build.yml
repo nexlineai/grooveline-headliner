@@ -1,0 +1,77 @@
+# Every push to main: package tests, an unsigned device IPA (artifact, 7 days) that iloader can
+# sign, and screenshots from the iOS Simulator pushed to the `shots` branch.
+# No secrets anywhere in this workflow. Never use pull_request_target.
+name: build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ios:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - run: xcodebuild -version
+      - name: Generate the Xcode project
+        run: brew install xcodegen && xcodegen generate
+      - name: Package tests
+        run: scripts/ci-test.sh
+      - name: Unsigned device build
+        run: scripts/ci-build-unsigned.sh
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: grooveline-headliner-unsigned-ipa
+          path: build/GroovelineHeadliner-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 7
+      # Raw logs need a token; annotations don't. On failure, surface the last log lines.
+      - name: Log tails
+        if: failure()
+        run: |
+          for f in build/*.log; do
+            [ -f "$f" ] || continue
+            tail -n 4 "$f" | sed -e 's/%/%25/g' -e "s#^#::error title=$(basename "$f")::#"
+          done
+
+  # The only job that may write, and only to the `shots` branch: pictures of each screen, so the
+  # game can be looked at from a machine that cannot run it.
+  shots:
+    runs-on: macos-26
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Generate the Xcode project
+        run: brew install xcodegen && xcodegen generate
+      - name: Simulator screenshots
+        run: scripts/ci-shots.sh
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+      - name: Push the pictures to the shots branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd build/shots
+          echo "run ${{ github.run_number }}, commit ${{ github.sha }}" > README.txt
+          git init -q -b shots
+          git add -A
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "shots: run ${{ github.run_number }} (${{ github.sha }})"
+          git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" shots
+      - name: Log tails
+        if: failure()
+        run: |
+          for f in build/*.log; do
+            [ -f "$f" ] || continue
+            tail -n 4 "$f" | sed -e 's/%/%25/g' -e "s#^#::error title=$(basename "$f")::#"
+          done

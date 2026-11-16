@@ -1,0 +1,28 @@
+[
+  {
+    "id": "saturday-job",
+    "title": "Saturday Job",
+    "artist": "Sol Poente",
+    "label": "Rua Baixa",
+    "genre": "Deep House",
+    "bpm": 122,
+    "key": "A minor",
+    "camelot": "8A",
+    "bars": 88,
+    "seconds": 173.13,
+    "file": "saturday-job.m4a"
+  },
+  {
+    "id": "low-tide",
+    "title": "Low Tide",
+    "artist": "Marea",
+    "label": "Cais Dub",
+    "genre": "Dub Techno",
+    "bpm": 124,
+    "key": "D minor",
+    "camelot": "7A",
+    "bars": 88,
+    "seconds": 170.34,
+    "file": "low-tide.m4a"
+  }
+]
