@@ -1,5 +1,6 @@
 import SpriteKit
 import SwiftUI
+import AVFoundation
 import HeadlinerCore
 import HeadlinerAudio
 
@@ -73,6 +74,10 @@ final class BoothScene: SKScene {
     private var phaseDot: SKShapeNode?
     private var roomGlow: SKSpriteNode?
     private var roomShade: SKSpriteNode?
+    private var roomVideo: SKVideoNode?
+    private var roomPlayer: AVQueuePlayer?
+    private var roomLooper: AVPlayerLooper?
+    private var roomMoving = false
     private var status: SKLabelNode?
 
     private var lastTime: TimeInterval = 0
@@ -111,7 +116,7 @@ final class BoothScene: SKScene {
         let W = size.width, H = size.height
         guard W > 200, H > 200 else { return }
         let left = max(insets.leading, 10), right = max(insets.trailing, 10), bottom = max(insets.bottom, 8)
-        let gearTop = H * 0.62
+        let gearTop = H * 0.58
         let gx0 = left, gy0 = bottom
         let gw = W - left - right, gh = gearTop - 6 - bottom
         let u = gh / 210
@@ -119,7 +124,7 @@ final class BoothScene: SKScene {
         let mixerW = min(gw * 0.31, 224 * u)
         let deckW = (gw - mixerW - gap * 2) / 2
 
-        buildRoom(CGRect(x: 0, y: gearTop, width: W, height: H - gearTop))
+        buildRoom(above: gearTop)
 
         let deckRects = [CGRect(x: gx0, y: gy0, width: deckW, height: gh),
                          CGRect(x: gx0 + deckW + gap + mixerW + gap, y: gy0, width: deckW, height: gh)]
@@ -134,19 +139,33 @@ final class BoothScene: SKScene {
         status = line
     }
 
-    private func buildRoom(_ rect: CGRect) {
+    /// The room is the DJ's view over the desk: a picture as wide as the screen, with the people in
+    /// its upper part. The gear covers the rest. A looping clip of the same picture plays on top of
+    /// the still while a record is heard.
+    private func buildRoom(above gearTop: CGFloat) {
+        let W = size.width, H = size.height
+        // Picture and clip are the same crop (1456 x 472). Lifted a little so heads and shoulders
+        // sit in the part the gear leaves free.
+        let pictureSize = CGSize(width: W, height: W * 472 / 1456)
+        let centre = CGPoint(x: W / 2, y: H + W * 0.026 - pictureSize.height / 2)
         if let image = Art.image("room-bedroom") {
-            let whole = SKTexture(image: image)
-            // Show the widest band of the picture that fills the strip; the faces sit a little above the middle.
-            let pictureAspect = image.size.width / image.size.height
-            let band = min(1, pictureAspect / (rect.width / rect.height))
-            let y = min(1 - band, max(0, 0.60 - band / 2))
-            let room = SKSpriteNode(texture: SKTexture(rect: CGRect(x: 0, y: y, width: 1, height: band), in: whole))
-            room.size = rect.size
-            room.position = CGPoint(x: rect.midX, y: rect.midY)
-            room.zPosition = -10
-            addChild(room)
+            let still = SKSpriteNode(texture: SKTexture(image: image))
+            still.size = pictureSize
+            still.position = centre
+            still.zPosition = -12
+            addChild(still)
         }
+        if let player = roomPlayer ?? makeRoomPlayer() {
+            let video = SKVideoNode(avPlayer: player)
+            video.size = pictureSize
+            video.position = centre
+            video.zPosition = -11
+            video.isHidden = !roomMoving // nothing to show until the clip has played once
+            addChild(video)
+            roomVideo = video
+        }
+
+        let rect = CGRect(x: 0, y: gearTop, width: W, height: H - gearTop)
         let shade = SKSpriteNode(color: .black, size: rect.size)
         shade.position = CGPoint(x: rect.midX, y: rect.midY)
         shade.alpha = 0.45
@@ -160,10 +179,25 @@ final class BoothScene: SKScene {
         glow.zPosition = -8
         addChild(glow)
         roomGlow = glow
-        let lip = SKSpriteNode(color: Palette.teal.withAlphaComponent(0.5), size: CGSize(width: rect.width, height: 1))
-        lip.position = CGPoint(x: rect.midX, y: rect.minY)
-        lip.zPosition = -7
+        // The desk the gear stands on hides the lower part of the picture.
+        let desk = SKSpriteNode(color: Palette.night, size: CGSize(width: W, height: gearTop))
+        desk.position = CGPoint(x: W / 2, y: gearTop / 2)
+        desk.zPosition = -7
+        addChild(desk)
+        let lip = SKSpriteNode(color: Palette.teal.withAlphaComponent(0.5), size: CGSize(width: W, height: 1))
+        lip.position = CGPoint(x: W / 2, y: gearTop)
+        lip.zPosition = -6
         addChild(lip)
+    }
+
+    private func makeRoomPlayer() -> AVQueuePlayer? {
+        guard let url = Bundle.main.url(forResource: "room-bedroom-dancing", withExtension: "mp4") else { return nil }
+        let player = AVQueuePlayer()
+        player.isMuted = true
+        player.preventsDisplaySleepDuringVideoPlayback = false
+        roomLooper = AVPlayerLooper(player: player, templateItem: AVPlayerItem(url: url))
+        roomPlayer = player
+        return player
     }
 
     private func buildDeck(_ d: Int, in rect: CGRect, unit u: CGFloat) {
@@ -623,7 +657,17 @@ final class BoothScene: SKScene {
         }
         if let glow = roomGlow {
             let phase = decks[lead].grid.phase(at: decks[lead].seconds)
-            glow.alpha = heard ? CGFloat(0.16 * exp(-phase * 5)) : 0
+            glow.alpha = heard ? CGFloat(0.12 * exp(-phase * 5)) : 0
+        }
+        // The friends dance while there is music and stop where they are when it goes quiet.
+        if heard != roomMoving {
+            roomMoving = heard
+            if heard {
+                roomVideo?.isHidden = false
+                roomPlayer?.play()
+            } else {
+                roomPlayer?.pause()
+            }
         }
 
         if let status {

@@ -55,9 +55,11 @@ shot() { # name, seconds to wait, launch arguments...
 }
 shot title 6
 shot booth 9 -screen booth -demo 1
+shot story-nuno 7 -screen story -scene cold-open
+shot story-lia 7 -screen story -scene white-label
 
 # What the app logged (audio engine, track loading), for reading next to the pictures.
-xcrun simctl spawn "$udid" log show --last 3m --style compact \
+xcrun simctl spawn "$udid" log show --last 3m --style compact --info --debug \
   --predicate 'subsystem == "org.grooveline.headliner"' 2>/dev/null | tail -n 60 > build/shots/log.txt || true
 xcrun simctl shutdown "$udid" || true
 # Landscape apps come out sideways on a portrait simulator; turn them upright.

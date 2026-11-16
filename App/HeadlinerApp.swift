@@ -24,6 +24,13 @@ struct RootView: View {
             switch game.screen {
             case .title: TitleView()
             case .booth: BoothView()
+            case .story(let id):
+                if let scene = game.scene(id) {
+                    StoryView(scene: scene) { game.next() }
+                        .id(id)
+                } else {
+                    Color.black.onAppear { game.next() }
+                }
             }
         }
     }

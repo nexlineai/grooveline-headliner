@@ -22,4 +22,7 @@ enum Art {
         guard let url = Bundle.main.url(forResource: name, withExtension: "jpg") else { return nil }
         return UIImage(contentsOfFile: url.path)
     }
+
+    /// A story picture (`App/Story/<name>.jpg`); same lookup, the bundle is flat.
+    static func storyImage(_ name: String) -> UIImage? { image(name) }
 }

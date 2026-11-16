@@ -1,18 +1,22 @@
 import Foundation
 import SwiftUI
 import os
+import AVFoundation
 import HeadlinerCore
 import HeadlinerAudio
 
 let gameLog = Logger(subsystem: "org.grooveline.headliner", category: "game")
 
-/// App-wide state: which screen is up, the deck engine and the crate.
+/// App-wide state: which screen is up, what comes after it, the deck engine, the crate and the story.
 final class Game: ObservableObject {
-    enum Screen { case title, booth }
+    enum Screen: Equatable { case title, story(String), booth }
 
     @Published var screen: Screen = .title
     let engine = DeckEngine()
     private(set) var tracks: [TrackInfo] = []
+    private(set) var scenes: [StoryScene] = []
+    /// Screens still to come; when one ends the next is shown, and after the last the title.
+    private var queue: [Screen] = []
     /// The screenshot run starts the app with `-demo 1`: the decks start by themselves.
     let demo: Bool
 
@@ -24,8 +28,19 @@ final class Game: ObservableObject {
            let list = try? JSONDecoder().decode([TrackInfo].self, from: data) {
             tracks = list
         }
-        gameLog.info("crate: \(self.tracks.count, privacy: .public) records")
-        if defaults.string(forKey: "screen") == "booth" { openBooth() }
+        if let url = Bundle.main.url(forResource: "scenes", withExtension: "json"),
+           let data = try? Data(contentsOf: url),
+           let list = try? JSONDecoder().decode([StoryScene].self, from: data) {
+            scenes = list
+        }
+        // Voices and music must sound with the ring switch on silent, like any game with headphones on.
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [])
+        gameLog.info("crate: \(self.tracks.count, privacy: .public) records, story: \(self.scenes.count, privacy: .public) scenes")
+        switch defaults.string(forKey: "screen") ?? "" {
+        case "booth": openBooth()
+        case "story": screen = .story(defaults.string(forKey: "scene") ?? "cold-open")
+        default: break
+        }
     }
 
     var build: String {
@@ -47,7 +62,25 @@ final class Game: ObservableObject {
 
     func closeBooth() {
         for deck in engine.decks { deck.motorOn = false }
-        screen = .title
+        next()
+    }
+
+    func scene(_ id: String) -> StoryScene? { scenes.first { $0.id == id } }
+
+    /// Shows these screens one after the other, then the title.
+    func run(_ screens: [Screen]) {
+        queue = screens
+        next()
+    }
+
+    /// The current screen is over.
+    func next() {
+        guard !queue.isEmpty else {
+            screen = .title
+            return
+        }
+        let upcoming = queue.removeFirst()
+        if upcoming == .booth { openBooth() } else { screen = upcoming }
     }
 
     func load(_ track: TrackInfo, on deck: Deck) {

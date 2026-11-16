@@ -3,6 +3,18 @@ import SwiftUI
 struct TitleView: View {
     @EnvironmentObject var game: Game
 
+    private func small(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 11, weight: .heavy))
+                .tracking(2)
+                .foregroundStyle(.white.opacity(0.85))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Capsule().stroke(.white.opacity(0.4), lineWidth: 1))
+        }
+    }
+
     var body: some View {
         VStack(spacing: 4) {
             Spacer()
@@ -19,18 +31,23 @@ struct TitleView: View {
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(.white.opacity(0.75))
             Button {
-                game.openBooth()
+                game.run([.story("cold-open"), .booth, .story("nine-years")])
             } label: {
-                Text("STEP UP TO THE DECKS")
-                    .font(.system(size: 16, weight: .heavy))
-                    .tracking(2)
+                Text("PLAY")
+                    .font(.system(size: 17, weight: .heavy))
+                    .tracking(6)
                     .foregroundStyle(.black)
-                    .padding(.horizontal, 30)
+                    .padding(.horizontal, 54)
                     .padding(.vertical, 13)
                     .background(Capsule().fill(Color(Palette.teal)))
             }
             .padding(.top, 16)
-            Text("Deck test · build \(game.build)")
+            HStack(spacing: 12) {
+                small("DECKS ONLY") { game.run([.booth]) }
+                small("SCENE: THE WHITE LABEL") { game.run([.story("white-label")]) }
+            }
+            .padding(.top, 10)
+            Text("Test build \(game.build)")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.white.opacity(0.45))
                 .padding(.top, 8)
