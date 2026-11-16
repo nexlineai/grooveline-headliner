@@ -36,7 +36,7 @@ final class StoryPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     var onEnd: () -> Void = {}
 
     /// The breath between two lines.
-    private static let pause = 0.35
+    private static let pause = 0.2
 
     private var items: [Int: AVPlayerItem] = [:] // line number in the shot -> its clip
     private var voice: AVAudioPlayer?
