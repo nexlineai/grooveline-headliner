@@ -24,5 +24,57 @@
     "bars": 88,
     "seconds": 170.34,
     "file": "low-tide.m4a"
+  },
+  {
+    "id": "bairro-lights",
+    "title": "Bairro Lights",
+    "artist": "Dona Lua",
+    "label": "Rua Baixa",
+    "genre": "Soulful House",
+    "bpm": 120,
+    "key": "C minor",
+    "camelot": "5A",
+    "bars": 88,
+    "seconds": 176.02,
+    "file": "bairro-lights.m4a"
+  },
+  {
+    "id": "miradouro",
+    "title": "Miradouro",
+    "artist": "Os Sete Colinas",
+    "label": "Fita Dourada",
+    "genre": "Disco House",
+    "bpm": 118,
+    "key": "E minor",
+    "camelot": "9A",
+    "bars": 88,
+    "seconds": 179,
+    "file": "miradouro.m4a"
+  },
+  {
+    "id": "night-bus",
+    "title": "Night Bus",
+    "artist": "Tejo Line",
+    "label": "Cais Dub",
+    "genre": "Tech House",
+    "bpm": 126,
+    "key": "F minor",
+    "camelot": "4A",
+    "bars": 88,
+    "seconds": 167.64,
+    "file": "night-bus.m4a"
+  },
+  {
+    "id": "foundry",
+    "title": "Foundry",
+    "artist": "Kiln",
+    "label": "Betão",
+    "genre": "Techno",
+    "bpm": 128,
+    "key": "G minor",
+    "camelot": "6A",
+    "bars": 128,
+    "seconds": 240.02,
+    "file": "foundry.m4a"
   }
 ]

@@ -7,8 +7,12 @@ api=https://api.github.com/repos/$repo
 run=${1:-$(curl -s "$api/actions/runs?per_page=1" | python3 -c 'import sys,json; print(json.load(sys.stdin)["workflow_runs"][0]["id"])')}
 while :; do
   state=$(curl -s "$api/actions/runs/$run" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("status"), d.get("conclusion"))')
-  case "$state" in completed*) break;; esac
-  sleep 30
+  case "$state" in
+    completed*) break;;
+    queued*|in_progress*|waiting*|pending*|requested*) ;;
+    *) echo "no answer from the GitHub API (60 calls an hour without a token; wait, or look at the shots branch): $state"; exit 2;;
+  esac
+  sleep 60
 done
 echo "run $run: $state"
 curl -s "$api/actions/runs/$run/jobs" | python3 -c '

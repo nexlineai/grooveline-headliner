@@ -51,6 +51,8 @@ Design, story, decisions and the build log are in the vault:
   is fed `BoothFacts` by `BoothScene.teach` every frame; `LessonOverlay` shows task and words over
   the room. The coach is a voice-over (Zé's choice), never on camera; music ducks while he talks.
   Voice files in `App/Lessons/` made with `tools/voice/say.sh` (Tó = `helios`).
+- Crate (`CrateView.swift`, free play only): lists `tracks.json`, loads a record on the left or
+  right deck (not onto a turning deck, one copy per record). `BoothScene.recordChanged(on:)` redraws.
 - The Grooveline name is always the site's mark: `GroovelineLogo` (bars + Orbitron Bold, teal
   `#00d4c8`). Fonts in `App/Fonts/` (Orbitron, OFL).
 - Turntable conventions Zé asked for in the Record Store apply here too: pitch fader up = slower,

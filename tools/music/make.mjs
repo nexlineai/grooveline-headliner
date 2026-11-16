@@ -44,6 +44,51 @@ const TRACKS = [
              delayBeats: 0.75, delayFb: 0.62, delayWet: 0.5, reverb: 0.38,
              pad: 0.1, openHat: 0.3, closedHat: 0.2, clap: 0.26, bassCut: 300, hiss: 0.012 },
   },
+  {
+    id: 'bairro-lights', title: 'Bairro Lights', artist: 'Dona Lua', label: 'Rua Baixa',
+    genre: 'Soulful House', bpm: 120, root: 48, key: 'C minor', camelot: '5A', seed: 41, swing: 0.16,
+    chords: [[0, 3, 7, 10, 14], [-4, 0, 3, 7, 10], [5, 8, 12, 15], [-5, -1, 2, 5]],
+    chordRhythm: [0.9, 0, 0, 0, 0, 0, 0.6, 0, 0, 0.7, 0, 0, 0, 0, 0.5, 0],
+    bass: [0, null, null, 12, null, null, 0, null, null, 7, null, null, 0, null, 10, null],
+    bassOct: -12,
+    style: { chordCut: 2900, chordFloor: 350, chordQ: 1.4, chordDecay: 0.28, sweep: 0.2,
+             delayBeats: 0.75, delayFb: 0.3, delayWet: 0.25, reverb: 0.28,
+             pad: 0.2, openHat: 0.38, closedHat: 0.24, clap: 0.4, bassCut: 460, hiss: 0 },
+  },
+  {
+    id: 'miradouro', title: 'Miradouro', artist: 'Os Sete Colinas', label: 'Fita Dourada',
+    genre: 'Disco House', bpm: 118, root: 52, key: 'E minor', camelot: '9A', seed: 67, swing: 0.08,
+    chords: [[0, 3, 7, 10], [-4, 0, 3, 7], [3, 7, 10, 14], [-2, 2, 5, 7]],
+    chordRhythm: [0, 0, 0.8, 0, 0, 0, 0.7, 0, 0, 0, 0.8, 0, 0, 0, 0.7, 0.4],
+    bass: [0, null, 12, null, 0, null, 12, null, 0, null, 12, null, 0, null, 12, 10],
+    bassOct: -12,
+    style: { chordCut: 3400, chordFloor: 500, chordQ: 1.3, chordDecay: 0.16, sweep: 0.15,
+             delayBeats: 0.75, delayFb: 0.25, delayWet: 0.18, reverb: 0.2,
+             pad: 0.18, openHat: 0.45, closedHat: 0.22, clap: 0.46, bassCut: 600, hiss: 0 },
+  },
+  {
+    id: 'night-bus', title: 'Night Bus', artist: 'Tejo Line', label: 'Cais Dub',
+    genre: 'Tech House', bpm: 126, root: 53, key: 'F minor', camelot: '4A', seed: 37, swing: 0.1,
+    chords: [[0, 3, 7, 10], [0, 3, 7, 10], [5, 8, 12, 15], [3, 7, 10, 14]],
+    chordRhythm: [0, 0, 0.8, 0, 0, 0.6, 0, 0, 0.8, 0, 0, 0.6, 0, 0, 0.7, 0],
+    bass: [0, null, 0, null, null, 0, null, 12, 0, null, 0, null, null, 7, null, 10],
+    bassOct: -12,
+    style: { chordCut: 3200, chordFloor: 400, chordQ: 2.0, chordDecay: 0.12, sweep: 0.3,
+             delayBeats: 0.5, delayFb: 0.3, delayWet: 0.2, reverb: 0.15,
+             pad: 0.08, openHat: 0.42, closedHat: 0.3, clap: 0.45, bassCut: 520, hiss: 0 },
+  },
+  {
+    id: 'foundry', title: 'Foundry', artist: 'Kiln', label: 'Betão',
+    genre: 'Techno', bpm: 128, root: 55, key: 'G minor', camelot: '6A', seed: 53, swing: 0.02,
+    chords: [[0, 7, 10, 15]],
+    chordRhythm: [0, 0, 0, 0, 0, 0, 0.9, 0, 0, 0, 0, 0, 0, 0.6, 0, 0],
+    bass: [null, 0, 0, 0, null, 0, 0, 0, null, 0, 0, 0, null, 0, 0, 12],
+    bassOct: -24,
+    arrangement: 'long',
+    style: { chordCut: 1400, chordFloor: 200, chordQ: 3.0, chordDecay: 0.4, sweep: 0.7,
+             delayBeats: 0.75, delayFb: 0.55, delayWet: 0.45, reverb: 0.42,
+             pad: 0.06, openHat: 0.36, closedHat: 0.3, clap: 0.2, bassCut: 260, hiss: 0.01 },
+  },
 ];
 
 // Bars per section and what plays in it. Every section but the last ends with a one-bar
@@ -57,6 +102,17 @@ const ARRANGEMENT = [
   { name: 'full 2', bars: 16, on: ['kick', 'hat', 'ohat', 'clap', 'bass', 'chord', 'pad'] },
   { name: 'outro', bars: 8, on: ['kick', 'hat', 'ohat', 'clap', 'bass'] },
   { name: 'outro 2', bars: 8, on: ['kick', 'hat'] },
+];
+// A DJ tool: sixteen bars of drums at each end to mix in and out of, and a longer breakdown.
+const ARRANGEMENT_LONG = [
+  { name: 'intro', bars: 16, on: ['kick', 'hat'] },
+  { name: 'intro 2', bars: 16, on: ['kick', 'hat', 'ohat', 'clap', 'bass'] },
+  { name: 'groove', bars: 16, on: ['kick', 'hat', 'ohat', 'clap', 'bass', 'chord'] },
+  { name: 'full', bars: 16, on: ['kick', 'hat', 'ohat', 'clap', 'bass', 'chord', 'pad'] },
+  { name: 'break', bars: 16, on: ['hat', 'chord', 'pad'] },
+  { name: 'full 2', bars: 16, on: ['kick', 'hat', 'ohat', 'clap', 'bass', 'chord', 'pad'] },
+  { name: 'outro', bars: 16, on: ['kick', 'hat', 'ohat', 'clap', 'bass'] },
+  { name: 'outro 2', bars: 16, on: ['kick', 'hat'] },
 ];
 
 // ---------- small DSP kit ----------
@@ -247,17 +303,18 @@ function reverb(b, wet, room = 0.86, damp = 0.35) {
 function render(tr) {
   const rnd = rng(tr.seed), st = tr.style;
   const beat = 60 / tr.bpm, step = beat / 4, barLen = beat * 4;
-  const bars = ARRANGEMENT.reduce((a, s) => a + s.bars, 0);
+  const sections = tr.arrangement === 'long' ? ARRANGEMENT_LONG : ARRANGEMENT;
+  const bars = sections.reduce((a, s) => a + s.bars, 0);
   const N = Math.ceil((bars * barLen + 0.02) * SR); // the last sound stops with the last bar
   const drums = bus(N), low = bus(N), keys = bus(N), air = bus(N);
   const duck = new Float32Array(N).fill(1);
   const at = (bar, s) => Math.round(((bar * 16 + s) * step + (s % 2 ? tr.swing * step : 0)) * SR);
 
   let bar = 0;
-  ARRANGEMENT.forEach((sec, si) => {
+  sections.forEach((sec, si) => {
     const has = (x) => sec.on.includes(x);
     for (let k = 0; k < sec.bars; k++, bar++) {
-      const fill = k === sec.bars - 1 && si < ARRANGEMENT.length - 1;
+      const fill = k === sec.bars - 1 && si < sections.length - 1;
       const chord = tr.chords[bar % tr.chords.length];
       const open = 1 - st.sweep * (0.5 + 0.5 * Math.cos(2 * Math.PI * bar / 16)); // the filter breathes every 16 bars
       for (let s = 0; s < 16; s++) {

@@ -116,6 +116,15 @@ final class BoothScene: SKScene {
         applyMix()
     }
 
+    /// A new record was put on deck `d`: its pitch fader goes back to the middle and the deck is
+    /// drawn again (title, strip).
+    func recordChanged(on d: Int) {
+        guard d >= 0, d < 2 else { return }
+        pitchFader[d] = 0.5
+        dropAt[d] = nil
+        needsBuild = true
+    }
+
     /// A lesson starts from a known desk: both records at their first beat and stopped, the
     /// crossfader on the left record, everything else in the middle, SYNC on for the right deck.
     private func setTheDeskForALesson() {
