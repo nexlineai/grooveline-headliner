@@ -30,7 +30,7 @@ struct PhonesView: View {
                 HStack(spacing: 8) {
                     mode("OFF", "The room on both sides.", on: game.phonesMode == 0) { game.phonesMode = 0 }
                     mode("SPLIT  L / R", "Left: the room. Right: your headphones.", on: game.phonesMode == 1) { game.phonesMode = 1 }
-                    mode("2 OUTPUTS", "Speaker: the room. Adapter: your headphones.", on: game.phonesMode == 2) { game.phonesMode = 2 }
+                    mode("2 OUTPUTS", "Speaker: the room. Bluetooth: your headphones.", on: game.phonesMode == 2) { game.phonesMode = 2 }
                 }
                 HStack(spacing: 10) {
                     Text("CUE")
@@ -44,7 +44,7 @@ struct PhonesView: View {
                 }
                 .opacity(game.phonesMode != 0 ? 1 : 0.35)
                 .disabled(game.phonesMode == 0)
-                Text("Press PHONES on a mixer channel to hear that record in your headphones before the room does. SPLIT works with any headphones (room in one ear, the next record in the other) or with a splitter cable. 2 OUTPUTS needs wired headphones or a sound card plugged in: the phone's speaker plays the room.")
+                Text("Press PHONES on a mixer channel to hear that record in your headphones before the room does. SPLIT works with any headphones or sound card (room in one ear, the next record in the other), and with a splitter cable it feeds speakers and headphones. 2 OUTPUTS needs Bluetooth headphones, or a DJ sound card with four outputs: a plain wired adapter switches the phone's speaker off.")
                     .font(.system(size: 11.5, weight: .medium))
                     .foregroundStyle(.white.opacity(0.65))
                     .fixedSize(horizontal: false, vertical: true)

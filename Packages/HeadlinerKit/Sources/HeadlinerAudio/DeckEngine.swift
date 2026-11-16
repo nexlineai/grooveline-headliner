@@ -8,8 +8,9 @@ public enum PhonesMode: Int, Sendable {
     case off = 0
     /// One stereo output: the room in the left ear, the headphones in the right.
     case split = 1
-    /// Two outputs at once: the room on the phone's speaker, the headphones on a plugged-in
-    /// sound card or adapter.
+    /// Two outputs at once: the room on the phone's speaker and the headphones on Bluetooth
+    /// headphones, or both on a sound card with four outputs. (With a plain wired adapter the
+    /// iPhone turns its own speaker off, so that pairing does not exist.)
     case twoOutputs = 2
 }
 
@@ -93,7 +94,16 @@ public final class DeckEngine {
             var wantTwo = phones == .twoOutputs
             #if os(iOS)
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(wantTwo ? .multiRoute : .playback, mode: .default, options: [])
+            if wantTwo {
+                // Bluetooth headphones only join a multi-output session when asked for.
+                do {
+                    try session.setCategory(.multiRoute, mode: .default, options: [.allowBluetoothA2DP])
+                } catch {
+                    try session.setCategory(.multiRoute, mode: .default, options: [])
+                }
+            } else {
+                try session.setCategory(.playback, mode: .default, options: [])
+            }
             try session.setPreferredIOBufferDuration(0.005)
             try session.setActive(true)
             bufferSeconds = session.ioBufferDuration
@@ -111,7 +121,7 @@ public final class DeckEngine {
             if wantTwo {
                 plan = Self.planTwoOutputs(channels: Int(hardware.channelCount))
                 if plan == nil {
-                    twoOutputsNote = "No second output found. Plug in headphones or a sound card. Playing the room only (\(outputs))."
+                    twoOutputsNote = Self.whyNotTwo()
                     #if os(iOS)
                     // Back to the ordinary single output.
                     try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [])
@@ -192,6 +202,11 @@ public final class DeckEngine {
     private static func planTwoOutputs(channels: Int) -> OutputPlan? {
         #if os(iOS)
         let ports = AVAudioSession.sharedInstance().currentRoute.outputs
+        // A DJ sound card: one device with four outputs. Speakers on 1-2, headphones on 3-4.
+        if ports.count == 1, (ports[0].channels?.count ?? 0) >= 4, channels >= 4 {
+            return OutputPlan(channels: channels, room: 0, roomWidth: 2, phones: 2, phonesWidth: 2,
+                              note: "ROOM: outputs 1-2  ·  PHONES: outputs 3-4 of \(ports[0].portName)")
+        }
         guard ports.count >= 2 else { return nil }
         var first: [Int] = [], width: [Int] = []
         var at = 0
@@ -201,8 +216,8 @@ public final class DeckEngine {
             at += n
         }
         guard at <= channels else { return nil }
-        let wired: [AVAudioSession.Port] = [.headphones, .usbAudio, .lineOut]
-        let phonesAt = ports.firstIndex { wired.contains($0.portType) } ?? 1
+        let worn: [AVAudioSession.Port] = [.bluetoothA2DP, .bluetoothLE, .bluetoothHFP, .headphones, .usbAudio, .lineOut]
+        let phonesAt = ports.firstIndex { worn.contains($0.portType) } ?? 1
         let roomAt = ports.firstIndex { $0.portType == .builtInSpeaker } ?? (phonesAt == 0 ? 1 : 0)
         guard roomAt != phonesAt else { return nil }
         return OutputPlan(channels: channels,
@@ -211,6 +226,27 @@ public final class DeckEngine {
                           note: "ROOM: \(ports[roomAt].portName)  ·  PHONES: \(ports[phonesAt].portName)")
         #else
         return nil
+        #endif
+    }
+
+    /// Why there are not two outputs right now, in words for the headphone panel.
+    private static func whyNotTwo() -> String {
+        #if os(iOS)
+        let ports = AVAudioSession.sharedInstance().currentRoute.outputs
+        let names = ports.map { $0.portName }.joined(separator: " + ")
+        guard let only = ports.first, ports.count == 1 else {
+            return "No second output found. Playing the room only (\(names.isEmpty ? "no output" : names))."
+        }
+        switch only.portType {
+        case .builtInSpeaker, .builtInReceiver:
+            return "Only the phone's speaker is there. Connect Bluetooth headphones (or a DJ sound card with four outputs), then choose 2 OUTPUTS again."
+        case .bluetoothA2DP, .bluetoothLE, .bluetoothHFP:
+            return "The iPhone sends everything to \(only.portName) and turns its speaker off, so there is one output. Use SPLIT."
+        default:
+            return "With \(only.portName) plugged in the iPhone turns its own speaker off, so there is one output. Use SPLIT with it, or try Bluetooth headphones for 2 OUTPUTS."
+        }
+        #else
+        return "No second output on this machine."
         #endif
     }
 
