@@ -43,12 +43,11 @@ Design, story, decisions and the build log are in the vault:
   source node that calls `Mixer.render`; restarts itself when the output changes, e.g. headphones
   plugged in). No system audio units: what the tests check is what the phone plays.
 - Headphones (`PhonesView`, `Game.phonesMode` / `cueMix`, PHONES buttons on the mixer), as in the
-  Record Store: OFF, SPLIT L/R, or 2 OUTPUTS. `DeckEngine.phones = .twoOutputs` switches the audio
-  session to `.multiRoute`, connects the source node straight to the output node in the
-  hardware's own multi-channel format and writes the room to the speaker's channels and the
-  headphone bus to the plugged-in output's channels (`planTwoOutputs`); with one output it falls
-  back to the room only and says so (`twoOutputsNote`). Only a real phone with an adapter can
-  test this; the simulator always takes the fallback.
+  Record Store: OFF or SPLIT L/R. A third mode, SOUND CARD, shows only when a device with four or
+  more outputs is connected (room on 1-2, headphones on 3-4; written, never run on real hardware).
+  Do NOT try again to play the phone's speaker next to a wired adapter or Bluetooth headphones:
+  Zé tested both on his iPhone (16 Nov 2026, `.multiRoute`), iOS sends everything to the added
+  output. Bluetooth is also a fifth of a second late.
 - `App/`: SwiftUI shell (`Game`, `TitleView`, `BoothView`) and the SpriteKit booth
   (`BoothScene` holds settings and touch handling, `BoothNodes` draws the gear).
 - Moving through a record: pick up the headshell and carry it (`Kind.needle`), or touch the strip

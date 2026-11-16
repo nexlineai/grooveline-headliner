@@ -8,10 +8,10 @@ public enum PhonesMode: Int, Sendable {
     case off = 0
     /// One stereo output: the room in the left ear, the headphones in the right.
     case split = 1
-    /// Two outputs at once: the room on the phone's speaker and the headphones on Bluetooth
-    /// headphones, or both on a sound card with four outputs. (With a plain wired adapter the
-    /// iPhone turns its own speaker off, so that pairing does not exist.)
-    case twoOutputs = 2
+    /// A sound card with four outputs: the room on outputs 1-2, the headphones on 3-4, both in
+    /// stereo. (The iPhone cannot play its own speaker next to a plugged-in adapter or Bluetooth
+    /// headphones: tried on Zé's phone, 16 Nov 2026. It sends everything to the one that was added.)
+    case soundCard = 2
 }
 
 /// Two decks and the mixer. All of the sound is made by `Mixer.render` in one source node, so
@@ -35,9 +35,9 @@ public final class DeckEngine {
     public private(set) var sampleRate: Double = 0
     /// Seconds of audio per hardware buffer (0 when unknown): the floor of the touch-to-sound delay.
     public private(set) var bufferSeconds: Double = 0
-    /// With `.twoOutputs`: which output carries what ("ROOM: Speaker · PHONES: USB Audio"), or
-    /// why it is not happening. Empty in the other modes.
-    public private(set) var twoOutputsNote = ""
+    /// With `.soundCard`: which outputs carry what, or that no such card is connected. Empty in
+    /// the other modes.
+    public private(set) var soundCardNote = ""
 
     public init() {
         mixer = UnsafeMutablePointer<MixerShared>.allocate(capacity: 1)
@@ -65,14 +65,14 @@ public final class DeckEngine {
         set { mixer.pointee.master = max(0, min(1, newValue)) }
     }
 
-    /// How the headphones are fed. Changing to or from `.twoOutputs` rebuilds the sound output
+    /// How the headphones are fed. Changing to or from `.soundCard` rebuilds the sound output
     /// (a short gap in the music).
     public var phones: PhonesMode = .off {
         didSet {
             mixer.pointee.split = phones == .split
-            let rebuild = (phones == .twoOutputs) != (oldValue == .twoOutputs)
+            if phones != .soundCard { soundCardNote = "" }
+            let rebuild = (phones == .soundCard) != (oldValue == .soundCard)
             if rebuild && running { restart() }
-            if phones != .twoOutputs { twoOutputsNote = "" }
         }
     }
 
@@ -91,24 +91,16 @@ public final class DeckEngine {
             engine.stop()
             engine = AVAudioEngine()
 
-            var wantTwo = phones == .twoOutputs
+            let wantCard = phones == .soundCard
             #if os(iOS)
             let session = AVAudioSession.sharedInstance()
-            if wantTwo {
-                // Bluetooth headphones only join a multi-output session when asked for.
-                do {
-                    try session.setCategory(.multiRoute, mode: .default, options: [.allowBluetoothA2DP])
-                } catch {
-                    try session.setCategory(.multiRoute, mode: .default, options: [])
-                }
-            } else {
-                try session.setCategory(.playback, mode: .default, options: [])
-            }
+            try session.setCategory(.playback, mode: .default, options: [])
             try session.setPreferredIOBufferDuration(0.005)
+            // Four channels when a sound card offers them and they are wanted, otherwise plain stereo.
+            let most = session.maximumOutputNumberOfChannels
+            try? session.setPreferredOutputNumberOfChannels(wantCard && most >= 4 ? 4 : min(2, max(1, most)))
             try session.setActive(true)
             bufferSeconds = session.ioBufferDuration
-            #else
-            wantTwo = false
             #endif
 
             let hardware = engine.outputNode.outputFormat(forBus: 0)
@@ -117,30 +109,15 @@ public final class DeckEngine {
             mixer.pointee.sampleRate = rate
             for deck in decks { deck.outputRate = rate }
 
-            var plan: OutputPlan?
-            if wantTwo {
-                plan = Self.planTwoOutputs(channels: Int(hardware.channelCount))
-                if plan == nil {
-                    twoOutputsNote = Self.whyNotTwo()
-                    #if os(iOS)
-                    // Back to the ordinary single output.
-                    try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [])
-                    try AVAudioSession.sharedInstance().setActive(true)
-                    engine = AVAudioEngine()
-                    #endif
-                }
-            }
-
-            if let plan {
-                // Straight to the hardware, one channel per socket channel, in the phone's own format.
-                let format = engine.outputNode.outputFormat(forBus: 0)
-                let node = makeNode(format: format, plan: plan)
+            if wantCard && hardware.channelCount >= 4 {
+                // Straight to the hardware in its own format: room on channels 1-2, headphones on 3-4.
+                let node = makeNode(format: hardware, plan: OutputPlan(room: 0, roomWidth: 2, phones: 2, phonesWidth: 2))
                 engine.attach(node)
-                engine.connect(node, to: engine.outputNode, format: format)
-                twoOutputsNote = plan.note
+                engine.connect(node, to: engine.outputNode, format: hardware)
+                soundCardNote = "ROOM: outputs 1-2  ·  PHONES: outputs 3-4 (\(outputs))"
             } else {
-                let now = engine.outputNode.outputFormat(forBus: 0).sampleRate
-                guard let format = AVAudioFormat(standardFormatWithSampleRate: now > 0 ? now : rate, channels: 2) else {
+                if wantCard { soundCardNote = "No sound card with four outputs is connected. Playing the room only." }
+                guard let format = AVAudioFormat(standardFormatWithSampleRate: rate, channels: 2) else {
                     throw DeckError.cannotAllocate
                 }
                 let node = makeNode(format: format, plan: nil)
@@ -188,66 +165,19 @@ public final class DeckEngine {
         #endif
     }
 
+    /// A sound card with four or more outputs is connected (so the sound-card mode can be offered).
+    public var soundCardConnected: Bool {
+        #if os(iOS)
+        return AVAudioSession.sharedInstance().maximumOutputNumberOfChannels >= 4
+        #else
+        return false
+        #endif
+    }
+
     /// Which hardware channels carry the room and which the headphones.
     struct OutputPlan {
-        var channels: Int
         var room: Int, roomWidth: Int
         var phones: Int, phonesWidth: Int
-        var note: String
-    }
-
-    /// With several outputs active, the hardware channels are the outputs' channels one after
-    /// the other. The room goes to the phone's own speaker (or the first output), the headphones
-    /// to a plugged-in output (or the other one).
-    private static func planTwoOutputs(channels: Int) -> OutputPlan? {
-        #if os(iOS)
-        let ports = AVAudioSession.sharedInstance().currentRoute.outputs
-        // A DJ sound card: one device with four outputs. Speakers on 1-2, headphones on 3-4.
-        if ports.count == 1, (ports[0].channels?.count ?? 0) >= 4, channels >= 4 {
-            return OutputPlan(channels: channels, room: 0, roomWidth: 2, phones: 2, phonesWidth: 2,
-                              note: "ROOM: outputs 1-2  ·  PHONES: outputs 3-4 of \(ports[0].portName)")
-        }
-        guard ports.count >= 2 else { return nil }
-        var first: [Int] = [], width: [Int] = []
-        var at = 0
-        for port in ports {
-            let n = max(1, port.channels?.count ?? 0)
-            first.append(at); width.append(n)
-            at += n
-        }
-        guard at <= channels else { return nil }
-        let worn: [AVAudioSession.Port] = [.bluetoothA2DP, .bluetoothLE, .bluetoothHFP, .headphones, .usbAudio, .lineOut]
-        let phonesAt = ports.firstIndex { worn.contains($0.portType) } ?? 1
-        let roomAt = ports.firstIndex { $0.portType == .builtInSpeaker } ?? (phonesAt == 0 ? 1 : 0)
-        guard roomAt != phonesAt else { return nil }
-        return OutputPlan(channels: channels,
-                          room: first[roomAt], roomWidth: min(2, width[roomAt]),
-                          phones: first[phonesAt], phonesWidth: min(2, width[phonesAt]),
-                          note: "ROOM: \(ports[roomAt].portName)  ·  PHONES: \(ports[phonesAt].portName)")
-        #else
-        return nil
-        #endif
-    }
-
-    /// Why there are not two outputs right now, in words for the headphone panel.
-    private static func whyNotTwo() -> String {
-        #if os(iOS)
-        let ports = AVAudioSession.sharedInstance().currentRoute.outputs
-        let names = ports.map { $0.portName }.joined(separator: " + ")
-        guard let only = ports.first, ports.count == 1 else {
-            return "No second output found. Playing the room only (\(names.isEmpty ? "no output" : names))."
-        }
-        switch only.portType {
-        case .builtInSpeaker, .builtInReceiver:
-            return "Only the phone's speaker is there. Connect Bluetooth headphones (or a DJ sound card with four outputs), then choose 2 OUTPUTS again."
-        case .bluetoothA2DP, .bluetoothLE, .bluetoothHFP:
-            return "The iPhone sends everything to \(only.portName) and turns its speaker off, so there is one output. Use SPLIT."
-        default:
-            return "With \(only.portName) plugged in the iPhone turns its own speaker off, so there is one output. Use SPLIT with it, or try Bluetooth headphones for 2 OUTPUTS."
-        }
-        #else
-        return "No second output on this machine."
-        #endif
     }
 
     private func makeNode(format: AVAudioFormat, plan: OutputPlan?) -> AVAudioSourceNode {

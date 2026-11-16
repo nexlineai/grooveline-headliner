@@ -128,14 +128,15 @@ final class BoothScene: SKScene {
         needsBuild = true
     }
 
-    /// A lesson starts from a known desk: both records at their first beat and stopped, the
-    /// crossfader on the left record, everything else in the middle, SYNC on for the right deck.
+    /// A lesson starts from a known desk: both records at their first beat and stopped, pitch
+    /// and EQ in the middle, and the crossfader, channel faders and SYNC as the lesson wants them.
     private func setTheDeskForALesson() {
-        cross = 0
-        channel = [0.85, 0.85]
+        let desk = lesson?.lesson.desk ?? LessonDesk()
+        cross = desk.crossfader
+        channel = desk.channel
         pitchFader = [0.5, 0.5]
         eq = [[0.5, 0.5, 0.5], [0.5, 0.5, 0.5]]
-        sync = [false, true]
+        sync = desk.sync
         phones = [false, false]
         for d in 0..<2 {
             let deck = decks[d]
@@ -763,10 +764,15 @@ final class BoothScene: SKScene {
             lessonReady = true
             lesson.begin()
         }
+        // In a lesson a record that runs out starts again, so nobody gets stuck waiting.
+        for deck in decks where deck.motorOn && deck.progress > 0.985 {
+            deck.seek(to: deck.grid.firstBeat)
+        }
         lesson.update(BoothFacts(motorOn: decks.map { $0.motorOn },
                                  turning: decks.map { $0.rate > 0.5 },
                                  beat: decks.map { $0.beat },
-                                 cross: cross))
+                                 cross: cross,
+                                 channel: channel))
         let wanted: Float = lesson.speaking ? 0.5 : 1
         let now = game.engine.masterVolume
         if abs(wanted - now) > 0.002 {
@@ -796,6 +802,7 @@ final class BoothScene: SKScene {
         case .play(let d): return .play(d)
         case .cue(let d): return .cue(d)
         case .crossfader: return .cross
+        case .channel(let d): return .channel(d)
         }
     }
 

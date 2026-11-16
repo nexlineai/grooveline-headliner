@@ -56,8 +56,9 @@ shot() { # name, seconds to wait, launch arguments...
 shot title 6
 shot booth 9 -screen booth -demo 1
 shot lesson 6 -screen lesson
+shot lesson2 6 -screen lesson -lesson on-the-phrase
 shot crate 6 -screen booth -crate 1
-shot phones 6 -screen booth -phones 1 -phonesMode 2 -demo 1
+shot phones 6 -screen booth -phones 1 -phonesMode 1 -demo 1
 shot story-nuno 5 -screen story -scene cold-open
 # Four seconds in, Lia is in the middle of her first line (a clip with her voice in it).
 shot story-lia 4 -screen story -scene white-label

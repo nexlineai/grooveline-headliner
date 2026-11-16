@@ -8,7 +8,7 @@ import UIKit
 
 /// The control a step points at.
 enum LessonTarget: Equatable {
-    case play(Int), cue(Int), crossfader
+    case play(Int), cue(Int), crossfader, channel(Int)
 }
 
 /// What has to happen before the lesson moves on.
@@ -19,6 +19,13 @@ enum LessonGoal: Equatable {
     case bars(Int)
     /// `deck` is started so that its bars begin with the bars of `against`.
     case startOnTheOne(deck: Int, against: Int)
+    /// Deck A plays on into its next phrase (eight bars).
+    case nextPhrase
+    /// `deck` is started so that its phrases (eight bars) begin with the phrases of `against`.
+    case startOnThePhrase(deck: Int, against: Int)
+    /// The deck's channel fader is in this part of its travel (0 = down, 1 = up). With
+    /// `onThePhrase`, the result card says whether it got there near a phrase change.
+    case channelFader(Int, ClosedRange<Double>, onThePhrase: Bool)
     /// The crossfader is in this part of its travel (0 = left, 1 = right).
     case crossfader(ClosedRange<Double>)
     /// The deck's motor is off.
@@ -41,18 +48,60 @@ struct LessonStep {
     var missTarget: LessonTarget?
 }
 
+/// How the desk is set when a lesson starts (both records stopped on their first beat).
+struct LessonDesk {
+    var crossfader = 0.0
+    var channel = [0.85, 0.85]
+    var sync = [false, true]
+}
+
 struct Lesson {
     var id: String
     var number: Int
     var title: String
     var coach: String
+    var desk = LessonDesk()
     var steps: [LessonStep]
 }
 
 enum Lessons {
     static func find(_ id: String) -> Lesson? { all.first { $0.id == id } }
 
-    static let all: [Lesson] = [firstMix]
+    static let all: [Lesson] = [firstMix, onThePhrase]
+
+    /// Beats in a phrase: eight bars. Every section of our records is a multiple of that, and the
+    /// last bar before a new section has a rising noise and no kick on its last beat.
+    static let phrase = 32.0
+
+    /// Lesson 2, still in the bedroom: a record has to come in where a phrase starts, and it is
+    /// brought in and taken out with the channel faders. SYNC still holds the tempo.
+    static let onThePhrase = Lesson(id: "on-the-phrase", number: 2, title: "ON THE PHRASE", coach: "TÓ",
+                                    desk: LessonDesk(crossfader: 0.5, channel: [0.85, 0], sync: [false, true]), steps: [
+        LessonStep(voice: "phrase-01",
+                   text: "Round two. Same room, same six people, and now they expect something. Start the left deck.",
+                   task: "PRESS PLAY ON THE LEFT DECK", goal: .startDeck(0), target: .play(0)),
+        LessonStep(voice: "phrase-02",
+                   text: "Listen. Bars come in blocks of eight. That's a phrase. At the end of one you hear a little whoosh, and the kick drops out for a beat. That's the record telling you something new is coming.",
+                   task: "LISTEN FOR THE END OF THE PHRASE", goal: .nextPhrase, target: nil),
+        LessonStep(voice: "phrase-03",
+                   text: "The next record has to start where a phrase starts, or the two will change at different times, and it sounds like an argument. The right fader is down, so nobody hears it yet. Press play on the right deck, on the first beat of a new phrase.",
+                   task: "PRESS PLAY ON THE RIGHT DECK, ON A NEW PHRASE", goal: .startOnThePhrase(deck: 1, against: 0), target: .play(1),
+                   missVoice: "phrase-03-miss",
+                   missText: "Close, but that was the middle of a phrase. Press cue on the right deck, and wait for the whoosh.",
+                   missTask: "PRESS CUE ON THE RIGHT DECK, THEN TRY AGAIN", missTarget: .cue(1)),
+        LessonStep(voice: "phrase-04",
+                   text: "That's it! Now they change together. Bring it in. Push the right channel fader up, slowly.",
+                   task: "RIGHT CHANNEL FADER UP", goal: .channelFader(1, 0.8...1, onThePhrase: false), target: .channel(1)),
+        LessonStep(voice: "phrase-05",
+                   text: "Both records, same phrase. Now wait for the next whoosh, and pull the left fader all the way down.",
+                   task: "LEFT CHANNEL FADER DOWN, AT THE NEXT PHRASE", goal: .channelFader(0, 0...0.04, onThePhrase: true), target: .channel(0)),
+        LessonStep(voice: "phrase-06",
+                   text: "Clean. Stop the left deck.",
+                   task: "STOP THE LEFT DECK", goal: .stopDeck(0), target: .play(0)),
+        LessonStep(voice: "phrase-07",
+                   text: "That was a real mix. On the phrase. Mira just looked up from her phone. That never happens.",
+                   task: "ON THE PHRASE", goal: .listen, target: nil),
+    ])
 
     /// Lesson 1, in the bedroom with Tó: start a record, hear the bar, bring the second record in
     /// on the one, crossfade. SYNC holds the tempo; that comes off in the record shop.
@@ -98,6 +147,8 @@ struct BoothFacts {
     /// Needle position in beats on each record's own grid.
     var beat: [Double]
     var cross: Double
+    /// Channel faders, 0 = down, 1 = up.
+    var channel: [Double]
 }
 
 /// Walks through a lesson. The booth scene feeds it `BoothFacts` every frame; the overlay shows
@@ -121,6 +172,9 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private var missed = false
     private var misses = 0
     private var oneError = 0.0
+    private var startJudged = false
+    /// Whether the record was taken out near a phrase change (nil when the lesson does not ask).
+    private var outOnThePhrase: Bool?
     private var startBeat: Double?
     private var wasOn = [false, false]
     private var armed = false
@@ -203,7 +257,32 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
                     if text != progress { progress = text }
                     if gone >= Double(n) { met() }
                 }
-            case .startOnTheOne(let deck, let against):
+            case .nextPhrase:
+                if facts.turning[0] {
+                    let from = startBeat ?? facts.beat[0]
+                    startBeat = from
+                    showBar(facts.beat[0])
+                    // Over when the needle crosses into a phrase that began after this step did.
+                    if (facts.beat[0] / Lessons.phrase).rounded(.down) > (from / Lessons.phrase).rounded(.down) { met() }
+                }
+            case .channelFader(let d, let range, let onThePhrase):
+                if onThePhrase { showBar(facts.beat[1 - d]) }
+                if range.contains(facts.channel[d]) {
+                    if onThePhrase {
+                        // Within a bar of a phrase change on the record that stays?
+                        var into = facts.beat[1 - d].truncatingRemainder(dividingBy: Lessons.phrase)
+                        if into < 0 { into += Lessons.phrase }
+                        outOnThePhrase = min(into, Lessons.phrase - into) <= 4
+                    }
+                    met()
+                }
+            case .startOnTheOne(let deck, let against), .startOnThePhrase(let deck, let against):
+                // The records have to line up bar on bar, or phrase on phrase.
+                var span = 4.0
+                if case .startOnThePhrase = step.goal {
+                    span = Lessons.phrase
+                    if !missed { showBar(facts.beat[against]) }
+                }
                 if fresh && facts.motorOn[deck] {
                     // Already running when the step began: it has to be stopped first.
                     missed = true
@@ -221,11 +300,12 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
                 if armed && facts.turning[deck] && facts.turning[against] {
                     // Up to speed: where do its bars fall against the other record's bars?
                     armed = false
-                    var apart = (facts.beat[against] - facts.beat[deck]).truncatingRemainder(dividingBy: 4)
-                    if apart < 0 { apart += 4 }
-                    let error = min(apart, 4 - apart)
+                    var apart = (facts.beat[against] - facts.beat[deck]).truncatingRemainder(dividingBy: span)
+                    if apart < 0 { apart += span }
+                    let error = min(apart, span - apart)
                     if error <= 0.4 {
                         oneError = error
+                        startJudged = true
                         met()
                     } else {
                         misses += 1
@@ -255,9 +335,18 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
         }
     }
 
+    /// Where the needle is in its phrase, for the task chip: "BAR 7 OF 8".
+    private func showBar(_ beat: Double) {
+        var into = beat.truncatingRemainder(dividingBy: Lessons.phrase)
+        if into < 0 { into += Lessons.phrase }
+        let text = "BAR \(Int(into / 4) + 1) OF 8"
+        if text != progress { progress = text }
+    }
+
     private func finish() {
-        // Stars for the one thing that took skill: how close to the one, and on which try.
-        let earned: Int
+        // Stars for what took skill: how close the start was and on which try, and, where the
+        // lesson asks for it, taking the old record out at a phrase change.
+        var earned: Int
         if misses == 0 && oneError <= 0.15 {
             earned = 3
         } else if misses <= 1 && oneError <= 0.3 {
@@ -265,15 +354,23 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
         } else {
             earned = 1
         }
+        if outOnThePhrase == false { earned = min(earned, 2) }
         target = nil
         stars = earned
     }
 
-    /// One line about how the start on the one went, for the result card.
+    /// One line about how it went, for the result card.
     var verdict: String {
-        let tries = misses == 0 ? "first try" : (misses == 1 ? "second try" : "try \(misses + 1)")
-        let how = oneError <= 0.15 ? "Right on the one" : (oneError <= 0.3 ? "Close to the one" : "Near the one")
-        return "\(how), \(tries)"
+        var parts: [String] = []
+        if startJudged {
+            let tries = misses == 0 ? "first try" : (misses == 1 ? "second try" : "try \(misses + 1)")
+            let how = oneError <= 0.15 ? "Right on it" : (oneError <= 0.3 ? "Close" : "Near enough")
+            parts.append("Start: \(how.lowercased()), \(tries)")
+        }
+        if let out = outOnThePhrase {
+            parts.append(out ? "Out: on the phrase" : "Out: in the middle of a phrase")
+        }
+        return parts.joined(separator: "   ·   ")
     }
 }
 

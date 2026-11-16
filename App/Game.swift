@@ -20,7 +20,7 @@ final class Game: ObservableObject {
     /// The screenshot run starts the app with `-demo 1`: the decks start by themselves.
     let demo: Bool
     /// Headphones: 0 off (the room on both sides), 1 split (room left, headphones right),
-    /// 2 two outputs (room on the speaker, headphones on a plugged-in output).
+    /// 2 a four-output sound card (room on 1-2, headphones on 3-4).
     @Published var phonesMode: Int {
         didSet {
             engine.phones = PhonesMode(rawValue: phonesMode) ?? .off

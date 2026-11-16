@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// Headphone settings: off, split (the room in the left ear, the cued record in the right), or
-/// two outputs (the room on the phone's speaker, the headphones on a plugged-in sound card);
-/// how much of the room is mixed into the headphones, and where the sound is going.
+/// Headphone settings: off, or split (the room in the left ear, the cued record in the right);
+/// with a four-output sound card connected, a third choice puts the room on outputs 1-2 and the
+/// headphones on 3-4. Also how much of the room is mixed into the headphones.
 struct PhonesView: View {
     @EnvironmentObject var game: Game
     let onClose: () -> Void
@@ -30,7 +30,9 @@ struct PhonesView: View {
                 HStack(spacing: 8) {
                     mode("OFF", "The room on both sides.", on: game.phonesMode == 0) { game.phonesMode = 0 }
                     mode("SPLIT  L / R", "Left: the room. Right: your headphones.", on: game.phonesMode == 1) { game.phonesMode = 1 }
-                    mode("2 OUTPUTS", "Speaker: the room. Bluetooth: your headphones.", on: game.phonesMode == 2) { game.phonesMode = 2 }
+                    if game.engine.soundCardConnected || game.phonesMode == 2 {
+                        mode("SOUND CARD", "Outputs 1-2: the room. 3-4: your headphones.", on: game.phonesMode == 2) { game.phonesMode = 2 }
+                    }
                 }
                 HStack(spacing: 10) {
                     Text("CUE")
@@ -44,15 +46,15 @@ struct PhonesView: View {
                 }
                 .opacity(game.phonesMode != 0 ? 1 : 0.35)
                 .disabled(game.phonesMode == 0)
-                Text("Press PHONES on a mixer channel to hear that record in your headphones before the room does. SPLIT works with any headphones or sound card (room in one ear, the next record in the other), and with a splitter cable it feeds speakers and headphones. 2 OUTPUTS needs Bluetooth headphones, or a DJ sound card with four outputs: a plain wired adapter switches the phone's speaker off.")
+                Text("Press PHONES on a mixer channel to hear that record in your headphones before the room does. SPLIT works with any wired headphones or adapter: the room in one ear, the next record in the other. With a splitter cable the left side feeds speakers and the right side your headphones. Wired is the way: Bluetooth headphones are a fifth of a second late.")
                     .font(.system(size: 11.5, weight: .medium))
                     .foregroundStyle(.white.opacity(0.65))
                     .fixedSize(horizontal: false, vertical: true)
                 VStack(alignment: .leading, spacing: 3) {
                     Text("SOUND GOES TO: \(game.engine.outputs)")
                         .foregroundStyle(.white.opacity(0.5))
-                    if !game.engine.twoOutputsNote.isEmpty {
-                        Text(game.engine.twoOutputsNote)
+                    if !game.engine.soundCardNote.isEmpty {
+                        Text(game.engine.soundCardNote)
                             .foregroundStyle(Color(Palette.orange))
                     }
                     if let problem = game.engine.lastError {
