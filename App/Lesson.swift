@@ -9,6 +9,8 @@ import UIKit
 /// The control a step points at.
 enum LessonTarget: Equatable {
     case play(Int), cue(Int), crossfader, channel(Int)
+    /// An EQ knob: deck, band (0 low, 1 mid, 2 high).
+    case eq(Int, Int)
 }
 
 /// What has to happen before the lesson moves on.
@@ -28,6 +30,11 @@ enum LessonGoal: Equatable {
     case channelFader(Int, ClosedRange<Double>, onThePhrase: Bool)
     /// The crossfader is in this part of its travel (0 = left, 1 = right).
     case crossfader(ClosedRange<Double>)
+    /// An EQ knob of `deck` is in this part of its travel (0 = killed, 0.5 = flat, 1 = boosted).
+    case eq(deck: Int, band: Int, ClosedRange<Double>)
+    /// The bass swap: the low of `from` is down and the low of `to` is back in the middle.
+    /// The result card says whether that happened near a phrase change.
+    case bassSwap(from: Int, to: Int)
     /// The deck's motor is off.
     case stopDeck(Int)
     /// Nothing to do: the step ends with the coach's line.
@@ -67,7 +74,46 @@ struct Lesson {
 enum Lessons {
     static func find(_ id: String) -> Lesson? { all.first { $0.id == id } }
 
-    static let all: [Lesson] = [firstMix, onThePhrase]
+    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap]
+
+    /// Lesson 3: the three EQ knobs, and why the new record comes in without its bass and takes
+    /// the bass over at a phrase change.
+    static let bassSwap = Lesson(id: "bass-swap", number: 3, title: "THE BASS SWAP", coach: "TÓ",
+                                 desk: LessonDesk(crossfader: 0.5, channel: [0.85, 0], sync: [false, true]), steps: [
+        LessonStep(voice: "bass-01",
+                   text: "Lesson three. The three knobs next to each fader. Start the left deck, and I'll show you.",
+                   task: "PRESS PLAY ON THE LEFT DECK", goal: .startDeck(0), target: .play(0)),
+        LessonStep(voice: "bass-02",
+                   text: "Low is the kick and the bassline. Mid is the body. High is the hats. Now drag the left low knob all the way down.",
+                   task: "LEFT LOW KNOB ALL THE WAY DOWN", goal: .eq(deck: 0, band: 0, 0...0.05), target: .eq(0, 0)),
+        LessonStep(voice: "bass-03",
+                   text: "Hear that? The floor just fell out. Put it back in the middle.",
+                   task: "LEFT LOW KNOB BACK TO THE MIDDLE", goal: .eq(deck: 0, band: 0, 0.47...0.53), target: .eq(0, 0)),
+        LessonStep(voice: "bass-04",
+                   text: "Here's the thing. Two basslines at the same time is mud. So the next record comes in without its bass. Turn the right low knob all the way down.",
+                   task: "RIGHT LOW KNOB ALL THE WAY DOWN", goal: .eq(deck: 1, band: 0, 0...0.05), target: .eq(1, 0)),
+        LessonStep(voice: "bass-05",
+                   text: "Good. Now start the right deck on a new phrase, like last time.",
+                   task: "PRESS PLAY ON THE RIGHT DECK, ON A NEW PHRASE", goal: .startOnThePhrase(deck: 1, against: 0), target: .play(1),
+                   missVoice: "phrase-03-miss",
+                   missText: "Close, but that was the middle of a phrase. Press cue on the right deck, and wait for the whoosh.",
+                   missTask: "PRESS CUE ON THE RIGHT DECK, THEN TRY AGAIN", missTarget: .cue(1)),
+        LessonStep(voice: "bass-06",
+                   text: "Fader up. Hear how it slides in on top? No fight.",
+                   task: "RIGHT CHANNEL FADER UP", goal: .channelFader(1, 0.8...1, onThePhrase: false), target: .channel(1)),
+        LessonStep(voice: "bass-07",
+                   text: "Now the swap. When the phrase changes: left low down, right low back to the middle. Two hands, one move.",
+                   task: "AT THE NEXT PHRASE: LEFT LOW DOWN, RIGHT LOW TO THE MIDDLE", goal: .bassSwap(from: 0, to: 1), target: .eq(0, 0)),
+        LessonStep(voice: "bass-08",
+                   text: "Yes! That is the bass swap. Now pull the left fader all the way down.",
+                   task: "LEFT CHANNEL FADER DOWN", goal: .channelFader(0, 0...0.04, onThePhrase: false), target: .channel(0)),
+        LessonStep(voice: "first-mix-08",
+                   text: "And stop the left deck.",
+                   task: "STOP THE LEFT DECK", goal: .stopDeck(0), target: .play(0)),
+        LessonStep(voice: "bass-09",
+                   text: "Clean. Every DJ you love does that all night long. And Sara is still dancing, which is the whole point.",
+                   task: "THE BASS SWAP", goal: .listen, target: nil),
+    ])
 
     /// Beats in a phrase: eight bars. Every section of our records is a multiple of that, and the
     /// last bar before a new section has a rising noise and no kick on its last beat.
@@ -149,6 +195,8 @@ struct BoothFacts {
     var cross: Double
     /// Channel faders, 0 = down, 1 = up.
     var channel: [Double]
+    /// EQ knobs per deck: low, mid, high; 0.5 is flat.
+    var eq: [[Double]]
 }
 
 /// Walks through a lesson. The booth scene feeds it `BoothFacts` every frame; the overlay shows
@@ -175,6 +223,8 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private var startJudged = false
     /// Whether the record was taken out near a phrase change (nil when the lesson does not ask).
     private var outOnThePhrase: Bool?
+    /// What that move was, for the result card ("Out" or "Swap").
+    private var phraseMove = "Out"
     private var startBeat: Double?
     private var wasOn = [false, false]
     private var armed = false
@@ -264,6 +314,18 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
                     showBar(facts.beat[0])
                     // Over when the needle crosses into a phrase that began after this step did.
                     if (facts.beat[0] / Lessons.phrase).rounded(.down) > (from / Lessons.phrase).rounded(.down) { met() }
+                }
+            case .eq(let d, let band, let range):
+                if range.contains(facts.eq[d][band]) { met() }
+            case .bassSwap(let from, let to):
+                showBar(facts.beat[to])
+                if facts.eq[from][0] <= 0.1 && (0.45...0.56).contains(facts.eq[to][0]) {
+                    // Within a bar of a phrase change?
+                    var into = facts.beat[to].truncatingRemainder(dividingBy: Lessons.phrase)
+                    if into < 0 { into += Lessons.phrase }
+                    outOnThePhrase = min(into, Lessons.phrase - into) <= 4
+                    phraseMove = "Swap"
+                    met()
                 }
             case .channelFader(let d, let range, let onThePhrase):
                 if onThePhrase { showBar(facts.beat[1 - d]) }
@@ -368,7 +430,7 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
             parts.append("Start: \(how.lowercased()), \(tries)")
         }
         if let out = outOnThePhrase {
-            parts.append(out ? "Out: on the phrase" : "Out: in the middle of a phrase")
+            parts.append(out ? "\(phraseMove): on the phrase" : "\(phraseMove): in the middle of a phrase")
         }
         return parts.joined(separator: "   ·   ")
     }

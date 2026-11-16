@@ -10,7 +10,7 @@ import HeadlinerAudio
 final class BoothScene: SKScene {
     private enum Kind: Equatable {
         case platter(Int), rim(Int), pitch(Int), channel(Int), cross, eq(Int, Int), play(Int), cue(Int), sync(Int)
-        case needle(Int), wave(Int), phones(Int)
+        case needle(Int), wave(Int), phones(Int), cueMix
     }
 
     private struct Grab {
@@ -79,6 +79,7 @@ final class BoothScene: SKScene {
     private var cueButton: [ButtonNode] = []
     private var syncButton: [ButtonNode] = []
     private var phonesButton: [ButtonNode] = []
+    private var cueMixKnob: KnobNode?
     private var meter: [MeterNode] = []
     private var meterLevel = [0.0, 0.0]
     private var bpmLabel: [SKLabelNode] = []
@@ -492,6 +493,16 @@ final class BoothScene: SKScene {
             meter.append(lights)
         }
 
+        // Cue mix, between the two PHONES buttons: left = only the cued record in the headphones,
+        // right = only the room.
+        let mixKnob = KnobNode(radius: 9 * u, tint: Palette.orange, title: "")
+        mixKnob.position = CGPoint(x: rect.midX, y: rect.minY + 49 * u)
+        mixKnob.value = game.cueMix
+        mixKnob.zPosition = 4
+        addChild(mixKnob)
+        cueMixKnob = mixKnob
+        hits.insert((Kind.cueMix, centred(rect.midX, mixKnob.position.y, 30 * u, 26 * u)), at: 0)
+
         // Crossfader.
         crossTravel = min(112 * u, rect.width * 0.55)
         let fader = FaderNode(travel: crossTravel, vertical: false, cap: CGSize(width: 14 * u, height: 24 * u), tint: Palette.teal, centreMark: true)
@@ -555,6 +566,7 @@ final class BoothScene: SKScene {
         case .channel(let d): return channel[d]
         case .cross: return cross
         case .eq(let d, let band): return eq[d][band]
+        case .cueMix: return game.cueMix
         default: return 0
         }
     }
@@ -660,6 +672,9 @@ final class BoothScene: SKScene {
                 cross = min(1, max(0, grab.startValue + Double((p.x - grab.start.x) / crossTravel)))
                 crossNode?.value = cross
                 applyMix()
+            case .cueMix:
+                game.cueMix = min(1, max(0, grab.startValue + Double((p.y - grab.start.y) / knobTravel)))
+                cueMixKnob?.value = game.cueMix
             case .eq(let d, let band):
                 var v = min(1, max(0, grab.startValue + Double((p.y - grab.start.y) / knobTravel)))
                 if abs(v - 0.5) < 0.03 { v = 0.5 }
@@ -772,7 +787,8 @@ final class BoothScene: SKScene {
                                  turning: decks.map { $0.rate > 0.5 },
                                  beat: decks.map { $0.beat },
                                  cross: cross,
-                                 channel: channel))
+                                 channel: channel,
+                                 eq: eq))
         let wanted: Float = lesson.speaking ? 0.5 : 1
         let now = game.engine.masterVolume
         if abs(wanted - now) > 0.002 {
@@ -803,6 +819,7 @@ final class BoothScene: SKScene {
         case .cue(let d): return .cue(d)
         case .crossfader: return .cross
         case .channel(let d): return .channel(d)
+        case .eq(let d, let band): return .eq(d, band)
         }
     }
 
@@ -908,6 +925,8 @@ final class BoothScene: SKScene {
             playButton[d].lit = deck.motorOn
             syncButton[d].lit = sync[d]
             if d < phonesButton.count { phonesButton[d].lit = phones[d] }
+            // The knob follows the slider in the headphone panel.
+            if let knob = cueMixKnob, knob.value != game.cueMix { knob.value = game.cueMix }
             cueButton[d].lit = !deck.motorOn && abs(seconds - deck.cuePoint) < 0.02
 
             let heardGain = deck.lifted ? 0 : MixMath.faderGain(channel[d]) * (d == 0 ? fade.a : fade.b)

@@ -57,6 +57,7 @@ shot title 6
 shot booth 9 -screen booth -demo 1
 shot lesson 6 -screen lesson
 shot lesson2 6 -screen lesson -lesson on-the-phrase
+shot lesson3 6 -screen lesson -lesson bass-swap
 shot crate 6 -screen booth -crate 1
 shot phones 6 -screen booth -phones 1 -phonesMode 1 -demo 1
 shot story-nuno 5 -screen story -scene cold-open
