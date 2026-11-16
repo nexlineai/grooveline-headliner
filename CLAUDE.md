@@ -27,7 +27,7 @@ Design, story, decisions and the build log are in the vault:
     then `.../check-runs/<id>/annotations`.
 - `project.yml` -> `xcodegen generate` -> `GroovelineHeadliner.xcodeproj` (gitignored).
 - iOS 26.0, iPhone only, landscape only, Swift 5 language mode.
-- Launch arguments for screenshots: `-screen booth`, `-demo 1`. Add one per new screen and a
+- Launch arguments for screenshots: `-screen booth`, `-demo 1`, `-screen lesson`, `-screen story -scene <id>`. Add one per new screen and a
   `shot` line in `scripts/ci-shots.sh`.
 
 ## Architecture
@@ -46,6 +46,11 @@ Design, story, decisions and the build log are in the vault:
   and lips are made together by the video model, so they match) or a `voice` (m4a over the still
   picture, no mouth movement). Never pair a separate voice file with a "talking" loop: Zé saw
   that on the phone and the lips were wrong.
+- Lessons (`Lesson.swift`): a `Lesson` is a list of `LessonStep`s (coach's voice line + text, a
+  task in a few words, a `LessonGoal` the decks must show, a control to point at). `LessonRunner`
+  is fed `BoothFacts` by `BoothScene.teach` every frame; `LessonOverlay` shows task and words over
+  the room. The coach is a voice-over (Zé's choice), never on camera; music ducks while he talks.
+  Voice files in `App/Lessons/` made with `tools/voice/say.sh` (Tó = `helios`).
 - The Grooveline name is always the site's mark: `GroovelineLogo` (bars + Orbitron Bold, teal
   `#00d4c8`). Fonts in `App/Fonts/` (Orbitron, OFL).
 - Turntable conventions Zé asked for in the Record Store apply here too: pitch fader up = slower,

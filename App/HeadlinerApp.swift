@@ -23,7 +23,8 @@ struct RootView: View {
             Color.black.ignoresSafeArea()
             switch game.screen {
             case .title: TitleView()
-            case .booth: BoothView()
+            case .booth: BoothView(lessonID: nil)
+            case .lesson(let id): BoothView(lessonID: id).id(id)
             case .story(let id):
                 if let scene = game.scene(id) {
                     StoryView(scene: scene) { game.next() }

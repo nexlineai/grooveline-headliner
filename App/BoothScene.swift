@@ -29,6 +29,11 @@ final class BoothScene: SKScene {
     private var decks: [Deck] { game.engine.decks }
 
     var insets = EdgeInsets() { didSet { if insets != oldValue { needsBuild = true } } }
+    /// The lesson being taught here, if any. It reads the decks every frame and says what to point at.
+    var lesson: LessonRunner?
+    private var pointer: SKShapeNode?
+    private var pointedAt: LessonTarget?
+    private var lessonReady = false
 
     // Settings.
     private var pitchFader = [0.5, 0.5]      // 1 = top = slower, as on a turntable
@@ -107,7 +112,28 @@ final class BoothScene: SKScene {
 
     override func didMove(to view: SKView) {
         view.isMultipleTouchEnabled = true
+        if lesson != nil { setTheDeskForALesson() }
         applyMix()
+    }
+
+    /// A lesson starts from a known desk: both records at their first beat and stopped, the
+    /// crossfader on the left record, everything else in the middle, SYNC on for the right deck.
+    private func setTheDeskForALesson() {
+        cross = 0
+        channel = [0.85, 0.85]
+        pitchFader = [0.5, 0.5]
+        eq = [[0.5, 0.5, 0.5], [0.5, 0.5, 0.5]]
+        sync = [false, true]
+        for d in 0..<2 {
+            let deck = decks[d]
+            deck.motorOn = false
+            deck.pitch = 0
+            deck.bend = 0
+            deck.cuePoint = deck.grid.firstBeat
+            deck.seek(to: deck.cuePoint)
+            for band in 0..<3 { deck.setEQ(band: band, value: 0.5) }
+        }
+        needsBuild = true
     }
 
     override func didChangeSize(_ oldSize: CGSize) {
@@ -118,6 +144,8 @@ final class BoothScene: SKScene {
 
     private func build() {
         removeAllChildren()
+        pointer = nil
+        pointedAt = nil
         releaseAllHands()
         hits = []
         record = []; arm = []; pitchNode = []; channelNode = []; knob = []
@@ -693,10 +721,55 @@ final class BoothScene: SKScene {
         }
         let dt = lastTime > 0 ? min(0.05, max(0.001, currentTime - lastTime)) : 1.0 / 60
         lastTime = currentTime
-        if game.demo && !demoStarted { startDemo() }
+        if game.demo && !demoStarted && lesson == nil { startDemo() }
         moveHands(dt)
         runSync()
         refresh(dt)
+        teach(dt, at: currentTime)
+    }
+
+    /// Feeds the lesson what the decks are doing, points at the control it names, and turns the
+    /// music down a little while the coach talks.
+    private func teach(_ dt: Double, at time: TimeInterval) {
+        guard let lesson else { return }
+        if !lessonReady {
+            lessonReady = true
+            lesson.begin()
+        }
+        lesson.update(BoothFacts(motorOn: decks.map { $0.motorOn },
+                                 turning: decks.map { $0.rate > 0.5 },
+                                 beat: decks.map { $0.beat },
+                                 cross: cross))
+        let wanted: Float = lesson.speaking ? 0.5 : 1
+        let now = game.engine.masterVolume
+        if abs(wanted - now) > 0.002 {
+            game.engine.masterVolume = now + (wanted - now) * Float(min(1, dt * 6))
+        }
+
+        if lesson.target != pointedAt {
+            pointedAt = lesson.target
+            pointer?.removeFromParent()
+            pointer = nil
+            if let target = lesson.target, let hit = hits.first(where: { $0.kind == kind(for: target) }) {
+                let ring = SKShapeNode(rect: hit.rect.insetBy(dx: -2, dy: -2), cornerRadius: 9)
+                ring.strokeColor = Palette.orange
+                ring.fillColor = .clear
+                ring.lineWidth = 2.5
+                ring.glowWidth = 2
+                ring.zPosition = 30
+                addChild(ring)
+                pointer = ring
+            }
+        }
+        pointer?.alpha = CGFloat(0.55 + 0.45 * sin(time * 6))
+    }
+
+    private func kind(for target: LessonTarget) -> Kind {
+        switch target {
+        case .play(let d): return .play(d)
+        case .cue(let d): return .cue(d)
+        case .crossfader: return .cross
+        }
     }
 
     /// The screenshot run: both records turning, the second one pitched down to match.

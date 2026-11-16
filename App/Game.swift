@@ -9,7 +9,7 @@ let gameLog = Logger(subsystem: "org.grooveline.headliner", category: "game")
 
 /// App-wide state: which screen is up, what comes after it, the deck engine, the crate and the story.
 final class Game: ObservableObject {
-    enum Screen: Equatable { case title, story(String), booth }
+    enum Screen: Equatable { case title, story(String), booth, lesson(String) }
 
     @Published var screen: Screen = .title
     let engine = DeckEngine()
@@ -38,6 +38,7 @@ final class Game: ObservableObject {
         gameLog.info("crate: \(self.tracks.count, privacy: .public) records, story: \(self.scenes.count, privacy: .public) scenes")
         switch defaults.string(forKey: "screen") ?? "" {
         case "booth": openBooth()
+        case "lesson": openBooth(lesson: defaults.string(forKey: "lesson") ?? "first-mix")
         case "story": screen = .story(defaults.string(forKey: "scene") ?? "cold-open")
         default: break
         }
@@ -47,7 +48,8 @@ final class Game: ObservableObject {
         (Bundle.main.infoDictionary?["CFBundleVersion"] as? String) ?? "?"
     }
 
-    func openBooth() {
+    /// Opens the booth: free play, or a lesson when one is named.
+    func openBooth(lesson: String? = nil) {
         engine.start()
         if let error = engine.lastError {
             gameLog.error("audio engine did not start: \(error, privacy: .public)")
@@ -57,11 +59,12 @@ final class Game: ObservableObject {
         for (deck, track) in zip(engine.decks, tracks) where !deck.isLoaded {
             load(track, on: deck)
         }
-        screen = .booth
+        screen = lesson.map { Screen.lesson($0) } ?? Screen.booth
     }
 
     func closeBooth() {
         for deck in engine.decks { deck.motorOn = false }
+        engine.masterVolume = 1
         next()
     }
 
@@ -79,8 +82,11 @@ final class Game: ObservableObject {
             screen = .title
             return
         }
-        let upcoming = queue.removeFirst()
-        if upcoming == .booth { openBooth() } else { screen = upcoming }
+        switch queue.removeFirst() {
+        case .booth: openBooth()
+        case .lesson(let id): openBooth(lesson: id)
+        case let other: screen = other
+        }
     }
 
     func load(_ track: TrackInfo, on deck: Deck) {

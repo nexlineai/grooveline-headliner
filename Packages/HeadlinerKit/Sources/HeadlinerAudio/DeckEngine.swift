@@ -16,6 +16,12 @@ public final class DeckEngine {
 
     public init() {}
 
+    /// Everything the decks put out, 0...1. Turned down a little while a coach talks over the music.
+    public var masterVolume: Float {
+        get { engine.mainMixerNode.outputVolume }
+        set { engine.mainMixerNode.outputVolume = max(0, min(1, newValue)) }
+    }
+
     public func start() {
         guard !running else { return }
         do {

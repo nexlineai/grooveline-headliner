@@ -29,7 +29,7 @@ struct TitleView: View {
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(.white.opacity(0.75))
             Button {
-                game.run([.story("cold-open"), .booth, .story("nine-years")])
+                game.run([.story("cold-open"), .story("nine-years"), .lesson("first-mix")])
             } label: {
                 Text("PLAY")
                     .font(.system(size: 17, weight: .heavy))
@@ -41,6 +41,7 @@ struct TitleView: View {
             }
             .padding(.top, 16)
             HStack(spacing: 12) {
+                small("LESSON 1") { game.run([.lesson("first-mix")]) }
                 small("DECKS ONLY") { game.run([.booth]) }
                 small("SCENE: THE WHITE LABEL") { game.run([.story("white-label")]) }
             }
