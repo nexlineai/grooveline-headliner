@@ -10,7 +10,7 @@ import HeadlinerAudio
 final class BoothScene: SKScene {
     private enum Kind: Equatable {
         case platter(Int), rim(Int), pitch(Int), channel(Int), cross, eq(Int, Int), play(Int), cue(Int), sync(Int)
-        case needle(Int), wave(Int)
+        case needle(Int), wave(Int), phones(Int)
     }
 
     private struct Grab {
@@ -41,6 +41,8 @@ final class BoothScene: SKScene {
     private var cross = 0.5
     private var eq = [[0.5, 0.5, 0.5], [0.5, 0.5, 0.5]] // per deck: low, mid, high
     private var sync = [false, false]
+    /// Headphone cue per channel: that record is heard in the headphones, before its fader.
+    private var phones = [false, false]
 
     // Hands.
     private var grabs: [UITouch: Grab] = [:]
@@ -76,6 +78,7 @@ final class BoothScene: SKScene {
     private var playButton: [ButtonNode] = []
     private var cueButton: [ButtonNode] = []
     private var syncButton: [ButtonNode] = []
+    private var phonesButton: [ButtonNode] = []
     private var meter: [MeterNode] = []
     private var meterLevel = [0.0, 0.0]
     private var bpmLabel: [SKLabelNode] = []
@@ -133,6 +136,7 @@ final class BoothScene: SKScene {
         pitchFader = [0.5, 0.5]
         eq = [[0.5, 0.5, 0.5], [0.5, 0.5, 0.5]]
         sync = [false, true]
+        phones = [false, false]
         for d in 0..<2 {
             let deck = decks[d]
             deck.motorOn = false
@@ -158,7 +162,7 @@ final class BoothScene: SKScene {
         releaseAllHands()
         hits = []
         record = []; arm = []; pitchNode = []; channelNode = []; knob = []
-        playButton = []; cueButton = []; syncButton = []; meter = []
+        playButton = []; cueButton = []; syncButton = []; phonesButton = []; meter = []
         bpmLabel = []; pitchLabel = []; beatDots = []
         wavePlayed = []; wavePlayhead = []; waveCue = []; waveDrop = []; timeLabel = []
 
@@ -471,6 +475,15 @@ final class BoothScene: SKScene {
             channelNode.append(fader)
             hits.insert((Kind.channel(d), centred(fx, fader.position.y, 40 * u, channelTravel + 28 * u)), at: 0)
 
+            // Headphone cue, under the channel fader.
+            let listen = ButtonNode(size: CGSize(width: 36 * u, height: 15 * u), title: "PHONES", tint: Palette.orange)
+            listen.position = CGPoint(x: fx, y: rect.minY + 49 * u)
+            listen.zPosition = 4
+            listen.lit = phones[d]
+            addChild(listen)
+            phonesButton.append(listen)
+            hits.insert((Kind.phones(d), centred(fx, listen.position.y, 44 * u, 24 * u)), at: 0)
+
             let lights = MeterNode(size: CGSize(width: 7 * u, height: 96 * u))
             let side: CGFloat = d == 0 ? -9 : 9
             lights.position = CGPoint(x: rect.midX + side * u, y: rect.minY + 110 * u)
@@ -595,6 +608,10 @@ final class BoothScene: SKScene {
                 tap.impactOccurred()
                 sync[d].toggle()
                 if !sync[d] { decks[d].bend = 0 }
+            case .phones(let d):
+                tap.impactOccurred()
+                phones[d].toggle()
+                decks[d].cue = phones[d]
             default:
                 break
             }
@@ -719,6 +736,7 @@ final class BoothScene: SKScene {
         let x = MixMath.crossfade(cross)
         decks[0].volume = MixMath.faderGain(channel[0]) * x.a
         decks[1].volume = MixMath.faderGain(channel[1]) * x.b
+        for d in 0..<2 { decks[d].cue = phones[d] }
     }
 
     // MARK: - Every frame
@@ -882,6 +900,7 @@ final class BoothScene: SKScene {
             pitchLabel[d].text = String(format: "%+.1f%%", deck.pitch * 100)
             playButton[d].lit = deck.motorOn
             syncButton[d].lit = sync[d]
+            if d < phonesButton.count { phonesButton[d].lit = phones[d] }
             cueButton[d].lit = !deck.motorOn && abs(seconds - deck.cuePoint) < 0.02
 
             let heardGain = deck.lifted ? 0 : MixMath.faderGain(channel[d]) * (d == 0 ? fade.a : fade.b)

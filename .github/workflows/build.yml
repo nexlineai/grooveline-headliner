@@ -11,6 +11,12 @@ on:
 permissions:
   contents: read
 
+# macOS runners are scarce (run 5 was dropped after waiting 15 minutes for one): a newer push
+# replaces a run that is still waiting or building.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ios:
     runs-on: macos-26

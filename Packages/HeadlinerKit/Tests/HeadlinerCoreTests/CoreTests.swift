@@ -174,3 +174,106 @@ final class VinylTests: XCTestCase {
         XCTAssertEqual(x.withUnsafeBufferPointer { Vinyl.firstOnset($0.baseAddress!, count: 100) }, 41)
     }
 }
+
+final class MixerTests: XCTestCase {
+    /// Two decks, each playing a steady tone (deck 0 at `hz0`, deck 1 at `hz1`), through the mixer.
+    private func mix(hz0: Double = 440, hz1: Double = 880, frames: Int = 44_100, split: Bool = false, cueMix: Float = 0,
+                     set: (UnsafeMutablePointer<ChannelStrip>, UnsafeMutablePointer<ChannelStrip>) -> Void) -> (left: [Float], right: [Float]) {
+        let rate = 44_100.0
+        let tones = [hz0, hz1].map { hz -> UnsafeMutablePointer<Float> in
+            let p = UnsafeMutablePointer<Float>.allocate(capacity: frames * 2)
+            for i in 0..<frames * 2 { p[i] = Float(0.5 * sin(2 * Double.pi * hz * Double(i) / rate)) }
+            return p
+        }
+        let decks = UnsafeMutablePointer<UnsafeMutablePointer<DeckShared>>.allocate(capacity: 2)
+        let strips = UnsafeMutablePointer<UnsafeMutablePointer<ChannelStrip>>.allocate(capacity: 2)
+        for d in 0..<2 {
+            let s = UnsafeMutablePointer<DeckShared>.allocate(capacity: 1)
+            s.initialize(to: DeckShared())
+            s.pointee.left = tones[d]; s.pointee.right = tones[d]; s.pointee.frames = frames * 2
+            s.pointee.gain = 1; s.pointee.targetGain = 1; s.pointee.rate = 1; s.pointee.targetRate = 1; s.pointee.position = 1
+            (decks + d).initialize(to: s)
+            let c = UnsafeMutablePointer<ChannelStrip>.allocate(capacity: 1)
+            c.initialize(to: ChannelStrip())
+            (strips + d).initialize(to: c)
+        }
+        let mixer = UnsafeMutablePointer<MixerShared>.allocate(capacity: 1)
+        mixer.initialize(to: MixerShared())
+        mixer.pointee.sampleRate = rate; mixer.pointee.split = split; mixer.pointee.cueMix = cueMix
+        set(strips[0], strips[1])
+        var left = [Float](repeating: 9, count: frames), right = [Float](repeating: 9, count: frames)
+        let scratch = UnsafeMutablePointer<Float>.allocate(capacity: 1024)
+        left.withUnsafeMutableBufferPointer { lp in
+            right.withUnsafeMutableBufferPointer { rp in
+                var done = 0
+                while done < frames { // in buffers of 512, like the phone
+                    let n = min(512, frames - done)
+                    Mixer.render(decks: decks, strips: strips, deckCount: 2, mixer: mixer, scratch: scratch,
+                                 left: lp.baseAddress! + done, right: rp.baseAddress! + done, count: n)
+                    done += n
+                }
+            }
+        }
+        for d in 0..<2 { decks[d].deallocate(); strips[d].deallocate(); tones[d].deallocate() }
+        decks.deallocate(); strips.deallocate(); mixer.deallocate(); scratch.deallocate()
+        return (left, right)
+    }
+
+    /// How strongly `hz` is present in the second half of `x` (amplitude of that tone).
+    /// Half a second holds a whole number of cycles of every tone used here, so tones do not leak into each other.
+    private func level(_ x: [Float], hz: Double) -> Double {
+        var re = 0.0, im = 0.0
+        let from = x.count / 2
+        for i in from..<x.count {
+            let a = 2 * Double.pi * hz * Double(i) / 44_100
+            re += Double(x[i]) * cos(a); im += Double(x[i]) * sin(a)
+        }
+        return 2 * (re * re + im * im).squareRoot() / Double(x.count - from)
+    }
+
+    func testFlatMixerPassesBothDecks() {
+        let out = mix { _, _ in }
+        XCTAssertEqual(level(out.left, hz: 440), 0.5, accuracy: 0.01)
+        XCTAssertEqual(level(out.left, hz: 880), 0.5, accuracy: 0.01)
+        XCTAssertEqual(level(out.right, hz: 440), 0.5, accuracy: 0.01)
+    }
+
+    func testFaderDownIsSilent() {
+        let out = mix { a, _ in a.pointee.fader = 0 }
+        XCTAssertLessThan(level(out.left, hz: 440), 0.001)
+        XCTAssertEqual(level(out.left, hz: 880), 0.5, accuracy: 0.01)
+    }
+
+    func testSplitPutsTheRoomLeftAndTheCueRight() {
+        // Deck 0 plays to the room. Deck 1 has its fader down and its headphone cue on.
+        let out = mix(split: true) { _, b in b.pointee.fader = 0; b.pointee.cue = 1 }
+        XCTAssertEqual(level(out.left, hz: 440), 0.5, accuracy: 0.01)
+        XCTAssertLessThan(level(out.left, hz: 880), 0.001)
+        XCTAssertEqual(level(out.right, hz: 880), 0.5, accuracy: 0.01)
+        XCTAssertLessThan(level(out.right, hz: 440), 0.001)
+    }
+
+    func testCueMixBringsTheRoomIntoTheHeadphones() {
+        let out = mix(split: true, cueMix: 0.5) { _, b in b.pointee.fader = 0; b.pointee.cue = 1 }
+        XCTAssertEqual(level(out.right, hz: 880), 0.25, accuracy: 0.01)
+        XCTAssertEqual(level(out.right, hz: 440), 0.25, accuracy: 0.01)
+        XCTAssertEqual(level(out.left, hz: 440), 0.5, accuracy: 0.01)
+    }
+
+    func testLowKillTakesTheBassAndLeavesTheRest() {
+        // 60 Hz and 3 kHz through deck 0 with the low knob all the way down; deck 1 silent.
+        let bass = mix(hz0: 60) { a, b in a.pointee.lowDB = -36; b.pointee.fader = 0 }
+        XCTAssertLessThan(level(bass.left, hz: 60), 0.5 * 0.03) // at least 30 dB down
+        let top = mix(hz0: 3_000) { a, b in a.pointee.lowDB = -36; b.pointee.fader = 0 }
+        XCTAssertEqual(level(top.left, hz: 3_000), 0.5, accuracy: 0.03)
+    }
+
+    func testHighKillAndMidBoost() {
+        let top = mix(hz0: 12_000) { a, b in a.pointee.highDB = -36; b.pointee.fader = 0 }
+        XCTAssertLessThan(level(top.left, hz: 12_000), 0.5 * 0.03)
+        let mid = mix(hz0: 1_000) { a, b in a.pointee.midDB = 6; b.pointee.fader = 0 }
+        XCTAssertEqual(level(mid.left, hz: 1_000), 0.5 * 1.995, accuracy: 0.03)
+        let low = mix(hz0: 60) { a, b in a.pointee.highDB = -36; b.pointee.fader = 0 }
+        XCTAssertEqual(level(low.left, hz: 60), 0.5, accuracy: 0.02)
+    }
+}

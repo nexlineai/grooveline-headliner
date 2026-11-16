@@ -34,8 +34,17 @@ Design, story, decisions and the build log are in the vault:
 - `Packages/HeadlinerKit/HeadlinerCore` (pure Swift, unit-tested on the CI host): `BeatGrid`,
   `Vinyl.render` (reads a record at a changing speed: play, stop, pitch, nudge, scratch and
   spinback are all the same mechanism), `MixMath`, `MixJudge` (how good the blend is).
-- `HeadlinerAudio`: `Deck` (one turntable; main-thread API over `DeckShared`, plain memory shared
-  with the audio thread, no locks) and `DeckEngine` (two decks -> 3-band EQ each -> output).
+- `HeadlinerCore/Mixer.swift`: the whole mixer as plain arithmetic, unit-tested: per deck a
+  3-band EQ (`Biquad`: low shelf 180 Hz, peak 1 kHz, high shelf 4.5 kHz, -36 dB kill to +6 dB), a
+  fader to the room, a headphone cue switch (before the fader); output either the room in stereo
+  or "split" (room mono left, headphones mono right, `cueMix` blends the room into the headphones).
+- `HeadlinerAudio`: `Deck` (one turntable; main-thread API over `DeckShared` and its
+  `ChannelStrip`, plain memory shared with the audio thread, no locks) and `DeckEngine` (ONE
+  source node that calls `Mixer.render`; restarts itself when the output changes, e.g. headphones
+  plugged in). No system audio units: what the tests check is what the phone plays.
+- Headphones (`PhonesView`, `Game.phonesSplit` / `cueMix`, PHONES buttons on the mixer): split
+  L/R as in the Record Store. A true second output (speaker + sound card at once) is NOT built;
+  `DeckEngine.probeSeveralOutputs()` (button in the panel) reports what iOS offers with a given adapter.
 - `App/`: SwiftUI shell (`Game`, `TitleView`, `BoothView`) and the SpriteKit booth
   (`BoothScene` holds settings and touch handling, `BoothNodes` draws the gear).
 - Moving through a record: pick up the headshell and carry it (`Kind.needle`), or touch the strip

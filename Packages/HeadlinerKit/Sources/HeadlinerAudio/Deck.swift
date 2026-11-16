@@ -11,9 +11,10 @@ public enum DeckError: Error {
 /// Call everything here from the main thread.
 public final class Deck {
     let shared: UnsafeMutablePointer<DeckShared>
+    /// This deck's channel on the mixer (EQ, fader, headphone cue), shared with the audio thread.
+    let strip: UnsafeMutablePointer<ChannelStrip>
     private var buffer: AVAudioPCMBuffer?
     private var retired: [AVAudioPCMBuffer] = []
-    var eq: AVAudioUnitEQ?
 
     public private(set) var info: TrackInfo?
     public private(set) var grid = BeatGrid(bpm: 120)
@@ -34,10 +35,12 @@ public final class Deck {
     public var held = false { didSet { apply() } }
     /// Speed of the hand, in record speeds (1 = normal play, 0 = holding still, negative = pulling back).
     public var handRate: Double = 0 { didSet { apply() } }
-    /// Channel fader and crossfader combined, 0...1.
-    public var volume: Double = 1 { didSet { applyGain() } }
+    /// Channel fader and crossfader combined, 0...1: how much of this deck the room hears.
+    public var volume: Double = 1 { didSet { strip.pointee.fader = Float(max(0, min(1, volume))) } }
+    /// Heard in the headphones (before the fader), when the mixer's headphone output is on.
+    public var cue = false { didSet { strip.pointee.cue = cue ? 1 : 0 } }
     /// The needle is off the record (being carried to another spot): the platter keeps turning, no sound.
-    public var lifted = false { didSet { applyGain() } }
+    public var lifted = false { didSet { shared.pointee.targetGain = lifted ? 0 : 1 } }
     /// How loud the record is along its length, 0...1 per slice (for the strip above the platter).
     public private(set) var overview: [Float] = []
     /// Where CUE returns to, in seconds.
@@ -46,16 +49,16 @@ public final class Deck {
     public init() {
         shared = UnsafeMutablePointer<DeckShared>.allocate(capacity: 1)
         shared.initialize(to: DeckShared())
+        strip = UnsafeMutablePointer<ChannelStrip>.allocate(capacity: 1)
+        strip.initialize(to: ChannelStrip())
         apply()
     }
 
     deinit {
         shared.deinitialize(count: 1)
         shared.deallocate()
-    }
-
-    private func applyGain() {
-        shared.pointee.targetGain = lifted ? 0 : Float(volume)
+        strip.deinitialize(count: 1)
+        strip.deallocate()
     }
 
     private func apply() {
@@ -129,7 +132,7 @@ public final class Deck {
         shared.pointee.seekTo = max(1, min(duration, seconds) * fileRate)
     }
 
-    /// Loudest output sample since the last call (for the meters).
+    /// Loudest sample off the record since the last call, before EQ and fader (for the channel meters).
     public func takePeak() -> Float {
         let p = shared.pointee.peak
         shared.pointee.peak = 0
@@ -138,22 +141,12 @@ public final class Deck {
 
     /// EQ knob: band 0 low, 1 mid, 2 high; value 0...1 with 0.5 flat.
     public func setEQ(band: Int, value: Double) {
-        guard let eq, band >= 0, band < eq.bands.count else { return }
-        eq.bands[band].gain = Float(MixMath.eqDecibels(value))
-    }
-
-    func makeNode(format: AVAudioFormat) -> AVAudioSourceNode {
-        let s = shared
-        return AVAudioSourceNode(format: format) { _, _, frameCount, audioBufferList -> OSStatus in
-            let buffers = UnsafeMutableAudioBufferListPointer(audioBufferList)
-            guard buffers.count > 0, let first = buffers[0].mData else { return noErr }
-            let left = first.assumingMemoryBound(to: Float.self)
-            var right = left
-            if buffers.count > 1, let second = buffers[1].mData {
-                right = second.assumingMemoryBound(to: Float.self)
-            }
-            Vinyl.render(s, left: left, right: right, count: Int(frameCount))
-            return noErr
+        let db = Float(MixMath.eqDecibels(value))
+        switch band {
+        case 0: strip.pointee.lowDB = db
+        case 1: strip.pointee.midDB = db
+        case 2: strip.pointee.highDB = db
+        default: break
         }
     }
 }

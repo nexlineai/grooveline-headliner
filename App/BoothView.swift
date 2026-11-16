@@ -9,6 +9,7 @@ struct BoothView: View {
     @State private var scene: BoothScene?
     @State private var runner: LessonRunner?
     @State private var crateOpen = false
+    @State private var phonesOpen = false
     @State private var crateTick = 0
 
     var body: some View {
@@ -35,26 +36,19 @@ struct BoothView: View {
                         .background(Circle().fill(.black.opacity(0.45)))
                 }
                 .padding(.top, 8)
-                if lessonID == nil {
-                    // Free play: the crate, top right.
-                    Button {
-                        crateOpen = true
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "square.stack.fill")
-                                .font(.system(size: 12, weight: .bold))
-                            Text("CRATE")
-                                .font(.system(size: 11, weight: .heavy))
-                                .tracking(2)
-                        }
-                        .foregroundStyle(.white.opacity(0.9))
-                        .padding(.horizontal, 12)
-                        .frame(height: 34)
-                        .background(Capsule().fill(.black.opacity(0.5)))
-                        .overlay(Capsule().stroke(.white.opacity(0.25), lineWidth: 1))
+                // Top right: headphones, and in free play the crate.
+                HStack(spacing: 8) {
+                    pill("headphones", game.phonesSplit ? "SPLIT" : "PHONES", lit: game.phonesSplit) { phonesOpen = true }
+                    if lessonID == nil {
+                        pill("square.stack.fill", "CRATE", lit: false) { crateOpen = true }
                     }
-                    .padding(.top, 8)
-                    .frame(maxWidth: .infinity, alignment: .topTrailing)
+                }
+                .padding(.top, 8)
+                .frame(maxWidth: .infinity, alignment: .topTrailing)
+                if phonesOpen {
+                    PhonesView { phonesOpen = false }
+                }
+                if lessonID == nil {
                     if crateOpen {
                         CrateView(tracks: game.tracks, decks: game.engine.decks, tick: crateTick, onLoad: { track, d in
                             game.load(track, on: game.engine.decks[d])
@@ -72,6 +66,7 @@ struct BoothView: View {
                 made.insets = geo.safeAreaInsets
                 // The screenshot run opens the crate by itself.
                 if lessonID == nil && UserDefaults.standard.bool(forKey: "crate") { crateOpen = true }
+                if UserDefaults.standard.bool(forKey: "phones") { phonesOpen = true }
                 if let id = lessonID, let lesson = Lessons.find(id) {
                     let coach = LessonRunner(lesson: lesson)
                     made.lesson = coach
@@ -83,6 +78,23 @@ struct BoothView: View {
             .onChange(of: geo.safeAreaInsets) { _, new in
                 scene?.insets = new
             }
+        }
+    }
+
+    private func pill(_ symbol: String, _ title: String, lit: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: symbol)
+                    .font(.system(size: 12, weight: .bold))
+                Text(title)
+                    .font(.system(size: 11, weight: .heavy))
+                    .tracking(2)
+            }
+            .foregroundStyle(lit ? Color.black : Color.white.opacity(0.9))
+            .padding(.horizontal, 12)
+            .frame(height: 34)
+            .background(Capsule().fill(lit ? GroovelineLogo.teal : Color.black.opacity(0.5)))
+            .overlay(Capsule().stroke(.white.opacity(lit ? 0 : 0.25), lineWidth: 1))
         }
     }
 }

@@ -19,10 +19,28 @@ final class Game: ObservableObject {
     private var queue: [Screen] = []
     /// The screenshot run starts the app with `-demo 1`: the decks start by themselves.
     let demo: Bool
+    /// Headphones: off (the room on both sides) or split (room left, headphones right).
+    @Published var phonesSplit: Bool {
+        didSet {
+            engine.split = phonesSplit
+            UserDefaults.standard.set(phonesSplit, forKey: "phonesSplit")
+        }
+    }
+    /// What the headphones hear: 0 = only the cued records, 1 = only the room.
+    @Published var cueMix: Double {
+        didSet {
+            engine.cueMix = cueMix
+            UserDefaults.standard.set(cueMix, forKey: "cueMix")
+        }
+    }
 
     init() {
         let defaults = UserDefaults.standard
         demo = defaults.bool(forKey: "demo")
+        phonesSplit = defaults.bool(forKey: "phonesSplit")
+        cueMix = defaults.double(forKey: "cueMix")
+        engine.split = phonesSplit
+        engine.cueMix = cueMix
         if let url = Bundle.main.url(forResource: "tracks", withExtension: "json"),
            let data = try? Data(contentsOf: url),
            let list = try? JSONDecoder().decode([TrackInfo].self, from: data) {
