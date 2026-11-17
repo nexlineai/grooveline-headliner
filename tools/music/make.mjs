@@ -971,6 +971,110 @@ const CHAPTER9 = [
 ];
 TRACKS.push(...CHAPTER9);
 
+// ---------- chapter 10: festivals ----------
+// Big rooms and open air: snare-roll builds, an anthem saw lead, orchestra hits, a crowd that
+// sings, a bowed cello bass, rain on the tent. From the sunset slot (118) to the main stage (128).
+const CHAPTER10 = [
+  {
+    id: 'por-do-sol', title: 'Pôr do Sol', artist: 'Duna', label: 'Cais Dub', chapter: 10,
+    genre: 'Organic House', bpm: 118, root: 53, key: 'F minor', camelot: '4A', seed: 853, swing: 0.1,
+    chords: [[0, 3, 7, 10], [-4, 0, 3, 7]], chordRhythm: x4([0, 0, 0, 0]),
+    arp: [0, null, null, 2, null, null, 1, null, 3, null, null, 2, null, 1, null, null],
+    bass: [0, null, null, null, null, null, null, null, -2, null, null, null, null, null, null, null], bassOct: -12,
+    kit: { kick: 'deep', hat: 'shaker', snare: 'rim', bass: 'cello', arp: 'pluck' },
+    drums: { hat: x4([0.4, 0.2, 0.5, 0.2]), clap: [0, 0, 0, 0, 0.5, 0, 0, 0, 0, 0, 0, 0, 0.5, 0, 0, 0],
+             perc: { congaLo: [0, 0, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 0, 0, 0.4, 0, 0] } },
+    style: { arp: 0.24, sweep: 0.3, delayBeats: 0.75, delayFb: 0.5, delayWet: 0.35, reverb: 0.45, pad: 0.07,
+             openHat: 0.18, closedHat: 0.22, clap: 0.32, perc: 0.3, hiss: 0.008 },
+    mix: { duck: 0.4, drive: 1.1 },
+    sections: [S('intro', 16, 'kick hat perc'), S('cello', 16, 'kick hat clap perc bass'),
+               S('pluck', 16, 'kick hat clap perc bass arp'), S('break', 8, 'bass arp pad'),
+               S('full', 16, 'kick hat clap perc bass arp pad'), S('outro', 8, 'kick hat perc')],
+  },
+  {
+    id: 'chuva', title: 'Chuva', artist: 'Lona', label: 'Cais Dub', chapter: 10,
+    genre: 'Dub Techno', bpm: 120, root: 46, key: 'B♭ minor', camelot: '3A', seed: 863, swing: 0.04,
+    chords: [[0, 3, 7, 10]], chordRhythm: [0, 0, 0.7, 0, 0, 0, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 0],
+    bass: x4([0, null, null, null]), bassOct: 0,
+    kit: { kick: 'deep', hat: 'metal', snare: 'rim', bass: 'sub', chordOct: 12 },
+    drums: { hat: x4([0.3, 0.2, 0.5, 0.2]), clap: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.5, 0, 0, 0] },
+    style: { rain: 0.05, chordCut: 1400, chordFloor: 200, chordQ: 2.4, chordDecay: 0.35, sweep: 0.6,
+             delayBeats: 0.75, delayFb: 0.65, delayWet: 0.45, reverb: 0.5, pad: 0.06,
+             openHat: 0.18, closedHat: 0.22, clap: 0.32, perc: 0.3, hiss: 0.01 },
+    mix: { duck: 0.45, drive: 1.1 },
+    sections: [S('intro', 16, 'kick hat'), S('dub', 16, 'kick hat bass chord'),
+               S('deep', 16, 'kick hat clap bass chord'), S('break', 8, 'chord pad'),
+               S('full', 16, 'kick hat clap bass chord pad'), S('outro', 8, 'kick hat')],
+  },
+  {
+    id: 'floresta', title: 'Floresta', artist: 'Clareira', label: 'Fita Dourada', chapter: 10,
+    genre: 'Melodic Techno', bpm: 122, root: 48, key: 'C minor', camelot: '5A', seed: 877, swing: 0,
+    chords: [[0, 3, 7, 10], [-4, 0, 3, 7], [-2, 2, 5, 9], [-5, -2, 2, 5]], chordRhythm: x4([0, 0, 0, 0]),
+    arp: [0, 1, 2, 3, 2, 1, 0, 1, 2, 3, 4, 3, 2, 1, 2, 3],
+    bass: x4([null, 0, null, 0]), bassOct: -12,
+    kit: { kick: 'rumble', hat: 'metal', ohat: 'metal', snare: 'clap', bass: 'sub', arp: 'bell' },
+    drums: { hat: x4([0.5, 0.3, 0.7, 0.3]), ohat: x4([0, 0, 0.9, 0]), clap: [0, 0, 0, 0, 0.9, 0, 0, 0, 0, 0, 0, 0, 0.9, 0, 0, 0] },
+    style: { arp: 0.16, crowd: 0.05, sweep: 0.5, delayBeats: 0.75, delayFb: 0.55, delayWet: 0.4, reverb: 0.45, pad: 0.07,
+             openHat: 0.28, closedHat: 0.24, clap: 0.38, perc: 0.3, hiss: 0 },
+    mix: { duck: 0.55, drive: 1.3 },
+    sections: [S('intro', 16, 'kick hat'), S('groove', 16, 'kick hat ohat clap bass'),
+               S('melody', 16, 'kick hat ohat clap bass arp'), S('break', 8, 'arp pad crowd'),
+               S('full', 16, 'kick hat ohat clap bass arp pad crowd'), S('outro', 8, 'kick hat')],
+  },
+  {
+    id: 'tenda', title: 'Tenda', artist: 'Lona', label: 'Rua Baixa', chapter: 10,
+    genre: 'Tech House', bpm: 124, root: 55, key: 'G minor', camelot: '6A', seed: 883, swing: 0.12,
+    chords: [[0, 3, 7]], chordRhythm: x4([0, 0, 0, 0]),
+    vox: [0, 0, 0, 0, 0, 0, 0.8, 0, 0, 0, 0, 0, 0, 0.6, 0, 0], vowel: 'hey', voxOct: 12, voxLen: 0.14,
+    bass: [0, null, 0, null, null, 7, null, 0, null, null, 10, null, 0, null, null, 7], bassOct: -24,
+    kit: { kick: 'punch', snare: 'clap', bass: 'fm', vox: 'robot' },
+    drums: { hat: x4([0.6, 0.3, 0.6, 0.3]), ohat: x4([0, 0, 0.9, 0]), clap: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+             perc: { tambourine: x4([0, 0.3, 0.5, 0.3]) } },
+    fx: { roll: true },
+    style: { vox: 0.24, sweep: 0.4, delayBeats: 0.5, delayFb: 0.3, delayWet: 0.2, reverb: 0.25, pad: 0.05,
+             openHat: 0.3, closedHat: 0.26, clap: 0.42, perc: 0.3, hiss: 0 },
+    mix: { duck: 0.5, drive: 1.35 },
+    sections: [S('intro', 8, 'kick hat'), S('intro 2', 8, 'kick hat ohat clap perc'),
+               S('groove', 16, 'kick hat ohat clap perc bass'), S('hey', 16, 'kick hat ohat clap perc bass vox'),
+               S('break', 8, 'bass vox'), S('full', 16, 'kick hat ohat clap perc bass vox'),
+               S('outro', 8, 'kick hat ohat clap')],
+  },
+  {
+    id: 'encore', title: 'Encore', artist: 'Mil Vozes', label: 'Fita Dourada', chapter: 10,
+    genre: 'Piano Anthem', bpm: 126, root: 48, key: 'C major', camelot: '8B', seed: 887, swing: 0.04,
+    chords: [[0, 4, 7], [-3, 0, 4], [-7, -3, 0], [-5, -1, 2]], chordRhythm: [0.8, 0, 0, 0.5, 0, 0, 0.6, 0, 0, 0, 0.5, 0, 0.6, 0, 0, 0],
+    bass: x4([null, null, 0, null]), bassOct: -12,
+    kit: { kick: 'punch', snare: 'clap', chord: 'piano', bass: 'organ', chordOct: 12 },
+    drums: { hat: x4([0.5, 0.3, 0.7, 0.3]), ohat: x4([0, 0, 1, 0]), clap: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0] },
+    fx: { roll: true },
+    style: { crowd: 0.08, sweep: 0.3, delayBeats: 0.75, delayFb: 0.35, delayWet: 0.25, reverb: 0.35, pad: 0.06,
+             openHat: 0.3, closedHat: 0.26, clap: 0.42, perc: 0.3, hiss: 0 },
+    mix: { duck: 0.55, drive: 1.3 },
+    sections: [S('intro', 16, 'kick hat'), S('piano', 16, 'kick hat ohat clap bass chord'),
+               S('sing', 16, 'kick hat ohat clap bass chord crowd'), S('break', 8, 'chord crowd'),
+               S('full', 16, 'kick hat ohat clap bass chord crowd'), S('outro', 8, 'kick hat')],
+  },
+  {
+    id: 'palco-principal', title: 'Palco Principal', artist: 'Sessenta Mil', label: 'Betão', chapter: 10,
+    genre: 'Festival Techno', bpm: 128, root: 50, key: 'D minor', camelot: '7A', seed: 899, swing: 0,
+    chords: [[0, 3, 7]], chordRhythm: x4([0, 0, 0, 0]),
+    lead: [0, null, null, 0, null, null, 3, null, 5, null, null, 3, null, 0, null, null], leadOct: 12,
+    leadSlide: [0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0],
+    bass: x4([null, 0, 0, 0]), bassOct: -12,
+    kit: { kick: 'rumble', hat: 'metal', ohat: 'metal', snare: 'clap', bass: 'sub', lead: 'saw' },
+    drums: { hat: x4([0.5, 0.4, 0.8, 0.4]), ohat: x4([0, 0, 1, 0]), clap: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+             perc: { orch: [0.9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] } },
+    fx: { roll: true },
+    style: { lead: 0.2, sweep: 0.4, delayBeats: 0.75, delayFb: 0.4, delayWet: 0.3, reverb: 0.4, pad: 0.06,
+             openHat: 0.3, closedHat: 0.26, clap: 0.4, perc: 0.3, hiss: 0 },
+    mix: { duck: 0.6, drive: 1.4 },
+    sections: [S('intro', 16, 'kick hat'), S('build', 16, 'kick hat ohat clap bass'),
+               S('drop', 16, 'kick hat ohat clap bass lead perc'), S('break', 8, 'lead pad'),
+               S('drop 2', 16, 'kick hat ohat clap bass lead perc'), S('outro', 8, 'kick hat')],
+  },
+];
+TRACKS.push(...CHAPTER10);
+
 // ---------- small DSP kit ----------
 function rng(seed) { // mulberry32
   let s = seed >>> 0;
@@ -1382,7 +1486,7 @@ function discoBass(b, t0, m, len, amp) { // round, plucked, the octave-jumping d
 function lead(b, t0, m, len, amp, from, kind, rnd, pan = 0) { // a monophonic synth lead: glide and vibrato
   const n = Math.floor((len + 0.12) * SR), f = new SVF(), f1 = hz(m), fA = from != null ? hz(from) : f1;
   const talk = kind === 'talk' ? [new Biquad('bp', 300, 5), new Biquad('bp', 870, 7), new Biquad('bp', 2240, 9)] : null;
-  let ph = rnd(), ps = 0;
+  let ph = rnd(), ps = 0, ph3 = rnd();
   for (let i = 0; i < n && t0 + i < b.L.length; i++) {
     const t = i / SR, vib = 1 + 0.008 * Math.sin(2 * Math.PI * 5.2 * t) * Math.min(1, t * 3);
     const fq = (f1 + (fA - f1) * Math.exp(-t * 30)) * vib, dt = fq / SR;
@@ -1399,12 +1503,16 @@ function lead(b, t0, m, len, amp, from, kind, rnd, pan = 0) { // a monophonic sy
       const s0 = 2 * ph - 1;
       if ((i & 63) === 0) { const o = Math.min(1, t / 0.09); talk[0].retune('bp', 300 + 500 * o, 5); talk[1].retune('bp', 870 + 280 * o, 7); }
       x = 2.5 * (talk[0].run(s0) + 0.6 * talk[1].run(s0) + 0.3 * talk[2].run(s0));
+    } else if (kind === 'saw') { // the anthem lead: three saws, one a touch sharp, one a touch flat
+      ps += dt * 1.006; ps -= Math.floor(ps);
+      ph3 += dt * 0.994; ph3 -= Math.floor(ph3);
+      x = ((2 * ph - 1) + (2 * ps - 1) + (2 * ph3 - 1)) / 2;
     } else if (kind === 'whistle') { // a pea whistle / flute-ish: a pure tone with breath, sharp attack
       x = Math.sin(2 * Math.PI * ph) * (1 + 0.15 * Math.sin(2 * Math.PI * 28 * t)) + (rnd() - 0.5) * 0.12;
     } else if (kind === 'reed') x = Math.sin(2 * Math.PI * ph) + 0.5 * Math.sin(4 * Math.PI * ph) + 0.35 * Math.sin(6 * Math.PI * ph); // breathy and soft
     else if (kind === 'flute') x = Math.sin(2 * Math.PI * ph) + 0.12 * Math.sin(4 * Math.PI * ph) + (rnd() - 0.5) * 0.18 * Math.exp(-t * 6);
     else x = ph < 0.5 ? 1 : -1; // square
-    if ((i & 15) === 0) f.set(kind === 'reed' ? 2400 : kind === 'flute' ? 3500 : kind === 'sync' ? 4500 : kind === 'talk' ? 5000 : kind === 'whistle' ? 6000 : 1800 + 1600 * Math.exp(-t * 8), 1);
+    if ((i & 15) === 0) f.set(kind === 'reed' ? 2400 : kind === 'flute' ? 3500 : kind === 'sync' ? 4500 : kind === 'talk' ? 5000 : kind === 'whistle' ? 6000 : kind === 'saw' ? 3000 + 3000 * Math.exp(-t * 6) : 1800 + 1600 * Math.exp(-t * 8), 1);
     const env = Math.min(1, t * (kind === 'reed' ? 40 : kind === 'flute' ? 25 : 300)) * (t < len ? 1 : Math.exp(-(t - len) * 30));
     add(b, t0 + i, (f.lp(x) + (kind === 'reed' ? (rnd() - 0.5) * 0.05 : 0)) * env * amp, pan);
   }
@@ -1722,6 +1830,63 @@ function chorus(b, depthMs, rate) { // two slowly moving copies a few ms late, o
     b.R[i] = R[i] * 0.7 + tap(L, base + depth * (1 - m)) * 0.5;
   }
 }
+// ---------- chapter 10 sounds: festivals ----------
+function snareRoll(b, t0, len, amp, rnd) { // the build: snare hits doubling in speed over the bar, getting louder
+  const beat = len / 4;
+  let t = 0;
+  for (const per of [1, 2, 4, 8]) { // per beat: quarters, eighths, sixteenths, thirty-seconds
+    for (let k = 0; k < per; k++) {
+      const at = t0 + Math.round((t + k * beat / per) * SR), grow = (t + k * beat / per) / len;
+      snare(b, at, amp * (0.35 + 0.65 * grow), rnd);
+    }
+    t += beat;
+  }
+}
+function orchHit(b, t0, m, amp, rnd) { // the stadium hit: a big saw chord (root, fifth, octave) and a timpani thump
+  const n = Math.floor(0.6 * SR), f = new SVF(), oscs = [];
+  for (const k of [0, 7, 12, 19]) for (const d of [-12, 12]) oscs.push(saw(hz(m + k), d, rnd()));
+  let ph = 0;
+  for (let i = 0; i < n && t0 + i < b.L.length; i++) {
+    const t = i / SR;
+    if ((i & 15) === 0) f.set(600 + 5000 * Math.exp(-t * 9), 0.9);
+    let x = 0;
+    for (const o of oscs) x += o();
+    ph += 2 * Math.PI * hz(m - 24) * (1 + Math.exp(-t * 30)) / SR;
+    const y = f.lp(x / oscs.length) * Math.exp(-t * 5) * 1.2 + Math.sin(ph) * Math.exp(-t * 8) * 0.9;
+    add(b, t0 + i, y * Math.min(1, t * 800) * amp);
+  }
+}
+function crowd(b, t0, len, amp, rnd) { // a crowd singing 'oh' and cheering: noise and buzz through two vowels, swelling
+  const n = Math.floor(len * SR), fo = VOWELS.oh.map((f, k) => new Biquad('bp', f, [4, 6, 8][k])), w = [1, 0.6, 0.3];
+  const fa = VOWELS.ah.map((f, k) => new Biquad('bp', f, [4, 6, 8][k]));
+  for (let i = 0; i < n && t0 + i < b.L.length; i++) {
+    const t = i / SR, x = rnd() * 2 - 1, mix = 0.5 + 0.5 * Math.sin(2 * Math.PI * t / len);
+    let y = 0;
+    for (let k = 0; k < 3; k++) y += (fo[k].run(x) * (1 - mix) + fa[k].run(x) * mix) * w[k];
+    const env = Math.sin(Math.PI * Math.min(1, t / len));
+    add(b, t0 + i, y * env * amp, (rnd() - 0.5) * 0.6);
+  }
+}
+function celloNote(b, t0, m, len, amp, rnd) { // a bowed low string: saws with a slow bow, vibrato, a dark body
+  const n = Math.floor((len + 0.2) * SR), f = new SVF(), f1 = hz(m);
+  let p1 = rnd(), p2 = rnd();
+  f.set(700, 1.1);
+  for (let i = 0; i < n && t0 + i < b.L.length; i++) {
+    const t = i / SR, vib = 1 + 0.005 * Math.sin(2 * Math.PI * 5.5 * t) * Math.min(1, t * 2);
+    p1 += f1 * vib / SR; if (p1 >= 1) p1 -= 1;
+    p2 += f1 * 1.003 * vib / SR; if (p2 >= 1) p2 -= 1;
+    const env = Math.min(1, t / 0.12) * (t < len ? 1 : Math.exp(-(t - len) * 12));
+    add(b, t0 + i, f.lp((2 * p1 - 1) + (2 * p2 - 1)) * 0.5 * env * amp);
+  }
+}
+function rain(b, amp, rnd) { // rain on a tent: a soft hiss and scattered drops, the whole record long
+  const lp = new Biquad('lp', 6000, 0.7), hp = new Biquad('hp', 900, 0.7);
+  for (let i = 0; i < b.L.length; i++) {
+    let x = hp.run(lp.run(rnd() * 2 - 1)) * 0.35;
+    if (rnd() < 0.0009) x += (rnd() * 2 - 1) * 2.5; // a drop
+    b.L[i] += x * amp; b.R[i] += (x * 0.7 + (rnd() * 2 - 1) * 0.08) * amp;
+  }
+}
 function hatVoice(kind, b, t0, amp, decay, rnd, pan) {
   if (kind === 'metal') hatMetal(b, t0, amp, decay, pan);
   else if (kind === 'shaker') shaker(b, t0, amp, rnd, pan);
@@ -1732,6 +1897,7 @@ function snareVoice(kind, b, t0, amp, rnd) {
   else if (kind === 'rim') rim(b, t0, amp, rnd);
   else clap(b, t0, amp, rnd);
 }
+let currentRoot = 50; // the key of the record being made (for pitched percussion: the orchestra hit)
 function perc(name, b, t0, amp, rnd, s) {
   if (name === 'congaHi') conga(b, t0, amp, 290, 0.35, rnd);
   else if (name === 'congaLo') conga(b, t0, amp, 190, -0.3, rnd);
@@ -1743,6 +1909,7 @@ function perc(name, b, t0, amp, rnd, s) {
   else if (name === 'tomHi') tom(b, t0, amp * 0.7, 165, 0.3, rnd);
   else if (name === 'tomLo') tom(b, t0, amp * 0.8, 105, -0.3, rnd);
   else if (name === 'clang') clang(b, t0, amp, rnd, s % 2 ? 0.4 : -0.4);
+  else if (name === 'orch') orchHit(b, t0, currentRoot, amp, rnd);
   else if (name === 'castanet') castanet(b, t0, amp, rnd, s % 2 ? 0.35 : -0.35);
   else if (name === 'laser') laser(b, t0, amp, s % 4 > 1 ? 0.5 : -0.5);
   else if (name === 'clapRoll') { clap(b, t0, amp * 0.5, rnd); clap(b, t0 + Math.round(0.03 * SR), amp * 0.35, rnd); }
@@ -1751,6 +1918,7 @@ function perc(name, b, t0, amp, rnd, s) {
 // ---------- one track ----------
 function render(tr) {
   const rnd = rng(tr.seed), st = tr.style;
+  currentRoot = tr.root;
   const beat = 60 / tr.bpm, step = beat / 4, barLen = beat * 4;
   const sections = tr.sections || (tr.arrangement === 'long' ? ARRANGEMENT_LONG : ARRANGEMENT);
   const kit = tr.kit || {}, dr = tr.drums || {}, mx = tr.mix || {};
@@ -1803,6 +1971,7 @@ function render(tr) {
           else if (kit.bass === 'disco') discoBass(low, t0, m, len, 0.55);
           else if (kit.bass === 'wobble') wobbleNote(low, t0, m, len, 0.42, beat);
           else if (kit.bass === 'fm') fmBass(low, t0, m, len, 0.5);
+          else if (kit.bass === 'cello') celloNote(low, t0, m, len, 0.7, rnd);
           else if (kit.bass === '808') boom808(low, t0, m, len, 0.6, tr.bassSlide?.[s] ? lastBass : null);
           else bassNote(low, t0, m, len, 0.5, st.bassCut);
           lastBass = m;
@@ -1848,7 +2017,11 @@ function render(tr) {
       if (has('strings')) strings(air, at(bar, 0), chord.slice(0, 4).map((c) => tr.root + c), barLen, st.strings, rnd);
       if (has('swell')) swell(air, at(bar, 0), chord.slice(0, 4).map((c) => tr.root + 12 + c), barLen, st.swell, rnd);
       if (has('gate') && tr.gate) gatedSaws(keys, at(bar, 0), chord.slice(0, 3).map((c) => tr.root + 12 + c), barLen, st.gate, rnd, tr.gate, step);
-      if (fill) riser(air, at(bar, 0), barLen, 0.1, rnd);
+      if (fill) {
+        if (tr.fx?.roll) snareRoll(drums, at(bar, 0), barLen, st.clap * 0.9, rnd);
+        else riser(air, at(bar, 0), barLen, 0.1, rnd);
+      }
+      if (has('crowd')) crowd(air, at(bar, 0), barLen, st.crowd, rnd);
     }
   });
 
@@ -1858,6 +2031,7 @@ function render(tr) {
   if (st.wow) { wow(keys, st.wow, st.wowRate ?? 0.5); wow(air, st.wow, st.wowRate ?? 0.5); }
   if (st.crush) crush(keys, st.crush[0], st.crush[1]);
   if (st.phaser) phaser(keys, st.phaser, 0.9);
+  if (st.rain) rain(air, st.rain, rnd);
   if (st.chorus) { chorus(keys, st.chorus, 0.6); chorus(air, st.chorus, 0.45); }
 
   const hissF = new Biquad('bp', 5200, 0.5);
