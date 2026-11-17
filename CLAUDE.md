@@ -20,8 +20,10 @@ Design, story, decisions and the build log are in the vault:
   `.github/workflows/build.yml` on every push to `main`.
   - One job `build` (one Mac per push; a newer push cancels an older run): package tests,
     unsigned IPA artifact for iloader, then the app runs in the iOS Simulator and screenshots +
-    the app's log are force-pushed to the `shots` branch. Look at them with:
-    `git fetch origin shots && git show origin/shots:booth.png > /tmp/booth.png` (then Read it).
+    the app's log are force-pushed to the `shots` branch. Look at them with
+    `scripts/get-shots.sh <scratch dir> [booth night ...]` (downloads over HTTPS, then Read them).
+    **Never `git fetch` the shots branch**: every run's pictures piled up in `.git` and filled
+    Omarchy's root disk (318 MB of loose objects, 17 Nov). This clone only fetches `main`.
   - On failure, read the annotations without a token:
     `curl -s https://api.github.com/repos/nexlineai/grooveline-headliner/commits/main/check-runs`
     then `.../check-runs/<id>/annotations`.
@@ -75,7 +77,8 @@ Design, story, decisions and the build log are in the vault:
   `#00d4c8`). Fonts in `App/Fonts/` (Orbitron, OFL).
 - Turntable conventions Zé asked for in the Record Store apply here too: pitch fader up = slower,
   CUE like a club deck (stopped: set the mark; playing: back to the mark and stop), crossfader
-  full until the middle.
+  full until the middle. Double tap on a knob = back to its default: EQ in the middle (flat),
+  the cue mix to CUE (Zé corrected this: the cue mix default is CUE, not the middle).
 
 ## Assets
 - `tools/music/make.mjs`: synthesizes the original tracks into `App/Tracks/` (+ `tracks.json`).

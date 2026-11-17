@@ -45,7 +45,10 @@ final class Game: ObservableObject {
         engine.cueMix = cueMix
         // Something was plugged in or pulled out: let the screens that show the outputs redraw.
         routeObserver = NotificationCenter.default.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) { [weak self] _ in
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { self?.objectWillChange.send() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                self?.engine.routeChanged()
+                self?.objectWillChange.send()
+            }
         }
         if let url = Bundle.main.url(forResource: "tracks", withExtension: "json"),
            let data = try? Data(contentsOf: url),

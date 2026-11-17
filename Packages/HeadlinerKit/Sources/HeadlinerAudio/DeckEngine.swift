@@ -69,11 +69,28 @@ public final class DeckEngine {
     /// (a short gap in the music).
     public var phones: PhonesMode = .off {
         didSet {
-            mixer.pointee.split = phones == .split
+            applySplit()
             if phones != .soundCard { soundCardNote = "" }
             let rebuild = (phones == .soundCard) != (oldValue == .soundCard)
             if rebuild && running { restart() }
         }
+    }
+
+    /// The sound is going to the phone's own speaker (SPLIT is then held off: one ear of a
+    /// phone speaker is no use to anybody).
+    public private(set) var speakerOnly = false
+
+    private func applySplit() {
+        mixer.pointee.split = phones == .split && !speakerOnly
+    }
+
+    /// Something was plugged in or pulled out: look at the outputs again.
+    public func routeChanged() {
+        #if os(iOS)
+        let ports = AVAudioSession.sharedInstance().currentRoute.outputs
+        speakerOnly = !ports.isEmpty && ports.allSatisfy { $0.portType == .builtInSpeaker || $0.portType == .builtInReceiver }
+        #endif
+        applySplit()
     }
 
     /// What the headphones hear: 0 = only the cued decks, 1 = only the room.
@@ -102,6 +119,7 @@ public final class DeckEngine {
             try session.setActive(true)
             bufferSeconds = session.ioBufferDuration
             #endif
+            routeChanged()
 
             let hardware = engine.outputNode.outputFormat(forBus: 0)
             let rate = hardware.sampleRate > 0 ? hardware.sampleRate : 48_000

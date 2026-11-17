@@ -226,6 +226,7 @@ final class BoothScene: SKScene {
         roomPictureSize = pictureSize
         roomCentre = centre
         roomVideos = [nil, nil, nil, nil]
+        for (m, player) in roomPlayers.enumerated() where m != roomMood { player?.pause() }
         if roomMood >= 0, let node = roomVideo(roomMood) { node.alpha = 1 }
 
         let rect = CGRect(x: 0, y: gearTop, width: W, height: H - gearTop)

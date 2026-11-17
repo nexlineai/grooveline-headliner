@@ -53,6 +53,10 @@ struct PhonesView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("SOUND GOES TO: \(game.engine.outputs)")
                         .foregroundStyle(.white.opacity(0.5))
+                    if game.phonesMode == 1 && game.engine.speakerOnly {
+                        Text("SPLIT is off while the sound comes out of the phone's speaker. Plug in wired headphones or a sound card.")
+                            .foregroundStyle(Color(Palette.orange))
+                    }
                     if !game.engine.soundCardNote.isEmpty {
                         Text(game.engine.soundCardNote)
                             .foregroundStyle(Color(Palette.orange))
