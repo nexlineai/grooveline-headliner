@@ -247,5 +247,15 @@
         {"who": "", "text": "TWO HUNDRED PEOPLE ON A FIELD MADE FOR TWENTY THOUSAND."}
       ] }
     ]
+  },
+  {
+    "id": "chapter-10-end",
+    "shots": [
+      { "lines": [
+        {"who": "", "text": "01:00. THE TREES ARE STILL SHAKING."},
+        {"who": "", "text": "CARLA ON THE PHONE: \"HELENA VOSS WANTS YOU. BACK TO BACK. NEXT MONTH.\""},
+        {"who": "", "text": "END OF CHAPTER 10"}
+      ] }
+    ]
   }
 ]

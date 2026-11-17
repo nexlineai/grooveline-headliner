@@ -107,6 +107,7 @@ shot sunset-night 10 -screen night -night sunset-slot -demo 1
 shot story-carla 5 -screen story -scene carla
 shot three-pm-night 10 -screen night -night three-pm -demo 1
 shot tent-night 10 -screen night -night tent-rain -demo 1
+shot forest-night 10 -screen night -night forest-stage -demo 1
 shot lesson-requests 6 -screen lesson -lesson requests
 shot garage 10 -screen night -night garage-party -demo 1
 shot garage-crate 6 -screen night -night garage-party -crate 1

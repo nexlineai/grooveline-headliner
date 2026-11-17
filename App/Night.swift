@@ -62,6 +62,8 @@ struct NightInfo {
     var echo: Double = 0
     /// A set that has to climb: the tempo on air must end at or above this for three stars.
     var climbTo: Double? = nil
+    /// The encore: three stars need one of these records on air when the night ends.
+    var encoreWith: [String] = []
 }
 
 /// What goes wrong in a night: the cable is kicked (the record stops), the needle jumps a groove,
@@ -340,7 +342,25 @@ enum Nights {
                                             "cable": [("tent-rain", "It's pouring! Everyone's running into the tent!")]],
                                     bag: ["chuva", "por-do-sol", "floresta", "tenda", "encore", "palco-principal", "residente", "portao"],
                                     clockStart: 22 * 60)
-    static let all = [firstParty, garageParty, saturdayShift, emptyTuesday, thursdayShow, caveWarmUp, fridayCave, afterhours, dubplateNight, berlinNight, ibizaNight, burnout, sunsetSlot, threePM, tentRain]
+    /// Chapter 10's last night: the forest stage. Late in the set the crowd calls for an encore,
+    /// and the night has to end on a big record (Encore or Palco Principal) for three stars.
+    static let forestStage = NightInfo(id: "forest-stage", title: "FOREST STAGE", length: 360, room: "forest",
+                                       records: ["floresta", "por-do-sol"], chapter: 10, mixesFor3Stars: 3,
+                                       remarks: [(at: 0.85, moment: "encore")],
+                                       lines: ["wait": [("forest-wait", "The forest stage. Lasers in the trees. Play something.")],
+                                               "start": [("cave-start", "Here we go. Easy does it.")],
+                                               "clean": [("forest-clean", "Smooth. Even the trees are dancing."), ("fri-clean-2", "Nobody even blinked. Perfect.")],
+                                               "rough": [("fri-rough", "Bumpy. Nine hundred people heard that.")],
+                                               "dead": [("fri-dead", "Silence! At peak time! Play!")],
+                                               "stale": [("fri-stale", "This one's done. Next.")],
+                                               "slip": [("fest-slip", "It's drifting. Listen to the monitors, not the echo.")],
+                                               "wreck": [("fri-wreck", "Ouch. Two kicks fighting.")],
+                                               "clash": [("fri-clash", "Two basslines. Kill a low.")],
+                                               "nuts": [("fest-nuts", "Look at them! Hands in the air, all the way to the back!")],
+                                               "encore": [("forest-encore", "Listen to them! They want an encore. Finish on your biggest record.")]],
+                                       bag: ["floresta", "por-do-sol", "tenda", "chuva", "encore", "palco-principal", "coro", "residente"],
+                                       clockStart: 23 * 60, echo: 0.1, encoreWith: ["encore", "palco-principal"])
+    static let all = [firstParty, garageParty, saturdayShift, emptyTuesday, thursdayShow, caveWarmUp, fridayCave, afterhours, dubplateNight, berlinNight, ibizaNight, burnout, sunsetSlot, threePM, tentRain, forestStage]
     static func find(_ id: String) -> NightInfo? { all.first { $0.id == id } }
 }
 
@@ -739,7 +759,8 @@ final class NightRunner: ObservableObject {
         let need = info.maxMood >= 3 ? 0.6 : 0.5
         let broughtDown = info.endBPM.map { lastBPM <= $0 + 0.5 } ?? true
         let climbed = info.climbTo.map { lastBPM >= $0 - 0.5 } ?? true
-        if crowd >= need && transitions >= info.mixesFor3Stars && deadAir < 3 && wreck < 4 && allRequests && !hotPlayed && broughtDown && climbed {
+        let encored = info.encoreWith.isEmpty || (lastOnAirRecord.map { info.encoreWith.contains($0) } ?? false)
+        if crowd >= need && transitions >= info.mixesFor3Stars && deadAir < 3 && wreck < 4 && allRequests && !hotPlayed && broughtDown && climbed && encored {
             earned = 3
         } else if crowd >= 0.42 && transitions >= 1 {
             earned = 2
@@ -753,6 +774,7 @@ final class NightRunner: ObservableObject {
         if !info.hot.isEmpty { summary += hotPlayed ? "   ·   too hot, too early" : "   ·   kept it warm" }
         if info.judgeKeys { summary += sourTime < 1 ? "   ·   in key" : "   ·   sour \(Int(sourTime.rounded())) s" }
         if info.endBPM != nil || info.climbTo != nil { summary += "   ·   ended at \(Int(lastBPM.rounded())) BPM" }
+        if !info.encoreWith.isEmpty { summary += encored ? "   ·   encore!" : "   ·   no encore" }
         comment = ""
         stars = earned
     }
