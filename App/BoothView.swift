@@ -7,7 +7,7 @@ struct BoothView: View {
     @EnvironmentObject var game: Game
     let lessonID: String?
     /// A night for a room, judged by the crowd.
-    let isNight: Bool
+    let nightID: String?
     @State private var nightRunner: NightRunner?
     @State private var scene: BoothScene?
     @State private var runner: LessonRunner?
@@ -26,16 +26,19 @@ struct BoothView: View {
                 let roomHeight = (geo.size.height + geo.safeAreaInsets.top + geo.safeAreaInsets.bottom) * 0.42 - geo.safeAreaInsets.top
                 if let runner {
                     LessonOverlay(runner: runner, roomHeight: roomHeight) {
+                        if let stars = runner.stars { game.record(stars, for: runner.lesson.id) }
                         game.closeBooth()
                     }
                 }
                 if let nightRunner {
                     NightOverlay(runner: nightRunner, roomHeight: roomHeight) {
+                        if let stars = nightRunner.stars, let id = nightID { game.record(stars, for: id) }
                         game.closeBooth()
                     }
                 }
                 Button {
-                    game.closeBooth()
+                    // Back leaves the lesson or night (and whatever was lined up after it).
+                    game.closeBooth(leaving: true)
                 } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 15, weight: .bold))
@@ -80,9 +83,9 @@ struct BoothView: View {
                     made.lesson = coach
                     runner = coach
                 }
-                if isNight {
+                if let id = nightID, let info = Nights.find(id) {
                     // Four and a half minutes: room for three records and two mixes.
-                    let party = NightRunner(title: "FIRST PARTY", length: UserDefaults.standard.bool(forKey: "demo") ? 20 : 270)
+                    let party = NightRunner(title: info.title, length: UserDefaults.standard.bool(forKey: "demo") ? 20 : info.length)
                     made.night = party
                     nightRunner = party
                 }

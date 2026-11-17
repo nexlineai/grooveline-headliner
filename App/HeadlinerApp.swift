@@ -23,12 +23,18 @@ struct RootView: View {
             Color.black.ignoresSafeArea()
             switch game.screen {
             case .title: TitleView()
-            case .booth: BoothView(lessonID: nil, isNight: false)
-            case .lesson(let id): BoothView(lessonID: id, isNight: false).id(id)
-            case .night: BoothView(lessonID: nil, isNight: true)
+            case .chapter(let number):
+                if let chapter = Chapters.find(number) {
+                    ChapterView(chapter: chapter)
+                } else {
+                    TitleView()
+                }
+            case .booth: BoothView(lessonID: nil, nightID: nil)
+            case .lesson(let id): BoothView(lessonID: id, nightID: nil).id(id)
+            case .night(let id): BoothView(lessonID: nil, nightID: id).id(id)
             case .story(let id):
                 if let scene = game.scene(id) {
-                    StoryView(scene: scene) { game.next() }
+                    StoryView(scene: scene) { game.sceneEnded(id) }
                         .id(id)
                 } else {
                     Color.black.onAppear { game.next() }

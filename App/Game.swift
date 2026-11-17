@@ -9,14 +9,18 @@ let gameLog = Logger(subsystem: "org.grooveline.headliner", category: "game")
 
 /// App-wide state: which screen is up, what comes after it, the deck engine, the crate and the story.
 final class Game: ObservableObject {
-    enum Screen: Equatable { case title, story(String), booth, lesson(String), night }
+    enum Screen: Equatable { case title, chapter(Int), story(String), booth, lesson(String), night(String) }
 
     @Published var screen: Screen = .title
     let engine = DeckEngine()
     private(set) var tracks: [TrackInfo] = []
     private(set) var scenes: [StoryScene] = []
-    /// Screens still to come; when one ends the next is shown, and after the last the title.
+    /// Screens still to come; when one ends the next is shown, and after the last `home`.
     private var queue: [Screen] = []
+    /// Where the player lands when the queue is done or they leave: the title, or a chapter.
+    private var home: Screen = .title
+    /// Best stars and scenes seen, saved on the phone.
+    @Published private(set) var progress = CareerProgress.load()
     /// The screenshot run starts the app with `-demo 1`: the decks start by themselves.
     let demo: Bool
     /// Headphones: 0 off (the room on both sides), 1 split (room left, headphones right),
@@ -66,8 +70,15 @@ final class Game: ObservableObject {
         switch defaults.string(forKey: "screen") ?? "" {
         case "booth": openBooth()
         case "lesson": openBooth(lesson: defaults.string(forKey: "lesson") ?? "first-mix")
-        case "night": openBooth(night: true)
+        case "night": openBooth(night: defaults.string(forKey: "night") ?? Nights.firstParty.id)
         case "story": screen = .story(defaults.string(forKey: "scene") ?? "cold-open")
+        case "chapter":
+            // The screenshot run shows a chapter part-way through (not saved).
+            if defaults.bool(forKey: "demoProgress") {
+                progress.stars = ["first-mix": 3, "on-the-phrase": 2]
+                progress.seen = ["cold-open"]
+            }
+            screen = .chapter(1)
         default: break
         }
     }
@@ -77,7 +88,7 @@ final class Game: ObservableObject {
     }
 
     /// Opens the booth: free play, or a lesson when one is named.
-    func openBooth(lesson: String? = nil, night: Bool = false) {
+    func openBooth(lesson: String? = nil, night: String? = nil) {
         engine.start()
         if let error = engine.lastError {
             gameLog.error("audio engine did not start: \(error, privacy: .public)")
@@ -87,19 +98,51 @@ final class Game: ObservableObject {
         for (deck, track) in zip(engine.decks, tracks) where !deck.isLoaded {
             load(track, on: deck)
         }
-        screen = night ? Screen.night : (lesson.map { Screen.lesson($0) } ?? Screen.booth)
+        if let night {
+            screen = .night(night)
+        } else if let lesson {
+            screen = .lesson(lesson)
+        } else {
+            screen = .booth
+        }
     }
 
-    func closeBooth() {
+    /// The booth is done with: the next screen in line, or with `leaving` straight home.
+    func closeBooth(leaving: Bool = false) {
         for deck in engine.decks { deck.motorOn = false }
         engine.masterVolume = 1
+        if leaving { leave() } else { next() }
+    }
+
+    /// Stops whatever was lined up and goes home (the chapter, or the title).
+    func leave() {
+        queue = []
+        screen = home
+    }
+
+    /// Keeps the best stars of a lesson or a night.
+    func record(_ stars: Int, for id: String) {
+        guard !demo || UserDefaults.standard.string(forKey: "screen") == nil else { return }
+        if stars > (progress.stars[id] ?? 0) {
+            progress.stars[id] = stars
+            progress.save()
+        }
+    }
+
+    /// A story scene was watched to the end.
+    func sceneEnded(_ id: String) {
+        if !progress.seen.contains(id) {
+            progress.seen.insert(id)
+            progress.save()
+        }
         next()
     }
 
     func scene(_ id: String) -> StoryScene? { scenes.first { $0.id == id } }
 
-    /// Shows these screens one after the other, then the title.
-    func run(_ screens: [Screen]) {
+    /// Shows these screens one after the other, then `home`.
+    func run(_ screens: [Screen], home: Screen = .title) {
+        self.home = home
         queue = screens
         next()
     }
@@ -107,13 +150,13 @@ final class Game: ObservableObject {
     /// The current screen is over.
     func next() {
         guard !queue.isEmpty else {
-            screen = .title
+            screen = home
             return
         }
         switch queue.removeFirst() {
         case .booth: openBooth()
         case .lesson(let id): openBooth(lesson: id)
-        case .night: openBooth(night: true)
+        case .night(let id): openBooth(night: id)
         case let other: screen = other
         }
     }

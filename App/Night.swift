@@ -6,6 +6,20 @@ import HeadlinerCore
 // drops fast on a train wreck or dead air. The friends in the room change with it and say
 // what they think. The night ends on the clock; the stars are for the whole night.
 
+/// The nights there are.
+struct NightInfo {
+    var id: String
+    var title: String
+    /// Seconds of play.
+    var length: Double
+}
+
+enum Nights {
+    static let firstParty = NightInfo(id: "first-party", title: "FIRST PARTY", length: 270)
+    static let all = [firstParty]
+    static func find(_ id: String) -> NightInfo? { all.first { $0.id == id } }
+}
+
 final class NightRunner: ObservableObject {
     let title: String
     /// Seconds of play, from the first record to the end of the night.

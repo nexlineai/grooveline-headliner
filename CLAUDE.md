@@ -65,7 +65,12 @@ Design, story, decisions and the build log are in the vault:
   is fed `BoothFacts` by `BoothScene.teach` every frame; `LessonOverlay` shows task and words over
   the room. The coach is a voice-over (Zé's choice), never on camera; music ducks while he talks.
   Voice files in `App/Lessons/` made with `tools/voice/say.sh` (Tó = `helios`).
-- Nights (`Night.swift`, `Screen.night`, title PARTY): no coach; `NightRunner` turns what the
+- Chapters (`Chapter.swift`): PLAY opens the chapter screen (steps with best stars, scenes
+  seen, CONTINUE = from the first step not done to the end of the chapter). Progress is saved in
+  `UserDefaults` under `progress.v1`, recorded at a result card's CONTINUE (never on the back
+  button, which leaves to the chapter). `Chapters.locked` is false while Zé tests (every step
+  playable); turn it on for the release.
+- Nights (`Night.swift`, `Nights`, `Screen.night(id)`): no coach; `NightRunner` turns what the
   room hears (`MixJudge` reading: silence / one record / blend quality, bass clash, which deck is
   on air) into crowd energy, a mood 0-3 and short comments from the friends; stars from the
   average energy, the number of mixes, dead air and train wrecks. `BoothScene.showRoom` cross-

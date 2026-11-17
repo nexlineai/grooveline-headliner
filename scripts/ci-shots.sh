@@ -54,6 +54,7 @@ shot() { # name, seconds to wait, launch arguments...
   xcrun simctl terminate "$udid" "$bundle" || true
 }
 shot title 6
+shot chapter 5 -screen chapter -demoProgress 1
 shot booth 9 -screen booth -demo 1
 shot lesson 6 -screen lesson
 shot lesson2 6 -screen lesson -lesson on-the-phrase
