@@ -1,10 +1,12 @@
+import AVFoundation
 import SwiftUI
 import HeadlinerCore
 
 // A night: you play for a room and the room answers. No coach, no steps. The crowd's energy
 // rises with a fresh record and a clean blend, sags when a record has been on too long, and
-// drops fast on a train wreck or dead air. The friends in the room change with it and say
-// what they think. The night ends on the clock; the stars are for the whole night.
+// drops fast on a train wreck or dead air. The friends in the room change with it, and Tó says
+// what is happening (voice-over, `App/Lessons/night-*.m4a`; he is the one voice that never
+// appears on camera). The night ends on the clock; the stars are for the whole night.
 
 /// The nights there are.
 struct NightInfo {
@@ -62,12 +64,51 @@ final class NightRunner: ObservableObject {
         self.length = length
     }
 
-    private func say(_ who: String, _ words: String) {
-        guard now >= quietUntil else { return }
-        commentBy = who
-        comment = words
-        commentUntil = now + 4
-        quietUntil = now + 8
+    /// What Tó can say, by moment; where there are several, they take turns.
+    private static let lines: [String: [(voice: String, text: String)]] = [
+        "wait": [("night-wait", "Whenever you're ready. Press play.")],
+        "start": [("night-start", "Finally! Here we go.")],
+        "clean": [("night-clean-1", "Oh, that was smooth."),
+                  ("night-clean-2", "Sara loves this one!"),
+                  ("night-clean-3", "Nobody even noticed the change. That's the idea.")],
+        "rough": [("night-rough", "Rough landing. But we're in.")],
+        "dead": [("night-dead-1", "Dead air! Play something, quick!"),
+                 ("night-dead-2", "Hello? Is it broken?")],
+        "stale": [("night-stale", "They know this one by heart now. Next record.")],
+        "slip": [("night-slip", "It's slipping. Nudge it back.")],
+        "wreck": [("night-wreck", "Ouch. Train wreck.")],
+        "clash": [("night-clash", "Two basslines. Kill one of the lows.")],
+        "nuts": [("night-nuts-1", "Look at them go!"),
+                 ("night-nuts-2", "Mira is dancing on the bed. Mira never dances!")],
+    ]
+    private var turn: [String: Int] = [:]
+    private var voice: AVAudioPlayer?
+
+    /// Tó is talking (the music steps back a little).
+    var speaking: Bool { voice?.isPlaying ?? false }
+
+    func stop() {
+        voice?.stop()
+        voice = nil
+    }
+
+    private func say(_ moment: String) {
+        guard now >= quietUntil, let options = Self.lines[moment], !options.isEmpty else { return }
+        let n = turn[moment, default: 0]
+        turn[moment] = n + 1
+        let line = options[n % options.count]
+        commentBy = "TÓ"
+        comment = line.text
+        var seconds = 3.0
+        if let url = Bundle.main.url(forResource: line.voice, withExtension: "m4a"),
+           let player = try? AVAudioPlayer(contentsOf: url) {
+            voice?.stop()
+            voice = player
+            player.play()
+            seconds = max(seconds, player.duration + 0.8)
+        }
+        commentUntil = now + seconds
+        quietUntil = now + seconds + 4
     }
 
     /// Called every frame with what the room hears: nothing, one record, or two, and for two,
@@ -78,11 +119,11 @@ final class NightRunner: ObservableObject {
         if !comment.isEmpty && now > commentUntil { comment = "" }
         if !began {
             if state == .silence {
-                if now > 5 { say("TÓ", "Whenever you're ready. Press play.") }
+                if now > 5 { say("wait") }
                 return
             }
             began = true
-            say("SARA", "Finally!")
+            say("start")
         }
         elapsed += dt
 
@@ -94,7 +135,7 @@ final class NightRunner: ObservableObject {
             deadAirRun += dt
             blendTime = 0
             blendQuality = 0
-            if deadAirRun > 1.5 { say("MIRA", "Is it broken?") }
+            if deadAirRun > 1.5 { say("dead") }
         case .solo:
             deadAirRun = 0
             clashRun = 0
@@ -106,7 +147,7 @@ final class NightRunner: ObservableObject {
                 toldStale = false
                 let clean = blendTime >= 4 && blendQuality / max(0.01, blendTime) >= 0.6
                 energy += clean ? 0.1 : 0.02
-                if clean { say("SARA", "Ooh, I love this one!") } else { say("TÓ", "Rough landing. But we're in.") }
+                say(clean ? "clean" : "rough")
             }
             blendTime = 0
             blendQuality = 0
@@ -116,7 +157,7 @@ final class NightRunner: ObservableObject {
                 rate = -0.012 // they have heard this one
                 if soloAge > 100 && !toldStale {
                     toldStale = true
-                    say("TÓ", "They know this one by heart now. Next record.")
+                    say("stale")
                 }
             } else {
                 rate = energy < 0.6 ? 0.008 : -0.004 // one record gets a room dancing, not screaming
@@ -134,15 +175,15 @@ final class NightRunner: ObservableObject {
             } else if quality > 0.3 {
                 rate = -0.03
                 driftRun += dt
-                if driftRun > 3 { say("TÓ", "It's slipping. Nudge it back.") }
+                if driftRun > 3 { say("slip") }
             } else {
                 rate = -0.09
                 wreck += dt
-                say("MIRA", "Ouch.")
+                say("wreck")
             }
             if bassClash {
                 clashRun += dt
-                if clashRun > 6 { say("TÓ", "Two basslines. Kill one of the lows.") }
+                if clashRun > 6 { say("clash") }
             } else {
                 clashRun = 0
             }
@@ -156,7 +197,7 @@ final class NightRunner: ObservableObject {
         while level < 3 && energy > edges[level] + 0.03 { level += 1 }
         while level > 0 && energy < edges[level - 1] - 0.03 { level -= 1 }
         if level != mood {
-            if level == 3 { say("SARA", "THIS ONE!") }
+            if level == 3 { say("nuts") }
             mood = level
         }
 
@@ -182,6 +223,7 @@ final class NightRunner: ObservableObject {
             earned = 1
         }
         let mixes = transitions == 1 ? "1 mix" : "\(transitions) mixes"
+        stop()
         summary = "\(mixes)   ·   crowd \(Int((crowd * 100).rounded())) %   ·   dead air \(Int(deadAir.rounded())) s"
         comment = ""
         stars = earned

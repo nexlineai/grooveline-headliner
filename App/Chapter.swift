@@ -82,7 +82,6 @@ struct ChapterView: View {
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            backdrop
             HStack(alignment: .center, spacing: 22) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("CHAPTER \(chapter.number)")
@@ -138,6 +137,9 @@ struct ChapterView: View {
             }
             .padding(.top, 8)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        // In the background, so the picture (wider than the screen) cannot make the screen wider.
+        .background { backdrop }
     }
 
     private var backdrop: some View {

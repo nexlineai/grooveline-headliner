@@ -11,7 +11,10 @@ let gameLog = Logger(subsystem: "org.grooveline.headliner", category: "game")
 final class Game: ObservableObject {
     enum Screen: Equatable { case title, chapter(Int), story(String), booth, lesson(String), night(String) }
 
-    @Published var screen: Screen = .title
+    @Published var screen: Screen = .title { didSet { updateMenuMusic() } }
+    /// Music under the title and chapter screens: sixteen bars of Saturday Job, looping.
+    private var menuMusic: AVAudioPlayer?
+    private var menuMusicStop: DispatchWorkItem?
     let engine = DeckEngine()
     private(set) var tracks: [TrackInfo] = []
     private(set) var scenes: [StoryScene] = []
@@ -81,6 +84,7 @@ final class Game: ObservableObject {
             screen = .chapter(1)
         default: break
         }
+        updateMenuMusic()
     }
 
     var build: String {
@@ -158,6 +162,36 @@ final class Game: ObservableObject {
         case .lesson(let id): openBooth(lesson: id)
         case .night(let id): openBooth(night: id)
         case let other: screen = other
+        }
+    }
+
+    /// The menu music plays on the title and chapter screens and fades out everywhere else.
+    private func updateMenuMusic() {
+        var wanted = screen == .title
+        if case .chapter = screen { wanted = true }
+        if wanted {
+            menuMusicStop?.cancel()
+            menuMusicStop = nil
+            if menuMusic == nil, let url = Bundle.main.url(forResource: "menu-loop", withExtension: "m4a"),
+               let player = try? AVAudioPlayer(contentsOf: url) {
+                player.numberOfLoops = -1
+                player.volume = 0
+                menuMusic = player
+            }
+            guard let player = menuMusic else { return }
+            if !player.isPlaying {
+                try? AVAudioSession.sharedInstance().setActive(true)
+                player.play()
+            }
+            player.setVolume(0.55, fadeDuration: 1.2)
+        } else if let player = menuMusic, player.isPlaying, menuMusicStop == nil {
+            player.setVolume(0, fadeDuration: 0.5)
+            let pause = DispatchWorkItem { [weak self] in
+                self?.menuMusic?.pause()
+                self?.menuMusicStop = nil
+            }
+            menuMusicStop = pause
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.55, execute: pause)
         }
     }
 

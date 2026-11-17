@@ -91,7 +91,10 @@ struct BoothView: View {
                 }
                 scene = made
             }
-            .onDisappear { runner?.stop() }
+            .onDisappear {
+                runner?.stop()
+                nightRunner?.stop()
+            }
             .onChange(of: geo.safeAreaInsets) { _, new in
                 scene?.insets = new
             }

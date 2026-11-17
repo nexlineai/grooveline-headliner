@@ -65,6 +65,11 @@ Design, story, decisions and the build log are in the vault:
   is fed `BoothFacts` by `BoothScene.teach` every frame; `LessonOverlay` shows task and words over
   the room. The coach is a voice-over (Zé's choice), never on camera; music ducks while he talks.
   Voice files in `App/Lessons/` made with `tools/voice/say.sh` (Tó = `helios`).
+- Menu music (`Game.updateMenuMusic`): `App/Art/menu-loop.m4a` (Saturday Job bars 32-48, a
+  16-bar loop) on the title and chapter screens, fading out on every other screen.
+- In a night Tó comments as a voice-over (`App/Lessons/night-*.m4a`, music ducks while he talks).
+  SwiftUI: a picture wider than the screen must go in `.background`, never as a ZStack child (it
+  made the chapter screen wider than the phone and pushed the back button off the edge).
 - Chapters (`Chapter.swift`): PLAY opens the chapter screen (steps with best stars, scenes
   seen, CONTINUE = from the first step not done to the end of the chapter). Progress is saved in
   `UserDefaults` under `progress.v1`, recorded at a result card's CONTINUE (never on the back

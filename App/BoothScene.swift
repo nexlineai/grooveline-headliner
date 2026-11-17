@@ -1031,6 +1031,12 @@ final class BoothScene: SKScene {
             // The record on air is the one that is heard; with both heard, the louder one.
             let onAir = snapshots[0].audible ? (snapshots[1].audible ? lead : 0) : 1
             night.update(dt: dt, state: reading.state, quality: reading.quality, bassClash: reading.bassClash, lead: onAir)
+            // The music steps back a little while Tó talks, as in the lessons.
+            let wanted: Float = night.speaking ? 0.5 : 1
+            let level = game.engine.masterVolume
+            if abs(wanted - level) > 0.002 {
+                game.engine.masterVolume = level + (wanted - level) * Float(min(1, dt * 6))
+            }
             showRoom(night.mood, dt)
         } else {
             // Otherwise the friends dance while there is music and stop where they are when it goes quiet.
