@@ -308,3 +308,27 @@ final class MixerTests: XCTestCase {
         XCTAssertEqual(level(out.right, hz: 880), 0.25, accuracy: 0.01)
     }
 }
+
+final class HarmonyTests: XCTestCase {
+    func testNeighboursOnTheWheel() {
+        XCTAssertTrue(Harmony.compatible("2A", "2A"))
+        XCTAssertTrue(Harmony.compatible("2A", "3A"))
+        XCTAssertTrue(Harmony.compatible("2A", "1A"))
+        XCTAssertTrue(Harmony.compatible("12A", "1A")) // the wheel wraps
+        XCTAssertTrue(Harmony.compatible("1B", "12B"))
+        XCTAssertTrue(Harmony.compatible("2A", "2B"))   // relative major
+        XCTAssertFalse(Harmony.compatible("2A", "4A"))
+        XCTAssertFalse(Harmony.compatible("2A", "8A"))
+        XCTAssertFalse(Harmony.compatible("2A", "3B"))
+        XCTAssertFalse(Harmony.compatible("3A", "10A"))
+        XCTAssertTrue(Harmony.compatible("2A", "?"))    // unknown keys never clash
+    }
+
+    func testPitchMovesTheKey() {
+        XCTAssertEqual(Harmony.detune(0, 0), 0, accuracy: 1e-12)
+        XCTAssertEqual(Harmony.detune(2.0 / 128, 0), 0.268, accuracy: 0.002) // 128 -> 130
+        XCTAssertFalse(Harmony.clash("9A", pitch: 0.0156, "10A", pitch: 0))   // Sinal at 130 with Portão
+        XCTAssertTrue(Harmony.clash("2A", pitch: 0.03125, "3A", pitch: 0))    // 128 pushed to 132: half a semitone out
+        XCTAssertTrue(Harmony.clash("2A", pitch: 0, "8A", pitch: 0))
+    }
+}

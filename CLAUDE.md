@@ -80,7 +80,14 @@ Design, story, decisions and the build log are in the vault:
   warm-up: one on air costs the third star), `clockStart` (minutes; CAVE starts at 00:30), and
   `.stuckGroove` (the record on air repeats one platter turn, 1.8 s, until the needle is lifted
   or the deck stops; energy drains while the room hears it). Lesson goal `pickRecord(deck, good)`:
-  any other record put on that deck is a miss ("too hot").
+  any other record put on that deck is a miss ("too hot"). `.powerCut` stops both decks and the
+  next 6 s of silence do not count. `judgeKeys`: a blend that `Harmony.clash`es for more than 3 s
+  drains the room. `LessonDesk.cueBar` cues every record in the lesson (crate loads too) that many
+  bars in, past the drum intros, so the music is heard at once.
+- **Keys (`HeadlinerCore/Harmony.swift`):** Camelot neighbours (same, ±1 with 12/1 wrapping, or
+  same number other letter). The decks have NO key lock: the pitch fader and SYNC move the key
+  too, so `clash` also counts records pitched more than 0.3 semitone apart (128 -> 130 is 0.27,
+  128 -> 132 is 0.53). Key lessons use records at the same BPM.
 - Chapters (`Chapter.swift`): PLAY opens the chapter screen (steps with best stars, scenes
   seen, CONTINUE = from the first step not done to the end of the chapter). Progress is saved in
   `UserDefaults` under `progress.v1`, recorded at a result card's CONTINUE (never on the back

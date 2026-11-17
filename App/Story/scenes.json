@@ -153,5 +153,14 @@
         {"who": "", "text": "END OF CHAPTER 6"}
       ] }
     ]
+  },
+  {
+    "id": "helena",
+    "shots": [
+      { "art": "scene-helena", "lines": [
+        {"who": "HELENA", "clip": "helena-01", "text": "You warmed up for me like you meant it. Nobody does that any more. Fridays, peak time. They're yours."},
+        {"who": "TÓ", "voice": "vo-helena-to", "text": "Fridays. At CAVE. Peak time. Somebody pinch me."}
+      ] }
+    ]
   }
 ]

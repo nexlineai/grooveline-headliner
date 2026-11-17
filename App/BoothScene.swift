@@ -151,7 +151,21 @@ final class BoothScene: SKScene {
         guard d >= 0, d < 2 else { return }
         pitchFader[d] = 0.5
         dropAt[d] = nil
+        // A lesson that cues its records past the intro cues the new one there too.
+        if let bar = lesson?.lesson.desk.cueBar {
+            let deck = decks[d]
+            deck.cuePoint = cueAt(bar, on: deck)
+            deck.seek(to: deck.cuePoint)
+        }
         needsBuild = true
+    }
+
+    /// Where a record is cued: `bar` bars after its first beat (when the record is that long),
+    /// otherwise on the first beat.
+    private func cueAt(_ bar: Int?, on deck: Deck) -> Double {
+        guard let bar else { return deck.grid.firstBeat }
+        let at = deck.grid.seconds(atBeat: Double(bar * 4))
+        return at < deck.duration - 20 ? at : deck.grid.firstBeat
     }
 
     /// A lesson starts from a known desk: both records at their first beat and stopped, pitch
@@ -178,7 +192,7 @@ final class BoothScene: SKScene {
             deck.motorOn = false
             deck.pitch = (0.5 - pitchFader[d]) * 2 * Self.pitchRange
             deck.bend = 0
-            deck.cuePoint = deck.grid.firstBeat
+            deck.cuePoint = cueAt(desk.cueBar, on: deck)
             deck.seek(to: deck.cuePoint)
             for band in 0..<3 { deck.setEQ(band: band, value: 0.5) }
         }
@@ -879,7 +893,7 @@ final class BoothScene: SKScene {
         }
         // In a lesson a record that runs out starts again, so nobody gets stuck waiting.
         for deck in decks where deck.motorOn && deck.progress > 0.985 {
-            deck.seek(to: deck.grid.firstBeat)
+            deck.seek(to: deck.cuePoint < deck.duration * 0.9 ? deck.cuePoint : deck.grid.firstBeat)
         }
         lesson.update(BoothFacts(motorOn: decks.map { $0.motorOn },
                                  turning: decks.map { $0.rate > 0.5 },
@@ -1095,10 +1109,16 @@ final class BoothScene: SKScene {
                     deck.seek(to: s.from)
                 }
             }
+            // Two records heard together in keys that fight (or pitched apart: no key lock).
+            var keyClash = false
+            if nightInfo?.judgeKeys == true, reading.state == .blend,
+               let a = decks[0].info?.camelot, let b = decks[1].info?.camelot {
+                keyClash = Harmony.clash(a, pitch: decks[0].pitch, b, pitch: decks[1].pitch)
+            }
             night.update(dt: dt, state: reading.state, quality: reading.quality, bassClash: reading.bassClash, lead: onAir,
                          onAirRecord: reading.state == .silence ? nil : decks[onAir].info?.id, channel: channel,
                          jingles: game.jingleCount, beat: decks[onAir].beat,
-                         stuck: stuck.map { snapshots[$0.deck].audible } ?? false)
+                         stuck: stuck.map { snapshots[$0.deck].audible } ?? false, keyClash: keyClash)
             // Things go wrong: somebody kicks the cable and the record on air stops.
             if night.takeMishap() {
                 switch nightInfo?.mishap ?? .cable {
@@ -1108,6 +1128,9 @@ final class BoothScene: SKScene {
                     deck.seek(to: deck.seconds + 0.4 * deck.grid.beatLength)
                 case .stuckGroove:
                     stuck = (onAir, decks[onAir].seconds)
+                case .powerCut:
+                    // Everything stops; the power is back a moment later and the room waits.
+                    for deck in decks { deck.motorOn = false }
                 default:
                     decks[onAir].motorOn = false
                 }

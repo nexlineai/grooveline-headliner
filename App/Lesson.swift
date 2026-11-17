@@ -109,6 +109,9 @@ struct LessonDesk {
     var pitch: [Double]?
     /// The records you brought (ids): the crate shows only these. nil = the whole chapter.
     var bag: [String]?
+    /// Where every record in this lesson is cued, in bars from its first beat (also records put
+    /// on from the crate): past the drum intro, where the music is. nil = the first beat.
+    var cueBar: Int?
 }
 
 struct Lesson {
@@ -123,7 +126,49 @@ struct Lesson {
 enum Lessons {
     static func find(_ id: String) -> Lesson? { all.first { $0.id == id } }
 
-    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars, requests, syncOff, byEar, holdIt, longBlend, onAir, warmUp]
+    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars, requests, syncOff, byEar, holdIt, longBlend, onAir, warmUp, keys]
+
+    /// Lesson 12, chapter 7, CAVE on a Friday: keys. Two records at the same tempo in keys that
+    /// fight, then one that is a neighbour on the Camelot wheel. All at 128 BPM: the decks have no
+    /// key lock, so a record pitched to another tempo would also sound out of tune.
+    static let keys = Lesson(id: "keys", number: 12, title: "KEYS", coach: "LIA",
+                             desk: LessonDesk(crossfader: 0.5, channel: [0.85, 0.85], sync: [false, true], room: "cavepeak",
+                                              records: ["oito-oito", "sem-lista"], crate: true, chapter: 7,
+                                              bag: ["oito-oito", "sem-lista", "madrugada", "cave", "seguranca", "sinal"],
+                                              cueBar: 40), steps: [
+        LessonStep(voice: "keys-01",
+                   text: "Friday, peak time. CAVE has club players, so sync is back. Today isn't about your hands. It's about your ears. Start the left one.",
+                   task: "PRESS PLAY ON THE LEFT DECK", goal: .startDeck(0), target: .play(0)),
+        LessonStep(voice: "keys-02",
+                   text: "Now the right one, on the one. Both faders are up.",
+                   task: "PRESS PLAY ON THE RIGHT DECK, ON THE ONE", goal: .startOnTheOne(deck: 1, against: 0), target: .play(1),
+                   missVoice: "ear-02-miss", missText: "Not the one. Cue it, and try again.",
+                   missTask: "PRESS CUE ON THE RIGHT DECK, THEN TRY AGAIN", missTarget: .cue(1)),
+        LessonStep(voice: "keys-03",
+                   text: "Hear that? Same beat, but the notes fight. Sour. Oito Oito is in E flat minor, Sem Lista is in A minor. They will never agree.",
+                   task: "LISTEN: THE NOTES FIGHT", goal: .listen, target: nil),
+        LessonStep(voice: "keys-04",
+                   text: "Stop the right one.",
+                   task: "STOP THE RIGHT DECK", goal: .stopDeck(1), target: .play(1)),
+        LessonStep(voice: "keys-05",
+                   text: "Open the crate. Every sleeve has a key, a number and a letter. Oito Oito is 2A. Its friends sit next to it on the wheel: 1A, 3A, or 2B, the same number with the other letter. Find one.",
+                   task: "CRATE: A 1A, 3A OR 2B ON THE RIGHT DECK", goal: .pickRecord(deck: 1, good: ["madrugada"]), target: .crate,
+                   missVoice: "keys-05-miss", missText: "That one fights. Look for a 1A, a 3A, or a 2B."),
+        LessonStep(voice: "keys-06",
+                   text: "Madrugada. 2B, and 128, like Oito Oito. Speed a record up and its notes go up too, so the tempo has to be close. Start it on the one.",
+                   task: "PRESS PLAY ON THE RIGHT DECK, ON THE ONE", goal: .startOnTheOne(deck: 1, against: 0), target: .play(1),
+                   missVoice: "ear-02-miss", missText: "Not the one. Cue it, and try again.",
+                   missTask: "PRESS CUE ON THE RIGHT DECK, THEN TRY AGAIN", missTarget: .cue(1)),
+        LessonStep(voice: "keys-07",
+                   text: "Hear that? Same beat, and now the notes agree. That's mixing in key.",
+                   task: "LISTEN: THE NOTES AGREE", goal: .listen, target: nil),
+        LessonStep(voice: "keys-08",
+                   text: "Take the left one out at the next phrase.",
+                   task: "LEFT CHANNEL FADER DOWN, AT THE NEXT PHRASE", goal: .channelFader(0, 0...0.04, onThePhrase: true), target: .channel(0)),
+        LessonStep(voice: "keys-09",
+                   text: "The numbers help. But your ears heard it first.",
+                   task: "KEYS", goal: .listen, target: nil),
+    ])
 
     /// The six records packed for CAVE.
     static let caveBag = ["porta", "seguranca", "fila", "luz-vermelha", "sem-lista", "cave"]

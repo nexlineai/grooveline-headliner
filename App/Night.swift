@@ -45,11 +45,14 @@ struct NightInfo {
     var hot: [String] = []
     /// Where the clock starts (minutes after midnight of the evening before); the night shows 90 minutes.
     var clockStart = 23 * 60
+    /// Blends in keys that fight (or pitched apart) drain the room (`Harmony.clash`).
+    var judgeKeys = false
 }
 
 /// What goes wrong in a night: the cable is kicked (the record stops), the needle jumps a groove,
-/// the stream drops, or a scratched record sticks in one groove until the needle is moved on.
-enum Mishap { case cable, needleSkip, streamDrop, stuckGroove }
+/// the stream drops, a scratched record sticks in one groove until the needle is moved on, or the
+/// power goes (both decks stop; a few seconds of silence are nobody's fault).
+enum Mishap { case cable, needleSkip, streamDrop, stuckGroove, powerCut }
 
 /// Who the night is for: a room of people, or listeners on the stream.
 enum Audience { case room, listeners }
@@ -148,7 +151,27 @@ enum Nights {
                                       bag: ["porta", "estatica", "antena", "onda-media", "fila", "seguranca", "luz-vermelha", "sem-lista", "cave"],
                                       hot: ["seguranca", "luz-vermelha", "sem-lista", "cave"],
                                       clockStart: 30)
-    static let all = [firstParty, garageParty, saturdayShift, emptyTuesday, thursdayShow, caveWarmUp]
+    /// Chapter 7: Friday at CAVE, peak time, now the resident. Club players (sync is back), nine
+    /// hundred people, records that have to agree in key (and in pitch: the decks have no key
+    /// lock), and a power cut.
+    static let fridayCave = NightInfo(id: "friday-cave", title: "FRIDAY AT CAVE", length: 360, room: "cavepeak",
+                                      records: ["residente", "portao"], chapter: 7, mixesFor3Stars: 3,
+                                      mishapAt: 0.55, mishap: .powerCut,
+                                      lines: ["wait": [("fri-wait", "Friday. Nine hundred people. Play something!")],
+                                              "start": [("fri-start", "Here we go. Peak time.")],
+                                              "clean": [("fri-clean-1", "Smooth. The whole cellar felt that."), ("fri-clean-2", "Nobody even blinked. Perfect.")],
+                                              "rough": [("fri-rough", "Bumpy. Nine hundred people heard that.")],
+                                              "dead": [("fri-dead", "Silence! At peak time! Play!")],
+                                              "stale": [("fri-stale", "This one's done. Next.")],
+                                              "slip": [("fri-slip", "It's drifting. Nudge it.")],
+                                              "wreck": [("fri-wreck", "Ouch. Two kicks fighting.")],
+                                              "clash": [("fri-clash", "Two basslines. Kill a low.")],
+                                              "nuts": [("fri-nuts", "Look at them! The whole cellar's jumping!")],
+                                              "keys": [("fri-keys", "Sour! Those keys fight. Get out of it, or change it.")],
+                                              "cable": [("fri-power", "Power cut! It's back, it's back! Restart, quick!")]],
+                                      bag: ["residente", "portao", "sinal", "sem-lista", "seguranca", "coro", "cave", "oito-oito"],
+                                      clockStart: 2 * 60, judgeKeys: true)
+    static let all = [firstParty, garageParty, saturdayShift, emptyTuesday, thursdayShow, caveWarmUp, fridayCave]
     static func find(_ id: String) -> NightInfo? { all.first { $0.id == id } }
 }
 
@@ -172,6 +195,11 @@ final class NightRunner: ObservableObject {
     private var hotPlayed = false
     /// Seconds the room has been hearing a stuck groove.
     private var stuckRun = 0.0
+    /// Seconds of a blend in keys that fight, now and in all; after a power cut, until when the
+    /// silence does not count.
+    private var keyClashRun = 0.0
+    private var sourTime = 0.0
+    private var graceUntil = -1.0
 
     /// Listeners on the stream, from the energy (radio nights).
     var listeners: Int { Int((40 + energyShown * 1260).rounded()) }
@@ -283,7 +311,7 @@ final class NightRunner: ObservableObject {
     /// how well they sit together. `lead` is the louder deck. `stuck`: the room hears a record
     /// stuck in one groove.
     func update(dt: Double, state: MixReading.State, quality: Double, bassClash: Bool, lead: Int, onAirRecord: String?, channel: [Double],
-                jingles: Int, beat: Double, stuck: Bool = false) {
+                jingles: Int, beat: Double, stuck: Bool = false, keyClash: Bool = false) {
         guard stars == nil else { return }
         // Requests and the cable come at their moment of the night, and cannot wait for silence.
         if began {
@@ -349,6 +377,7 @@ final class NightRunner: ObservableObject {
                 mishapDone = true
                 mishapDue = true
                 if info.mishap == .streamDrop { energy = max(0, energy - 0.1) } // listeners leave
+                if info.mishap == .powerCut { graceUntil = now + 6 }
                 say("cable", urgent: true)
             }
         }
@@ -366,6 +395,8 @@ final class NightRunner: ObservableObject {
 
         var rate = 0.0
         switch state {
+        case .silence where now < graceUntil:
+            break // the power is coming back: nobody's fault
         case .silence:
             rate = -0.12
             deadAir += dt
@@ -433,6 +464,17 @@ final class NightRunner: ObservableObject {
         } else {
             stuckRun = 0
         }
+        // Keys that fight: a few seconds pass for a quick cut, then the room winces.
+        if keyClash && state == .blend {
+            keyClashRun += dt
+            if keyClashRun > 3 {
+                rate -= 0.03
+                sourTime += dt
+                say("keys")
+            }
+        } else {
+            keyClashRun = 0
+        }
         // A small room only gets so wild.
         let cap = [0.24, 0.48, 0.75, 1.0][min(3, max(0, info.maxMood))]
         energy = min(cap, max(0, energy + rate * dt))
@@ -476,6 +518,7 @@ final class NightRunner: ObservableObject {
         summary = "\(mixes)   ·   crowd \(Int((crowd * 100).rounded())) %   ·   dead air \(Int(deadAir.rounded())) s"
         if !info.requests.isEmpty { summary += "   ·   requests \(requestsMet) / \(info.requests.count)" }
         if !info.hot.isEmpty { summary += hotPlayed ? "   ·   too hot, too early" : "   ·   kept it warm" }
+        if info.judgeKeys { summary += sourTime < 1 ? "   ·   in key" : "   ·   sour \(Int(sourTime.rounded())) s" }
         comment = ""
         stars = earned
     }

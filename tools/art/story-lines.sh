@@ -16,6 +16,8 @@ NUNO_WHO='The big bald security man leaning on the flight case looks at the view
 NUNO_REST='His lips form exactly these words. He says only this one line, then closes his mouth and is still again. Far behind him the lasers sweep slowly over the festival crowd. Sound: only his voice. No music.'
 DOOR_WHO='The big bald doorman holding the clipboard looks at the viewer and says, with the voice from <AUDIO_0>, low, calm and slow:'
 DOOR_REST='His lips form exactly these words. He says only this one line, then closes his mouth and is still again. The queue on the left waits behind the rope; the red bulb above the door glows. Sound: only his voice. No music.'
+HELENA_WHO='The woman with the grey streak in her short black hair, leaning against the flight cases, looks at the viewer and says, with the voice from <AUDIO_0>, low, dry and unhurried:'
+HELENA_REST='Her lips form exactly these words. She says only this line, then closes her mouth and is still again with a faint smile. Far behind her, people dance in the coloured light at the end of the corridor. Sound: only her voice. No music.'
 LIA_WHO='The woman behind the counter looks at the viewer and says, with the voice from <AUDIO_0>, dry, warm and unhurried:'
 LIA_REST='Her lips form exactly these words. She says only this one line, then closes her mouth and is still again with a small smile. She keeps holding the blank white record sleeve. Rain runs down the window. The yellow tram outside is parked and does not move. Sound: only her voice. No music.'
 
@@ -40,6 +42,9 @@ want white-label-04 && line white-label-04 scene-shop-lia ara 6 "$LIA_WHO \"Here
 want white-label-05 && line white-label-05 scene-shop-lia ara 4 "$LIA_WHO \"Play it when you know why.\" She says it quietly and seriously. $LIA_REST" &
 # Chapter 6 (17 Nov 2026): Nuno at the door of CAVE, nine years younger.
 want nuno-01 && line nuno-01 scene-nuno-door zagan 4 "$DOOR_WHO \"Not on the list.\" He glances down at the clipboard first, then back up at the viewer as he speaks. $DOOR_REST" &
+# Chapter 7: Helena Voss backstage at CAVE. She will coach by voice-over later, so she has an xAI
+# voice (luna, the lowest of the female voices; Zé can recast by ear from voice/casting/).
+want helena-01 && line helena-01 scene-helena luna 8 "$HELENA_WHO \"You warmed up for me like you meant it. Nobody does that any more. Fridays, peak time. They're yours.\" She tilts her head slightly on the last words. $HELENA_REST" &
 want nuno-02 && line nuno-02 scene-nuno-door zagan 5 "$DOOR_WHO \"Warm-up. Downstairs. Mind the step.\" He taps the clipboard once with a ringed finger and tips his head towards the steel door. $DOOR_REST" &
 wait
 

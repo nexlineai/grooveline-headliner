@@ -26,7 +26,19 @@ enum Chapters {
     /// played straight away; on for the release.
     static let locked = false
 
-    static let all: [Chapter] = [bedroom, houseParties, shop, pubs, radio, door]
+    static let all: [Chapter] = [bedroom, houseParties, shop, pubs, radio, door, resident]
+
+    /// Chapter 7: Fridays at CAVE. Helena gives you peak time; club players, keys, a power cut.
+    static let resident = Chapter(number: 7, title: "RESIDENT",
+                                  line: "Fridays at CAVE, peak time: club players, nine hundred people, and records that have to agree.",
+                                  steps: [
+        ChapterStep(id: "helena", kind: .story, title: "HELENA VOSS", detail: "Fridays, peak time. They're yours.",
+                    screens: [.story("helena")]),
+        ChapterStep(id: "keys", kind: .lesson, title: "KEYS", detail: "Same beat, wrong notes. Find a neighbour on the wheel.",
+                    screens: [.lesson("keys")]),
+        ChapterStep(id: Nights.fridayCave.id, kind: .night, title: Nights.fridayCave.title, detail: "Peak time, records in key, and the power goes.",
+                    screens: [.night(Nights.fridayCave.id)]),
+    ])
 
     /// Chapter 6: club CAVE, the warm-up slot. Nuno at the door, a bag of records, the headliner late.
     static let door = Chapter(number: 6, title: "THE DOOR",
@@ -151,11 +163,12 @@ struct ChapterView: View {
         ZStack(alignment: .topLeading) {
             HStack(alignment: .center, spacing: 22) {
                 VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 10) {
+                    HStack(spacing: 6) {
                         Text("CHAPTER \(chapter.number)")
                             .font(.system(size: 12, weight: .heavy))
                             .tracking(5)
                             .foregroundStyle(GroovelineLogo.teal)
+                            .fixedSize()
                         // Other chapters, while nothing is locked.
                         if !Chapters.locked {
                             ForEach(Chapters.all.filter { $0.number != chapter.number }, id: \.number) { other in
@@ -165,7 +178,7 @@ struct ChapterView: View {
                                     Text("\(other.number)")
                                         .font(.system(size: 11, weight: .heavy))
                                         .foregroundStyle(.white.opacity(0.8))
-                                        .frame(width: 24, height: 24)
+                                        .frame(width: 22, height: 22)
                                         .background(Circle().stroke(.white.opacity(0.35), lineWidth: 1))
                                 }
                             }
