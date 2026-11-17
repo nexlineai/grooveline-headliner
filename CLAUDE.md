@@ -100,9 +100,9 @@ Design, story, decisions and the build log are in the vault:
   is not saved yet; when it is, add it to `CareerProgress` as an Optional (synthesized Codable
   inside `try?`: a new non-optional field wipes every saved progress).
   CUT (`LessonDesk.cutter`) renders `DrumMachine.arrangement` (intro 16 kick+hat, groove 16
-  +clap+bass, full 16, break 8 chord+hat, full 16, outro 8 = 80 bars) as the record `dubplate`,
+  +clap+bass, full 16, break 8 chord+hat, full 16, outro 8 = 80 bars) as the record `your-dubplate` (not `dubplate`: chapter 3 has a record with that id),
   saved as `CareerProgress.track` (Optional) and listed in the crate (free play, and bags that
-  name "dubplate"; crate loads of it go through `Studio.loadCut`). Night `mixdownCheck`: 5 s after
+  name "your-dubplate"; crate loads of it go through `Studio.loadCut`). Night `mixdownCheck`: 5 s after
   the dubplate is on air its bass "booms"; its low knob must be at 0.35 or below within 8 s.
   Every App file that names a HeadlinerCore type must `import HeadlinerCore` (build 38 failed).
   Studio audio is levelled: the full mix (all rows) is scaled to `DrumMachine.targetRMS` (-15

@@ -166,7 +166,7 @@ final class BoothScene: SKScene {
 
     /// The studio's pattern was edited: the left deck plays the new version from where it is.
     func patternChanged() {
-        guard lesson?.lesson.desk.studio == true, decks[0].info?.id != "dubplate" else { return }
+        guard lesson?.lesson.desk.studio == true, decks[0].info?.id != "your-dubplate" else { return }
         Studio.load(game.pattern, on: decks[0], keepPlace: true)
     }
 

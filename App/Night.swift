@@ -199,7 +199,7 @@ enum Nights {
     /// system its bass booms until its low comes down.
     static let dubplateNight = NightInfo(id: "dubplate-night", title: "DUBPLATE", length: 360, room: "cavepeak",
                                          records: ["onda-media", "estatica"], chapter: 8, mixesFor3Stars: 2,
-                                         requests: [NightRequest(at: 0.2, record: "dubplate", voice: "dub-req", text: "Now. Play your record. It's in the crate.")],
+                                         requests: [NightRequest(at: 0.2, record: "your-dubplate", voice: "dub-req", text: "Now. Play your record. It's in the crate.")],
                                          lines: ["wait": [("dub-wait", "Saturday at CAVE. Your record's in the bag. Play something.")],
                                                  "start": [("fri-start", "Here we go. Peak time.")],
                                                  "clean": [("fri-clean-1", "Smooth. The whole cellar felt that."), ("fri-clean-2", "Nobody even blinked. Perfect.")],
@@ -214,7 +214,7 @@ enum Nights {
                                                  "boom": [("dub-boom", "Your bass is huge on this system. Bring its low down a bit.")],
                                                  "boomOk": [("dub-boom-ok", "Better. Now it sounds like a club record.")],
                                                  "boomNo": [("dub-boom-no", "It's booming. The sound guy is waving at you.")]],
-                                         bag: ["onda-media", "estatica", "dubplate", "sinal", "antena", "sem-lista"],
+                                         bag: ["onda-media", "estatica", "your-dubplate", "sinal", "antena", "sem-lista"],
                                          clockStart: 60, mixdownCheck: true)
     static let all = [firstParty, garageParty, saturdayShift, emptyTuesday, thursdayShow, caveWarmUp, fridayCave, afterhours, dubplateNight]
     static func find(_ id: String) -> NightInfo? { all.first { $0.id == id } }
@@ -395,14 +395,14 @@ final class NightRunner: ObservableObject {
             }
             // Your dubplate on a big system: the bass booms; its low knob must come down.
             if info.mixdownCheck {
-                if onAirRecord == "dubplate" && plateOnAirAt == nil { plateOnAirAt = now }
-                if let at = plateOnAirAt, !boomAsked, now - at > 5, onAirRecord == "dubplate" {
+                if onAirRecord == "your-dubplate" && plateOnAirAt == nil { plateOnAirAt = now }
+                if let at = plateOnAirAt, !boomAsked, now - at > 5, onAirRecord == "your-dubplate" {
                     boomAsked = true
                     boomBy = now + 8
                     say("boom", urgent: true)
                 }
                 if let by = boomBy {
-                    if onAirRecord == "dubplate" && lowOnAir <= 0.35 {
+                    if onAirRecord == "your-dubplate" && lowOnAir <= 0.35 {
                         boomBy = nil
                         energy = min(1, energy + 0.05)
                         say("boomOk", urgent: true)

@@ -85,7 +85,7 @@ struct BoothView: View {
                 if crateShown {
                     if crateOpen {
                         CrateView(tracks: crateRecords, decks: game.engine.decks, tick: crateTick, onLoad: { track, d in
-                            if track.id == "dubplate" {
+                            if track.id == "your-dubplate" {
                                 // On the big system (the DUBPLATE night) the cut booms until its low comes down.
                                 let boom = nightID.flatMap { Nights.find($0)?.mixdownCheck } ?? false
                                 Studio.loadCut(dubplatePattern, on: game.engine.decks[d], heavyLows: boom)
@@ -184,7 +184,7 @@ struct BoothView: View {
         var bag: [String]?
         if let id = lessonID, let lesson = Lessons.find(id) { chapter = lesson.desk.chapter; bag = lesson.desk.bag }
         if let id = nightID, let info = Nights.find(id) { chapter = info.chapter; bag = info.bag }
-        if let bag { return game.tracks.filter { bag.contains($0.id) } + (bag.contains("dubplate") ? [Studio.cutInfo()] : []) }
+        if let bag { return game.tracks.filter { bag.contains($0.id) } + (bag.contains("your-dubplate") ? [Studio.cutInfo()] : []) }
         return game.tracks.filter { ($0.chapter ?? 1) <= chapter }
     }
 

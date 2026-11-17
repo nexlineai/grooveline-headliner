@@ -19,7 +19,7 @@ enum Studio {
     static func cutInfo(seconds: Double? = nil) -> TrackInfo {
         let bars = DrumMachine.arrangement.reduce(0) { $0 + $1.bars }
         let length = seconds ?? Double(bars * DrumMachine.barFrames(bpm: bpm)) / DrumMachine.sampleRate
-        return TrackInfo(id: "dubplate", title: "YOUR DUBPLATE", artist: "YOU", label: "ONE COPY", genre: "Your own",
+        return TrackInfo(id: "your-dubplate", title: "YOUR DUBPLATE", artist: "YOU", label: "ONE COPY", genre: "Your own",
                          bpm: bpm, key: "A minor", camelot: "8A", bars: bars, seconds: length, chapter: 8)
     }
 
@@ -57,7 +57,7 @@ struct StudioGrid: View {
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 30)) { _ in
-            let playing = deck.motorOn && deck.rate > 0.5 && (deck.info?.id == "studio" || deck.info?.id == "dubplate")
+            let playing = deck.motorOn && deck.rate > 0.5 && (deck.info?.id == "studio" || deck.info?.id == "your-dubplate")
             let beat = deck.beat
             let now = playing ? Int((beat * 4).rounded(.down)) % DrumPattern.steps : -1
             HStack(alignment: .center, spacing: 8) {
