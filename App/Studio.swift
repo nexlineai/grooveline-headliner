@@ -24,30 +24,40 @@ enum Studio {
     }
 }
 
-/// Three rows of sixteen steps. A tap switches a step; the column being played lights up.
+/// Rows of sixteen steps on two pages (DRUMS: kick, clap, hat; SYNTH: bass, chord). A tap
+/// switches a step; the column being played lights up.
 struct StudioGrid: View {
     @Binding var pattern: DrumPattern
+    @Binding var page: Int
     /// The deck playing the pattern, for the running light.
     let deck: Deck
 
-    private let tints = [GroovelineLogo.teal, Color(Palette.orange), Color(Palette.magenta)]
+    private let tints = [GroovelineLogo.teal, Color(Palette.orange), Color(Palette.magenta),
+                         Color(red: 0.62, green: 0.88, blue: 0.32), Color(red: 0.66, green: 0.58, blue: 1)]
+    private let pages = [[0, 1, 2], [3, 4]]
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 30)) { _ in
             let playing = deck.motorOn && deck.rate > 0.5 && deck.info?.id == "studio"
             let beat = deck.beat
             let now = playing ? Int((beat * 4).rounded(.down)) % DrumPattern.steps : -1
-            VStack(spacing: 4) {
-                ForEach(0..<DrumPattern.voices.count, id: \.self) { row in
-                    HStack(spacing: 3) {
-                        Text(DrumPattern.voices[row])
-                            .font(.system(size: 10, weight: .heavy))
-                            .tracking(1.5)
-                            .foregroundStyle(tints[row])
-                            .frame(width: 42, alignment: .leading)
-                        ForEach(0..<DrumPattern.steps, id: \.self) { step in
-                            cell(row: row, step: step, now: now)
-                                .padding(.leading, step > 0 && step % 4 == 0 ? 5 : 0)
+            HStack(alignment: .center, spacing: 8) {
+                VStack(spacing: 4) {
+                    tab("DRUMS", 0)
+                    tab("SYNTH", 1)
+                }
+                VStack(spacing: 4) {
+                    ForEach(pages[min(1, max(0, page))], id: \.self) { row in
+                        HStack(spacing: 3) {
+                            Text(DrumPattern.voices[row])
+                                .font(.system(size: 10, weight: .heavy))
+                                .tracking(1.5)
+                                .foregroundStyle(tints[row])
+                                .frame(width: 42, alignment: .leading)
+                            ForEach(0..<DrumPattern.steps, id: \.self) { step in
+                                cell(row: row, step: step, now: now)
+                                    .padding(.leading, step > 0 && step % 4 == 0 ? 5 : 0)
+                            }
                         }
                     }
                 }
@@ -70,7 +80,22 @@ struct StudioGrid: View {
                 .fill(on ? tints[row] : Color.white.opacity(beatStart ? 0.16 : 0.08))
                 .overlay(RoundedRectangle(cornerRadius: 5)
                     .stroke(step == now ? Color.white : Color.white.opacity(0.15), lineWidth: step == now ? 2 : 1))
-                .frame(width: 30, height: 26)
+                .frame(width: 28, height: 26)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func tab(_ title: String, _ index: Int) -> some View {
+        let on = page == index
+        return Button {
+            page = index
+        } label: {
+            Text(title)
+                .font(.system(size: 10, weight: .heavy))
+                .tracking(1.5)
+                .foregroundStyle(on ? Color.black : Color.white.opacity(0.85))
+                .frame(width: 58, height: 39)
+                .background(RoundedRectangle(cornerRadius: 8).fill(on ? GroovelineLogo.teal : Color.white.opacity(0.08)))
         }
         .buttonStyle(.plain)
     }

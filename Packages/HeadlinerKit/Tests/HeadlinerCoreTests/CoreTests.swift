@@ -397,3 +397,23 @@ final class DrumMachineTests: XCTestCase {
         XCTAssertEqual(DrumPattern.house.on(2), [2, 6, 10, 14])
     }
 }
+
+final class StudioSynthTests: XCTestCase {
+    func testFiveRowsEvenFromAShorterPattern() {
+        XCTAssertEqual(DrumPattern().rows.count, 5)
+        XCTAssertEqual(DrumPattern.house.rows.count, 5)
+        XCTAssertTrue(DrumPattern.house.rows[3].allSatisfy { !$0 })
+        XCTAssertEqual(DrumPattern(rows: [[true]]).rows[0].count, 16)
+    }
+
+    func testBassAndChordSound() {
+        XCTAssertGreaterThan(DrumMachine.voice(3).map { abs($0) }.max() ?? 0, 0.1)
+        XCTAssertGreaterThan(DrumMachine.voice(4).map { abs($0) }.max() ?? 0, 0.1)
+        var p = DrumPattern()
+        p.rows[3][2] = true
+        let audio = DrumMachine.render(p, bpm: 124, bars: 1)
+        let at = DrumMachine.stepFrame(2, bpm: 124)
+        XCTAssertEqual(audio.left[0..<at].map { abs($0) }.max() ?? 1, 0)
+        XCTAssertGreaterThan(audio.left[at..<(at + 4_410)].map { abs($0) }.max() ?? 0, 0.05)
+    }
+}

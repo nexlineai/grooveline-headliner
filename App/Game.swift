@@ -41,6 +41,8 @@ final class Game: ObservableObject {
     let demo: Bool
     /// The studio's drum pattern (chapter 8). Not saved yet.
     @Published var pattern = DrumPattern()
+    /// Which page of the step grid shows: 0 drums, 1 synth.
+    @Published var studioPage = 0
     /// Headphones: 0 off (the room on both sides), 1 split (room left, headphones right),
     /// 2 a four-output sound card (room on 1-2, headphones on 3-4).
     @Published var phonesMode: Int {
@@ -62,6 +64,7 @@ final class Game: ObservableObject {
         let defaults = UserDefaults.standard
         demo = defaults.bool(forKey: "demo")
         if defaults.bool(forKey: "demoPattern") { pattern = .house }
+        studioPage = defaults.integer(forKey: "studioPage")
         phonesMode = defaults.integer(forKey: "phonesMode")
         cueMix = defaults.double(forKey: "cueMix")
         engine.phones = PhonesMode(rawValue: phonesMode) ?? .off

@@ -959,7 +959,8 @@ final class BoothScene: SKScene {
                                  jingles: game.jingleCount,
                                  time: CACurrentMediaTime(),
                                  filter: filterSetting,
-                                 pattern: game.pattern.rows))
+                                 pattern: game.pattern.rows,
+                                 page: game.studioPage))
         let wanted: Float = lesson.speaking || game.jinglePlaying ? 0.5 : 1
         let now = game.engine.masterVolume
         if abs(wanted - now) > 0.002 {

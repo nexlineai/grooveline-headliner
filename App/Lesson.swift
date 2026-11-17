@@ -72,8 +72,11 @@ enum LessonGoal: Equatable {
     /// The deck's tempo is brought down to `to` BPM with its pitch fader, never more than 1.5 BPM
     /// within one bar (faster and the room feels the brakes: a miss, then carry on).
     case rideTempo(deck: Int, to: Double)
-    /// The studio's pattern: exactly these steps (0-based) are on in this row (0 kick, 1 clap, 2 hat).
+    /// The studio's pattern: exactly these steps (0-based) are on in this row (0 kick, 1 clap,
+    /// 2 hat, 3 bass, 4 chord).
     case pattern(row: Int, steps: [Int])
+    /// The step grid shows this page (0 drums, 1 synth).
+    case studioPage(Int)
     /// The deck's motor is off.
     case stopDeck(Int)
     /// Nothing to do: the step ends with the coach's line.
@@ -124,6 +127,8 @@ struct LessonDesk {
     var cueBar: Int?
     /// The studio: the step grid over the room, and the left deck plays what it says.
     var studio = false
+    /// The pattern a studio lesson starts from (nil: empty).
+    var pattern: DrumPattern?
 }
 
 struct Lesson {
@@ -138,7 +143,35 @@ struct Lesson {
 enum Lessons {
     static func find(_ id: String) -> Lesson? { all.first { $0.id == id } }
 
-    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars, requests, syncOff, byEar, holdIt, longBlend, onAir, warmUp, keys, filterMix, tempo, drums]
+    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars, requests, syncOff, byEar, holdIt, longBlend, onAir, warmUp, keys, filterMix, tempo, drums, synth]
+
+    /// Lesson 16, chapter 8: bass and chords on the SYNTH page, over the house drums. The bass
+    /// goes where the kick is not; one on the kick shows why; chord stabs just before the clap.
+    static let synth = Lesson(id: "synth", number: 16, title: "BASS AND CHORDS", coach: "LIA",
+                              desk: LessonDesk(crossfader: 0.5, channel: [0.85, 0], sync: [false, false], room: "bedroom",
+                                               chapter: 8, studio: true, pattern: .house), steps: [
+        LessonStep(voice: "synth-01",
+                   text: "Your drums are still here. Press play.",
+                   task: "PRESS PLAY ON THE LEFT DECK", goal: .startDeck(0), target: .play(0)),
+        LessonStep(voice: "synth-02",
+                   text: "Now the notes. Tap SYNTH, on the left of the grid.",
+                   task: "TAP SYNTH (LEFT OF THE GRID)", goal: .studioPage(1), target: nil),
+        LessonStep(voice: "synth-03",
+                   text: "The bass goes where the kick isn't. Between the kicks: steps 3, 7, 11 and 15.",
+                   task: "BASS ON 3, 7, 11 AND 15", goal: .pattern(row: 3, steps: [2, 6, 10, 14]), target: nil),
+        LessonStep(voice: "synth-04",
+                   text: "Now add one on step 1, with the kick. Listen.",
+                   task: "ADD A BASS NOTE ON STEP 1", goal: .pattern(row: 3, steps: [0, 2, 6, 10, 14]), target: nil),
+        LessonStep(voice: "synth-05",
+                   text: "Hear the thump go muddy? Kick and bass, fighting for the same space. Take it off again.",
+                   task: "TAKE THE BASS OFF STEP 1", goal: .pattern(row: 3, steps: [2, 6, 10, 14]), target: nil),
+        LessonStep(voice: "synth-06",
+                   text: "Chords. A stab on steps 4 and 12, just before the clap. It pushes the groove forward.",
+                   task: "CHORD ON 4 AND 12", goal: .pattern(row: 4, steps: [3, 11]), target: nil),
+        LessonStep(voice: "synth-07",
+                   text: "Drums, bass, chords. That's a track. Next, we make it a record.",
+                   task: "BASS AND CHORDS", goal: .listen, target: nil),
+    ])
 
     /// Lesson 15, chapter 8, the studio: a drum machine. Three rows, sixteen steps, one bar; the
     /// left deck plays the pattern as a record. Four on the floor, the clap on two and four, the
@@ -687,8 +720,9 @@ struct BoothFacts {
     var time: Double
     /// Filter knob per deck, 0.5 = off.
     var filter: [Double]
-    /// The studio's pattern, per row the steps that are on.
+    /// The studio's pattern, per row the steps that are on; the grid's page.
     var pattern: [[Bool]]
+    var page: Int
 }
 
 /// Walks through a lesson. The booth scene feeds it `BoothFacts` every frame; the overlay shows
@@ -1008,6 +1042,8 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
                 if !facts.motorOn[d] { met() }
             case .filter(let d, let range):
                 if range.contains(facts.filter[d]) { met() }
+            case .studioPage(let p):
+                if facts.page == p { met() }
             case .pattern(let row, let steps):
                 if facts.pattern.indices.contains(row) {
                     let on = facts.pattern[row].indices.filter { facts.pattern[row][$0] }

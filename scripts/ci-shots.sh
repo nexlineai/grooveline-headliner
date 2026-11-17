@@ -89,6 +89,7 @@ shot afterhours-night 10 -screen night -night afterhours -demo 1
 shot story-vex 5 -screen story -scene vex
 shot chapter8 5 -screen chapter -chapter 8
 shot lesson-drums 8 -screen lesson -lesson drums -lessonStep 1 -demoPattern 1 -demo 1
+shot lesson-synth 6 -screen lesson -lesson synth -lessonStep 2 -studioPage 1
 shot lesson-requests 6 -screen lesson -lesson requests
 shot garage 10 -screen night -night garage-party -demo 1
 shot garage-crate 6 -screen night -night garage-party -crate 1

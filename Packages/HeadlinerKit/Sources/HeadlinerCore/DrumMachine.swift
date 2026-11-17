@@ -4,14 +4,20 @@ import Foundation
 // a 16-step pattern per voice, rendered offline into a record that an ordinary deck plays: pitch,
 // sync, EQ, the filter and the room's judging all work on it unchanged.
 
-/// What the player programmed: per voice (kick, clap, hat), sixteen steps of one bar.
+/// What the player programmed: per voice (kick, clap, hat, bass, chord), sixteen steps of one
+/// bar. The bass and the chord are in A minor (the studio's key).
 public struct DrumPattern: Codable, Equatable, Sendable {
     public static let steps = 16
-    public static let voices = ["KICK", "CLAP", "HAT"]
+    public static let voices = ["KICK", "CLAP", "HAT", "BASS", "CHORD"]
     public var rows: [[Bool]]
 
+    /// Missing rows (or steps) are filled in empty, so an older or shorter pattern still works.
     public init(rows: [[Bool]]? = nil) {
-        self.rows = rows ?? Array(repeating: Array(repeating: false, count: Self.steps), count: Self.voices.count)
+        var all = rows ?? []
+        while all.count < Self.voices.count { all.append([]) }
+        self.rows = all.map { row in
+            Array(row.prefix(Self.steps)) + Array(repeating: false, count: max(0, Self.steps - row.count))
+        }
     }
 
     /// The steps that are on in a row (0-based).
@@ -41,7 +47,7 @@ public enum DrumMachine {
         Int((Double(s) * Double(barFrames(bpm: bpm)) / Double(DrumPattern.steps)).rounded())
     }
 
-    /// One hit of a voice, mono: 0 kick, 1 clap, 2 hat.
+    /// One hit of a voice, mono: 0 kick, 1 clap, 2 hat, 3 bass (A, 110 Hz), 4 chord (A minor 7).
     public static func voice(_ v: Int) -> [Float] {
         let sr = sampleRate
         var noise = Noise(seed: UInt32(17 + v))
@@ -71,6 +77,12 @@ public enum DrumMachine {
                 out[i] = Float(Double(fast - slow) * burst * 1.2) // what lies between: the clap's band
             }
             return out
+        case 3:
+            // Bass: a saw on A (110 Hz) whose low-pass closes fast: a short, round pluck.
+            return saws([110], length: 0.22, startHz: 2_400, endHz: 180, decay: 18, gain: 0.9, noise: &noise)
+        case 4:
+            // Chord: A minor 7 (A, C, E, G) on detuned saws, a bright stab that closes quickly.
+            return saws([220, 261.63, 329.63, 392], length: 0.3, startHz: 3_200, endHz: 400, decay: 12, gain: 0.55, noise: &noise)
         default:
             // Hat: bright noise with the low end taken out, gone in a few hundredths of a second.
             let n = Int(0.08 * sr)
@@ -87,13 +99,39 @@ public enum DrumMachine {
         }
     }
 
+    /// Saws at `freqs` (two slightly detuned per note) through a low-pass that falls from `startHz`
+    /// to `endHz`, fading over `length` seconds.
+    static func saws(_ freqs: [Double], length: Double, startHz: Double, endHz: Double, decay: Double, gain: Double,
+                     noise: inout Noise) -> [Float] {
+        let sr = sampleRate, n = Int(length * sr)
+        var out = [Float](repeating: 0, count: n)
+        var phases = freqs.flatMap { _ in [Double(noise.next()), Double(noise.next())] }.map { abs($0) }
+        let speeds = freqs.flatMap { [$0 * 0.996 / sr, $0 * 1.004 / sr] }
+        var y: Double = 0
+        for i in 0..<n {
+            let t = Double(i) / sr
+            var x = 0.0
+            for k in 0..<phases.count {
+                phases[k] += speeds[k]
+                if phases[k] >= 1 { phases[k] -= 1 }
+                x += 2 * phases[k] - 1
+            }
+            x /= Double(phases.count)
+            let cutoff = endHz + (startHz - endHz) * exp(-t * decay)
+            y += (1 - exp(-2 * .pi * cutoff / sr)) * (x - y) // one-pole low-pass
+            let fade = min(1, t * 400) * (t < length - 0.02 ? 1 : max(0, (length - t) / 0.02))
+            out[i] = Float(y * fade * gain * 2)
+        }
+        return out
+    }
+
     /// The pattern played for `bars` bars at `bpm`, stereo. One bar is rendered (a hit that runs
     /// past the end of the bar continues at its start) and repeated, so an edit costs almost
     /// nothing and the record loops without a seam.
     public static func render(_ pattern: DrumPattern, bpm: Double, bars: Int) -> (left: [Float], right: [Float]) {
         let frames = barFrames(bpm: bpm)
         var barL = [Float](repeating: 0, count: frames), barR = barL
-        let levels: [(gain: Float, left: Float, right: Float)] = [(0.9, 1, 1), (0.5, 1, 0.92), (0.3, 0.85, 1)]
+        let levels: [(gain: Float, left: Float, right: Float)] = [(0.9, 1, 1), (0.5, 1, 0.92), (0.3, 0.85, 1), (0.7, 1, 1), (0.35, 0.9, 1)]
         for v in 0..<min(pattern.rows.count, levels.count) {
             let hit = voice(v), level = levels[v]
             for s in 0..<DrumPattern.steps where s < pattern.rows[v].count && pattern.rows[v][s] {

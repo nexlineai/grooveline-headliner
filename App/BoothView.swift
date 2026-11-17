@@ -33,7 +33,7 @@ struct BoothView: View {
                     }
                 }
                 if studio && runner?.stars == nil {
-                    StudioGrid(pattern: $game.pattern, deck: game.engine.decks[0])
+                    StudioGrid(pattern: $game.pattern, page: $game.studioPage, deck: game.engine.decks[0])
                         .frame(maxWidth: .infinity)
                         .frame(height: max(60, roomHeight - 4), alignment: .bottom)
                 }
@@ -91,8 +91,12 @@ struct BoothView: View {
             }
             .onAppear {
                 guard scene == nil else { return }
-                // A studio lesson starts from an empty pattern (the screenshot run brings a groove).
-                if studio && !UserDefaults.standard.bool(forKey: "demoPattern") { game.pattern = DrumPattern() }
+                // A studio lesson starts from its own pattern, or an empty one (the screenshot run
+                // can bring a groove), on the page asked for.
+                if studio, let id = lessonID, let lesson = Lessons.find(id) {
+                    if !UserDefaults.standard.bool(forKey: "demoPattern") { game.pattern = lesson.desk.pattern ?? DrumPattern() }
+                    game.studioPage = UserDefaults.standard.integer(forKey: "studioPage")
+                }
                 let made = BoothScene(game: game)
                 made.insets = geo.safeAreaInsets
                 // The screenshot run opens the crate by itself.

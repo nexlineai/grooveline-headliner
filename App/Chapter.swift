@@ -35,6 +35,8 @@ enum Chapters {
                                 steps: [
         ChapterStep(id: "drums", kind: .lesson, title: "DRUMS", detail: "Sixteen steps. Four on the floor.",
                     screens: [.lesson("drums")]),
+        ChapterStep(id: "synth", kind: .lesson, title: "BASS AND CHORDS", detail: "The bass goes where the kick isn't.",
+                    screens: [.lesson("synth")]),
     ])
 
     /// Chapter 7: Fridays at CAVE. Helena gives you peak time; club players, keys, a power cut.
