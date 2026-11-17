@@ -664,6 +664,109 @@ const CHAPTER6 = [
 ];
 TRACKS.push(...CHAPTER6);
 
+// ---------- chapter 7: resident at CAVE ----------
+// Peak time (128-132) and afterhours (118-120), so the chapter can teach tempo changes. New
+// sounds: laser zaps, a choir, a trance gate, an 808 boom bass, a kalimba on wobbly tape, a handpan.
+const CHAPTER7 = [
+  {
+    id: 'residente', title: 'Residente', artist: 'Turno da Noite', label: 'Betão', chapter: 7,
+    genre: 'Hardgroove', bpm: 130, root: 54, key: 'F# minor', camelot: '11A', seed: 653, swing: 0.04,
+    chords: [[0, 3, 7]], chordRhythm: x4([0, 0, 0, 0]),
+    bass: x4([null, null, 0, null]), bassOct: -12,
+    kit: { kick: 'punch', hat: 'metal', ohat: 'metal', snare: 'clap', bass: 'sub' },
+    drums: { hat: x4([0.6, 0.4, 0.8, 0.4]), ohat: x4([0, 0, 0.9, 0]), clap: [0, 0, 0, 0, 0.9, 0, 0, 0, 0, 0, 0, 0, 0.9, 0, 0, 0.4],
+             perc: { ride: x4([0.6, 0.3, 0.8, 0.3]), tomHi: [0, 0, 0, 0.5, 0, 0, 0, 0, 0, 0, 0.6, 0, 0, 0, 0, 0],
+                     tomLo: [0, 0, 0, 0, 0, 0, 0.6, 0, 0, 0, 0, 0, 0, 0.7, 0, 0], laser: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.7, 0, 0, 0, 0.5, 0] } },
+    style: { sweep: 0.3, delayBeats: 0.75, delayFb: 0.45, delayWet: 0.3, reverb: 0.25, pad: 0.06,
+             openHat: 0.3, closedHat: 0.26, clap: 0.42, perc: 0.36, hiss: 0 },
+    mix: { duck: 0.55, drive: 1.5 },
+    sections: [S('intro', 16, 'kick hat'), S('toms', 16, 'kick hat ohat perc bass'),
+               S('clap', 16, 'kick hat ohat clap perc bass'), S('break', 8, 'perc pad'),
+               S('full', 16, 'kick hat ohat clap perc bass'), S('outro', 8, 'kick hat ohat')],
+  },
+  {
+    id: 'coro', title: 'Coro', artist: 'Catedral', label: 'Betão', chapter: 7,
+    genre: 'Peak-time Techno', bpm: 132, root: 46, key: 'Bb minor', camelot: '3A', seed: 661, swing: 0,
+    chords: [[0, 3, 7], [0, 3, 7], [-4, 0, 3], [-2, 2, 5]], chordRhythm: [0.9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    bass: x4([null, 0, null, 0]), bassOct: -12,
+    kit: { kick: 'rumble', hat: 'metal', ohat: 'metal', snare: 'clap', chord: 'choir', bass: 'sub', chordOct: 12 },
+    drums: { hat: x4([0.5, 0.4, 0.8, 0.4]), ohat: x4([0, 0, 1, 0]), clap: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+             perc: { ride: x4([0.5, 0, 0.7, 0]) } },
+    style: { choir: 0.5, choirBeats: 4, sweep: 0.3, delayBeats: 0.75, delayFb: 0.4, delayWet: 0.25, reverb: 0.4, pad: 0.05,
+             openHat: 0.3, closedHat: 0.26, clap: 0.4, perc: 0.32, hiss: 0 },
+    mix: { duck: 0.6, drive: 1.4 },
+    sections: [S('intro', 16, 'kick hat perc'), S('groove', 16, 'kick hat ohat clap perc bass'),
+               S('choir', 16, 'kick hat ohat clap perc bass chord'), S('break', 8, 'chord'),
+               S('full', 16, 'kick hat ohat clap perc bass chord'), S('outro', 8, 'kick hat perc')],
+  },
+  {
+    id: 'portao', title: 'Portão', artist: 'Luz de Presença', label: 'Fita Dourada', chapter: 7,
+    genre: 'Trance Techno', bpm: 130, root: 47, key: 'B minor', camelot: '10A', seed: 673, swing: 0,
+    chords: [[0, 3, 7], [0, 3, 7], [-4, 0, 3], [-2, 2, 5]], chordRhythm: x4([0, 0, 0, 0]),
+    gate: [1, 0, 0.8, 1, 0, 0.8, 1, 0, 1, 0, 0.8, 1, 0, 0.8, 0, 1],
+    bass: x4([null, null, 0, null]), bassOct: -12,
+    kit: { kick: 'punch', hat: 'metal', ohat: 'metal', snare: 'clap', bass: 'sub' },
+    drums: { hat: x4([0.5, 0.3, 0.7, 0.3]), ohat: x4([0, 0, 1, 0]), clap: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0] },
+    style: { gate: 0.32, sweep: 0.3, delayBeats: 0.75, delayFb: 0.4, delayWet: 0.25, reverb: 0.35, pad: 0.06,
+             openHat: 0.3, closedHat: 0.24, clap: 0.4, perc: 0.3, hiss: 0 },
+    mix: { duck: 0.6, drive: 1.35 },
+    sections: [S('intro', 16, 'kick hat'), S('groove', 16, 'kick hat ohat clap bass'),
+               S('gate', 16, 'kick hat ohat clap bass gate'), S('break', 8, 'gate pad'),
+               S('full', 16, 'kick hat ohat clap bass gate'), S('outro', 8, 'kick hat')],
+  },
+  {
+    id: 'oito-oito', title: 'Oito Oito', artist: 'Máquina Velha', label: 'Rua Baixa', chapter: 7,
+    genre: 'Electro Techno', bpm: 128, root: 51, key: 'Eb minor', camelot: '2A', seed: 683, swing: 0.03,
+    chords: [[0, 3, 7]], chordRhythm: x4([0, 0, 0, 0]),
+    bass: [0, null, null, 0, null, null, 12, null, null, null, 0, null, 10, null, 7, null], bassOct: -12,
+    bassSlide: [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0],
+    kit: { kick: 'deep', hat: 'metal', snare: 'clap', bass: '808' },
+    drums: { hat: x4([0.6, 0.3, 0.7, 0.3]), clap: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+             perc: { cowbell: [0, 0, 0, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 0, 0, 0.4, 0], clapRoll: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.6] } },
+    style: { sweep: 0.3, delayBeats: 0.5, delayFb: 0.35, delayWet: 0.2, reverb: 0.2, pad: 0.05,
+             openHat: 0.28, closedHat: 0.26, clap: 0.45, perc: 0.34, hiss: 0 },
+    mix: { duck: 0.45, drive: 1.3 },
+    sections: [S('intro', 8, 'kick hat'), S('intro 2', 8, 'kick hat clap perc'),
+               S('boom', 16, 'kick hat clap perc bass'), S('break', 8, 'bass perc'),
+               S('full', 16, 'kick hat ohat clap perc bass'), S('groove', 16, 'kick hat clap bass'),
+               S('outro', 8, 'kick hat clap')],
+  },
+  {
+    id: 'manha', title: 'Manhã', artist: 'Janela Aberta', label: 'Cais Dub', chapter: 7,
+    genre: 'Afterhours', bpm: 120, root: 56, key: 'Ab minor', camelot: '1A', seed: 691, swing: 0.12,
+    chords: [[0, 3, 7, 10], [-2, 2, 5, 9]], chordRhythm: x4([0, 0, 0, 0]),
+    arp: [0, null, 2, null, 1, null, 3, null, 0, 2, null, 4, null, 3, null, 1],
+    bass: [0, null, null, null, null, null, 0, null, null, null, null, null, 7, null, null, null], bassOct: -12,
+    kit: { kick: 'deep', hat: 'shaker', snare: 'rim', bass: 'sub', arp: 'kalimba' },
+    drums: { hat: x4([0.4, 0.2, 0.5, 0.2]), clap: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.6, 0, 0, 0],
+             perc: { rim: [0, 0, 0, 0.3, 0, 0, 0, 0, 0, 0, 0.4, 0, 0, 0, 0, 0] } },
+    style: { arp: 0.3, wow: 3, wowRate: 0.5, sweep: 0.2, delayBeats: 0.75, delayFb: 0.5, delayWet: 0.35, reverb: 0.4, pad: 0.07,
+             openHat: 0.2, closedHat: 0.26, clap: 0.36, perc: 0.3, hiss: 0.01 },
+    mix: { duck: 0.45, drive: 1.1 },
+    sections: [S('intro', 16, 'kick hat perc'), S('groove', 16, 'kick hat perc bass'),
+               S('kalimba', 16, 'kick hat clap perc bass arp'), S('break', 8, 'arp pad'),
+               S('full', 16, 'kick hat clap perc bass arp pad'), S('outro', 8, 'kick hat perc')],
+  },
+  {
+    id: 'fumo', title: 'Fumo', artist: 'Subsolo', label: 'Cais Dub', chapter: 7,
+    genre: 'Afterhours Dub', bpm: 118, root: 49, key: 'C# minor', camelot: '12A', seed: 709, swing: 0.08,
+    chords: [[0, 3, 7, 10]], chordRhythm: [0, 0, 0.7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    arp: [0, null, null, null, null, null, 2, null, null, null, null, null, 1, null, null, null],
+    bass: [0, null, null, null, null, null, null, 0, null, null, 0, null, null, null, null, null], bassOct: -12,
+    kit: { kick: 'deep', hat: 'metal', snare: 'rim', bass: 'sub', arp: 'hang' },
+    drums: { hat: x4([0.3, 0.15, 0.5, 0.15]), clap: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.5, 0, 0, 0],
+             perc: { congaLo: [0, 0, 0, 0, 0, 0, 0.4, 0, 0, 0, 0, 0, 0, 0, 0.3, 0] } },
+    style: { arp: 0.32, wow: 2, wowRate: 0.35, chordCut: 1400, chordFloor: 200, chordQ: 2.2, chordDecay: 0.35,
+             sweep: 0.5, delayBeats: 0.75, delayFb: 0.62, delayWet: 0.45, reverb: 0.45, pad: 0.06,
+             openHat: 0.18, closedHat: 0.22, clap: 0.34, perc: 0.3, hiss: 0.012 },
+    mix: { duck: 0.45, drive: 1.1 },
+    sections: [S('intro', 16, 'kick hat'), S('drift', 16, 'kick hat perc bass'),
+               S('hang', 16, 'kick hat clap perc bass arp'), S('break', 8, 'arp chord pad'),
+               S('full', 16, 'kick hat clap perc bass arp chord'), S('outro', 8, 'kick hat perc')],
+  },
+];
+TRACKS.push(...CHAPTER7);
+
 // ---------- small DSP kit ----------
 function rng(seed) { // mulberry32
   let s = seed >>> 0;
@@ -1200,6 +1303,90 @@ function hoover(b, t0, notes, amp, rnd, len = 0.5) { // the rave stab: fat detun
     add(b, t0 + i, Math.tanh(1.3 * f.lp(x / v.length)) * env * amp);
   }
 }
+// ---------- chapter 7 sounds: the resident, peak time and afterhours ----------
+function choir(b, t0, notes, len, amp, rnd, vowel = 'ah') { // a held choir: sixteen buzzing voices with their own vibrato, one set of formants
+  const n = Math.floor((len + 0.8) * SR), fm = VOWELS[vowel] || VOWELS.ah, w = [1, 0.55, 0.25];
+  const fl = fm.map((f, k) => new Biquad('bp', f, [5, 7, 9][k])), fr = fm.map((f, k) => new Biquad('bp', f * 1.02, [5, 7, 9][k]));
+  const voices = [];
+  for (const m of notes) for (const d of [-14, -5, 6, 15]) voices.push({ f: hz(m) * 2 ** (d / 1200), ph: rnd(), v: rnd() * 6.28, right: d > 0 });
+  const half = voices.length / 2;
+  for (let i = 0; i < n && t0 + i < b.L.length; i++) {
+    const t = i / SR;
+    let l = 0, r = 0;
+    for (const o of voices) {
+      o.ph += o.f * (1 + 0.004 * Math.sin(2 * Math.PI * 5.2 * t + o.v)) / SR;
+      if (o.ph >= 1) o.ph -= 1;
+      if (o.right) r += 2 * o.ph - 1; else l += 2 * o.ph - 1;
+    }
+    let yl = 0, yr = 0;
+    for (let k = 0; k < 3; k++) { yl += fl[k].run(l / half) * w[k]; yr += fr[k].run(r / half) * w[k]; }
+    const env = Math.min(1, t / 0.35) * (t < len ? 1 : Math.exp(-(t - len) * 5));
+    b.L[t0 + i] += yl * env * amp; b.R[t0 + i] += yr * env * amp;
+  }
+}
+function gatedSaws(b, t0, notes, len, amp, rnd, pattern, stepLen) { // a held supersaw chord chopped into sixteenths: the trance gate
+  const n = Math.floor(len * SR), fl = new SVF(), fr = new SVF(), L = [], R = [];
+  for (const m of notes) for (const d of [-17, -8, 0, 8, 17]) { L.push(saw(hz(m), d, rnd())); R.push(saw(hz(m), -d, rnd())); }
+  fl.set(2600, 0.8); fr.set(2800, 0.8);
+  let g = 0;
+  for (let i = 0; i < n && t0 + i < b.L.length; i++) {
+    const t = i / SR, s = Math.floor(t / stepLen) % 16, into = (t % stepLen) / stepLen;
+    g += ((pattern[s] > 0 && into < 0.7 ? pattern[s] : 0) - g) * 0.0045; // about 5 ms each way, no clicks
+    let l = 0, r = 0;
+    for (const o of L) l += o();
+    for (const o of R) r += o();
+    b.L[t0 + i] += fl.lp(l / L.length) * g * amp;
+    b.R[t0 + i] += fr.lp(r / R.length) * g * amp;
+  }
+}
+function boom808(b, t0, m, len, amp, from) { // the long 808 drum tuned as a bassline: a sine that slides in and rings out
+  const n = Math.floor((len + 0.25) * SR), f1 = hz(m), f0 = from != null ? hz(from) : f1 * 1.6, k = from != null ? 30 : 45;
+  let ph = 0;
+  for (let i = 0; i < n && t0 + i < b.L.length; i++) {
+    const t = i / SR;
+    ph += 2 * Math.PI * (f1 + (f0 - f1) * Math.exp(-t * k)) / SR;
+    const env = Math.min(1, t * 600) * (t < len ? Math.exp(-t * 1.2) : Math.exp(-len * 1.2 - (t - len) * 18));
+    add(b, t0 + i, Math.tanh(1.8 * Math.sin(ph)) * env * amp);
+  }
+}
+function laser(b, t0, amp, pan = 0) { // the 'pew': a square wave diving from 3 kHz
+  const n = Math.floor(0.16 * SR);
+  let ph = 0;
+  for (let i = 0; i < n && t0 + i < b.L.length; i++) {
+    const t = i / SR;
+    ph += (180 + 3200 * Math.exp(-t * 32)) / SR; if (ph >= 1) ph -= 1;
+    add(b, t0 + i, (ph < 0.5 ? 1 : -1) * Math.exp(-t * 22) * amp * 0.25, pan);
+  }
+}
+function kalimba(b, t0, m, amp, pan = 0) { // a thumb piano: a soft tine, two high partials dying fast, and the buzz of the bridge
+  const n = Math.floor(1.1 * SR), o1 = sine(hz(m)), o2 = sine(hz(m) * 5.95), o3 = sine(hz(m) * 9.8);
+  let e1 = 1, e2 = 1, e3 = 1;
+  const d1 = Math.exp(-3.2 / SR), d2 = Math.exp(-18 / SR), d3 = Math.exp(-45 / SR);
+  for (let i = 0; i < n && t0 + i < b.L.length; i++) {
+    const f = o1();
+    const y = (f * e1 + 0.3 * o2() * e2 + 0.15 * o3() * e3) * (1 + 0.12 * Math.sign(f) * e2) * Math.min(1, i / 12) * amp;
+    e1 *= d1; e2 *= d2; e3 *= d3;
+    add(b, t0 + i, y, pan);
+  }
+}
+function hang(b, t0, m, amp, pan = 0) { // a handpan: a round note with its octave and its fifth above ringing in
+  const n = Math.floor(2.2 * SR), o1 = sine(hz(m)), o2 = sine(hz(m) * 2.01), o3 = sine(hz(m) * 2.99);
+  for (let i = 0; i < n && t0 + i < b.L.length; i++) {
+    const t = i / SR;
+    const y = o1() * Math.exp(-t * 1.8) + 0.45 * o2() * Math.exp(-t * 2.6) * Math.min(1, t / 0.02) + 0.25 * o3() * Math.exp(-t * 3.5) * Math.min(1, t / 0.06);
+    add(b, t0 + i, y * Math.min(1, i / 60) * amp * (1 + 0.08 * Math.sin(2 * Math.PI * 4 * t)), pan);
+  }
+}
+function wow(b, depthMs, rate) { // tape wobble: the whole bus drifts a little sharp and flat, slowly
+  const n = b.L.length, depth = depthMs / 1000 * SR;
+  for (const ch of [b.L, b.R]) {
+    const src = Float32Array.from(ch);
+    for (let i = 0; i < n; i++) {
+      const j = i - depth * (1 + Math.sin(2 * Math.PI * rate * i / SR)), k = Math.floor(j), f = j - k;
+      ch[i] = k >= 0 && k + 1 < n ? src[k] * (1 - f) + src[k + 1] * f : 0;
+    }
+  }
+}
 function hatVoice(kind, b, t0, amp, decay, rnd, pan) {
   if (kind === 'metal') hatMetal(b, t0, amp, decay, pan);
   else if (kind === 'shaker') shaker(b, t0, amp, rnd, pan);
@@ -1221,6 +1408,7 @@ function perc(name, b, t0, amp, rnd, s) {
   else if (name === 'tomHi') tom(b, t0, amp * 0.7, 165, 0.3, rnd);
   else if (name === 'tomLo') tom(b, t0, amp * 0.8, 105, -0.3, rnd);
   else if (name === 'clang') clang(b, t0, amp, rnd, s % 2 ? 0.4 : -0.4);
+  else if (name === 'laser') laser(b, t0, amp, s % 4 > 1 ? 0.5 : -0.5);
   else if (name === 'clapRoll') { clap(b, t0, amp * 0.5, rnd); clap(b, t0 + Math.round(0.03 * SR), amp * 0.35, rnd); }
 }
 
@@ -1276,6 +1464,7 @@ function render(tr) {
           else if (kit.bass === 'organ') organBass(low, t0, m, len, 0.55);
           else if (kit.bass === 'disco') discoBass(low, t0, m, len, 0.55);
           else if (kit.bass === 'wobble') wobbleNote(low, t0, m, len, 0.42, beat);
+          else if (kit.bass === '808') boom808(low, t0, m, len, 0.6, tr.bassSlide?.[s] ? lastBass : null);
           else bassNote(low, t0, m, len, 0.5, st.bassCut);
           lastBass = m;
         }
@@ -1291,6 +1480,7 @@ function render(tr) {
           else if (kit.chord === 'hoover') hoover(keys, t0, notes, v * 0.4, rnd, step * 2);
           else if (kit.chord === 'bell') notes.forEach((m, k) => bell(keys, t0 + Math.round(k * 0.02 * SR), m, v * 0.18, (k - 1.5) * 0.3));
           else if (kit.chord === 'clav') notes.slice(0, 3).forEach((m, k) => clav(keys, t0, m, v * 0.3, rnd, (k - 1) * 0.3));
+          else if (kit.chord === 'choir') choir(air, t0, notes, (st.choirBeats ?? 4) * beat, v * st.choir, rnd, tr.vowel || 'ah');
           else stab(keys, t0, chord.map((c) => tr.root + 12 + c), v * 0.42, st, open * (sec.name === 'break' ? 1.25 : 1), rnd);
         }
         if (has('arp') && tr.arp && tr.arp[s] != null) {
@@ -1298,6 +1488,8 @@ function render(tr) {
           const m = tr.root + 12 * (1 + Math.floor(k / tones.length)) + tones[k % tones.length];
           if (kit.arp === 'marimba') marimba(keys, t0, m, st.arp * (0.7 + 0.6 * open), s % 2 ? 0.35 : -0.35);
           else if (kit.arp === 'bell') bell(keys, t0, m, st.arp * (0.7 + 0.6 * open), s % 2 ? 0.35 : -0.35);
+          else if (kit.arp === 'kalimba') kalimba(keys, t0, m, st.arp * (0.7 + 0.6 * open), s % 2 ? 0.35 : -0.35);
+          else if (kit.arp === 'hang') hang(keys, t0, m, st.arp * (0.7 + 0.6 * open), s % 2 ? 0.3 : -0.3);
           else pluck(keys, t0, m, st.arp * (0.7 + 0.6 * open), rnd, s % 2 ? 0.35 : -0.35);
         }
         if (has('lead') && tr.lead && tr.lead[s] != null) {
@@ -1313,6 +1505,7 @@ function render(tr) {
       }
       if (has('pad')) pad(air, at(bar, 0), chord.slice(0, 4).map((c) => tr.root + c), barLen, st.pad, rnd);
       if (has('strings')) strings(air, at(bar, 0), chord.slice(0, 4).map((c) => tr.root + c), barLen, st.strings, rnd);
+      if (has('gate') && tr.gate) gatedSaws(keys, at(bar, 0), chord.slice(0, 3).map((c) => tr.root + 12 + c), barLen, st.gate, rnd, tr.gate, step);
       if (fill) riser(air, at(bar, 0), barLen, 0.1, rnd);
     }
   });
@@ -1320,6 +1513,7 @@ function render(tr) {
   pingPong(keys, st.delayBeats * beat * SR, st.delayFb, st.delayWet);
   reverb(keys, st.reverb);
   reverb(air, st.reverb * 0.8);
+  if (st.wow) { wow(keys, st.wow, st.wowRate ?? 0.5); wow(air, st.wow, st.wowRate ?? 0.5); }
 
   const hissF = new Biquad('bp', 5200, 0.5);
   const mix = bus(N);
