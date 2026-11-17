@@ -138,6 +138,7 @@ final class BoothScene: SKScene {
         pitchFader = [0.5, 0.5]
         eq = [[0.5, 0.5, 0.5], [0.5, 0.5, 0.5]]
         sync = desk.sync
+        if let mix = desk.cueMix { game.cueMix = mix }
         phones = [false, false]
         for d in 0..<2 {
             let deck = decks[d]
@@ -788,7 +789,10 @@ final class BoothScene: SKScene {
                                  beat: decks.map { $0.beat },
                                  cross: cross,
                                  channel: channel,
-                                 eq: eq))
+                                 eq: eq,
+                                 phonesOn: game.phonesMode != 0,
+                                 phones: phones,
+                                 cueMix: game.cueMix))
         let wanted: Float = lesson.speaking ? 0.5 : 1
         let now = game.engine.masterVolume
         if abs(wanted - now) > 0.002 {
@@ -820,6 +824,8 @@ final class BoothScene: SKScene {
         case .crossfader: return .cross
         case .channel(let d): return .channel(d)
         case .eq(let d, let band): return .eq(d, band)
+        case .phones(let d): return .phones(d)
+        case .cueMixKnob: return .cueMix
         }
     }
 

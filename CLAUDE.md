@@ -82,10 +82,13 @@ Design, story, decisions and the build log are in the vault:
   `--loop`, for anything that looks wrong in reverse). `tools/art/story-lines.sh` holds the
   prompts of every spoken line. Check the words of each clip with `voxtype transcribe`.
   Work files go in `/data/headliner-work/` (root disk is nearly full), only finished clips in git.
-- `tools/art/animate_or.py IN.jpg OUT.mp4 "prompt" --model ID [--return]`: the same through
-  OpenRouter's video API (key: keyring `service openrouter account claude-art`), for cheaper
-  models. They speak in their own voice (no cast voices) and most are 16:9 only. Tested 16 Nov:
-  `google/gemini-omni-1.2-flash` works ($0.07/s at 720p, half of Grok); `google/veo-3.1-lite`
-  refused our picture ("violates Vertex AI's usage guidelines").
+- **Talking clips are made with `tools/art/animate_or.py IN.jpg OUT.mp4 "prompt" --model
+  google/gemini-omni-1.2-flash --return`** (OpenRouter, key: keyring `service openrouter account
+  claude-art`; Zé's choice 17 Nov: half of Grok's price, he likes look and voice). It is 16:9
+  only, so new scene pictures are 16:9 with faces inside the middle 80 % of the height. The voice
+  comes from the model: use the same voice description for a character in every prompt.
+  Only about two lines per scene go on camera, the rest is voice over the picture (cost).
+  `animate.py` (Grok, cast voices, twice the price) made the first two scenes.
+  `google/veo-3.1-lite` refused our picture ("violates Vertex AI's usage guidelines").
 - `tools/voice/say.sh OUT.m4a VOICE "text"`: spoken lines without a picture. `voice/casting/` has every voice
   saying one line, for Zé to cast by ear.

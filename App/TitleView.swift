@@ -29,7 +29,7 @@ struct TitleView: View {
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(.white.opacity(0.75))
             Button {
-                game.run([.story("cold-open"), .story("nine-years"), .lesson("first-mix"), .lesson("on-the-phrase"), .lesson("bass-swap")])
+                game.run([.story("cold-open"), .story("nine-years"), .lesson("first-mix"), .lesson("on-the-phrase"), .lesson("bass-swap"), .lesson("in-your-ears")])
             } label: {
                 Text("PLAY")
                     .font(.system(size: 17, weight: .heavy))
@@ -41,9 +41,10 @@ struct TitleView: View {
             }
             .padding(.top, 16)
             HStack(spacing: 12) {
-                small("LESSON 1") { game.run([.lesson("first-mix")]) }
-                small("LESSON 2") { game.run([.lesson("on-the-phrase")]) }
-                small("LESSON 3") { game.run([.lesson("bass-swap")]) }
+                small("L1") { game.run([.lesson("first-mix")]) }
+                small("L2") { game.run([.lesson("on-the-phrase")]) }
+                small("L3") { game.run([.lesson("bass-swap")]) }
+                small("L4") { game.run([.lesson("in-your-ears")]) }
                 small("DECKS") { game.run([.booth]) }
                 small("SCENE") { game.run([.story("white-label")]) }
             }

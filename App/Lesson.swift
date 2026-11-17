@@ -11,6 +11,8 @@ enum LessonTarget: Equatable {
     case play(Int), cue(Int), crossfader, channel(Int)
     /// An EQ knob: deck, band (0 low, 1 mid, 2 high).
     case eq(Int, Int)
+    /// The PHONES button of a mixer channel, and the cue mix knob between them.
+    case phones(Int), cueMixKnob
 }
 
 /// What has to happen before the lesson moves on.
@@ -35,6 +37,12 @@ enum LessonGoal: Equatable {
     /// The bass swap: the low of `from` is down and the low of `to` is back in the middle.
     /// The result card says whether that happened near a phrase change.
     case bassSwap(from: Int, to: Int)
+    /// The headphone output is switched on in the PHONES panel (split, or a sound card).
+    case phonesReady
+    /// The deck's PHONES button is on.
+    case phonesCue(Int)
+    /// The cue mix knob is in this part of its travel (0 = only the cued record, 1 = only the room).
+    case cueMix(ClosedRange<Double>)
     /// The deck's motor is off.
     case stopDeck(Int)
     /// Nothing to do: the step ends with the coach's line.
@@ -60,6 +68,8 @@ struct LessonDesk {
     var crossfader = 0.0
     var channel = [0.85, 0.85]
     var sync = [false, true]
+    /// Where the cue mix knob starts, when the lesson cares.
+    var cueMix: Double?
 }
 
 struct Lesson {
@@ -74,7 +84,46 @@ struct Lesson {
 enum Lessons {
     static func find(_ id: String) -> Lesson? { all.first { $0.id == id } }
 
-    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap]
+    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars]
+
+    /// Lesson 4: headphones. The next record is heard in one ear before the room gets it, the cue
+    /// mix brings the room into that ear, and only then the fader goes up.
+    static let inYourEars = Lesson(id: "in-your-ears", number: 4, title: "IN YOUR EARS", coach: "TÓ",
+                                   desk: LessonDesk(crossfader: 0.5, channel: [0.85, 0], sync: [false, true], cueMix: 0), steps: [
+        LessonStep(voice: "ears-01",
+                   text: "Lesson four. Headphones. Wired ones, Bluetooth is too slow. Top right, tap PHONES, and choose split.",
+                   task: "TAP PHONES (TOP RIGHT) AND CHOOSE SPLIT", goal: .phonesReady, target: nil),
+        LessonStep(voice: "ears-02",
+                   text: "Now your left ear is the room, and your right ear is yours alone. Start the left deck.",
+                   task: "PRESS PLAY ON THE LEFT DECK", goal: .startDeck(0), target: .play(0)),
+        LessonStep(voice: "ears-03",
+                   text: "Under the right fader there's a button that says PHONES. Press it.",
+                   task: "PRESS PHONES UNDER THE RIGHT FADER", goal: .phonesCue(1), target: .phones(1)),
+        LessonStep(voice: "ears-04",
+                   text: "The right fader is down. So start the right deck whenever you like. The room hears nothing. Only you.",
+                   task: "PRESS PLAY ON THE RIGHT DECK", goal: .startDeck(1), target: .play(1)),
+        LessonStep(voice: "ears-05",
+                   text: "That is the whole trick. You get to be wrong in private. Now do it properly. Press cue, and start it on a new phrase.",
+                   task: "PRESS PLAY ON THE RIGHT DECK, ON A NEW PHRASE", goal: .startOnThePhrase(deck: 1, against: 0), target: .play(1),
+                   missVoice: "phrase-03-miss",
+                   missText: "Close, but that was the middle of a phrase. Press cue on the right deck, and wait for the whoosh.",
+                   missTask: "PRESS CUE ON THE RIGHT DECK, THEN TRY AGAIN", missTarget: .cue(1)),
+        LessonStep(voice: "ears-06",
+                   text: "Now the little orange knob between the two PHONES buttons. Drag it up to the middle. That brings the room into your right ear too, so you hear the mix before anybody else.",
+                   task: "CUE MIX KNOB TO THE MIDDLE", goal: .cueMix(0.35...0.65), target: .cueMixKnob),
+        LessonStep(voice: "ears-07",
+                   text: "Sounds right? Then give it to the room. Right fader up.",
+                   task: "RIGHT CHANNEL FADER UP", goal: .channelFader(1, 0.8...1, onThePhrase: false), target: .channel(1)),
+        LessonStep(voice: "ears-08",
+                   text: "And at the next phrase, left fader down.",
+                   task: "LEFT CHANNEL FADER DOWN, AT THE NEXT PHRASE", goal: .channelFader(0, 0...0.04, onThePhrase: true), target: .channel(0)),
+        LessonStep(voice: "first-mix-08",
+                   text: "And stop the left deck.",
+                   task: "STOP THE LEFT DECK", goal: .stopDeck(0), target: .play(0)),
+        LessonStep(voice: "ears-09",
+                   text: "That's how every DJ on earth does it. You heard it first. They only heard it right.",
+                   task: "IN YOUR EARS", goal: .listen, target: nil),
+    ])
 
     /// Lesson 3: the three EQ knobs, and why the new record comes in without its bass and takes
     /// the bass over at a phrase change.
@@ -197,6 +246,12 @@ struct BoothFacts {
     var channel: [Double]
     /// EQ knobs per deck: low, mid, high; 0.5 is flat.
     var eq: [[Double]]
+    /// The headphone output is on (split or sound card).
+    var phonesOn: Bool
+    /// PHONES button per channel.
+    var phones: [Bool]
+    /// Cue mix knob: 0 = only the cued record, 1 = only the room.
+    var cueMix: Double
 }
 
 /// Walks through a lesson. The booth scene feeds it `BoothFacts` every frame; the overlay shows
@@ -317,6 +372,12 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
                 }
             case .eq(let d, let band, let range):
                 if range.contains(facts.eq[d][band]) { met() }
+            case .phonesReady:
+                if facts.phonesOn { met() }
+            case .phonesCue(let d):
+                if facts.phones[d] { met() }
+            case .cueMix(let range):
+                if range.contains(facts.cueMix) { met() }
             case .bassSwap(let from, let to):
                 showBar(facts.beat[to])
                 if facts.eq[from][0] <= 0.1 && (0.45...0.56).contains(facts.eq[to][0]) {
