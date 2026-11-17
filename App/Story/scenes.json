@@ -294,5 +294,14 @@
         {"who": "", "text": "END OF CHAPTER 11"}
       ] }
     ]
+  },
+  {
+    "id": "carla-meridian",
+    "shots": [
+      { "art": "scene-carla", "lines": [
+        {"who": "CARLA", "clip": "carla-meridian-01", "text": "MERIDIAN called. The closing set, on the main stage. Sixty thousand people. They asked for you by name."},
+        {"who": "TÓ", "voice": "vo-carla-meridian-to", "text": "MERIDIAN. The closing set. Nine years ago it was a lamp, a bedsheet and Mira. Somebody pinch me."}
+      ] }
+    ]
   }
 ]

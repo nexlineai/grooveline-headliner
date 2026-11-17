@@ -115,6 +115,9 @@ shot lesson-b2b-pick 6 -screen lesson -lesson b2b -lessonStep 1 -crate 1
 shot boat-night 10 -screen night -night boat-party -demo 1
 shot story-vex-poster 4 -screen story -scene vex-poster
 shot vex-night 10 -screen night -night vex-b2b -demo 1
+shot chapter12 5 -screen chapter -chapter 12
+shot story-carla-meridian 4 -screen story -scene carla-meridian
+shot lesson-skip 8 -screen lesson -lesson skip
 shot lesson-requests 6 -screen lesson -lesson requests
 shot garage 10 -screen night -night garage-party -demo 1
 shot garage-crate 6 -screen night -night garage-party -crate 1

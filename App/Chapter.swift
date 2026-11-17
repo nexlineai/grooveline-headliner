@@ -27,7 +27,18 @@ enum Chapters {
     /// played straight away; on for the release.
     static let locked = false
 
-    static let all: [Chapter] = [bedroom, houseParties, shop, pubs, radio, door, resident, studio, road, festivals, backToBack]
+    static let all: [Chapter] = [bedroom, houseParties, shop, pubs, radio, door, resident, studio, road, festivals, backToBack, headliner]
+
+    /// Chapter 12: headliner. MERIDIAN calls; the needle will skip again, so this time you are
+    /// ready. (The night itself, the white label and the credits come last, with Zé.)
+    static let headliner = Chapter(number: 12, title: "HEADLINER",
+                                   line: "MERIDIAN's main stage, sixty thousand people, and a record bag you packed yourself.",
+                                   steps: [
+        ChapterStep(id: "carla-meridian", kind: .story, title: "CARLA", detail: "MERIDIAN called.",
+                    screens: [.story("carla-meridian")]),
+        ChapterStep(id: "skip", kind: .lesson, title: "THE SKIP", detail: "It skipped once. This time you know what to do.",
+                    screens: [.lesson("skip")]),
+    ])
 
     /// Chapter 11: back to back. Helena first: one booth, two DJs, her deck is hers.
     static let backToBack = Chapter(number: 11, title: "BACK TO BACK",

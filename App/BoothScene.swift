@@ -1046,6 +1046,10 @@ final class BoothScene: SKScene {
                                  page: game.studioPage,
                                  cuts: game.cuts,
                                  stepOns: stepOns))
+        // A step that makes the needle skip: it lands 0.4 beat on, the kicks fall apart.
+        if let d = lesson.takeSkip(), d < 2, decks[d].isLoaded {
+            decks[d].seek(to: decks[d].seconds + 0.4 * decks[d].grid.beatLength)
+        }
         let wanted: Float = lesson.speaking || game.jinglePlaying ? 0.5 : 1
         let now = game.engine.masterVolume
         if abs(wanted - now) > 0.002 {

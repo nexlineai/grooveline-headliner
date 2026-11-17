@@ -104,6 +104,8 @@ struct LessonStep {
     /// For a step that can also be missed the other way (too late): what is said then.
     var lateVoice: String?
     var lateText: String?
+    /// The needle of this deck skips (jumps 0.4 beat on) as the step begins (chapter 12).
+    var skip: Int? = nil
 }
 
 /// How the desk is set when a lesson starts (both records stopped on their first beat).
@@ -163,7 +165,41 @@ struct Lesson {
 enum Lessons {
     static func find(_ id: String) -> Lesson? { all.first { $0.id == id } }
 
-    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars, requests, syncOff, byEar, holdIt, longBlend, onAir, warmUp, keys, filterMix, tempo, drums, synth, dubplate, borrowedBooth, genreSwitch, delay, backToBack]
+    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars, requests, syncOff, byEar, holdIt, longBlend, onAir, warmUp, keys, filterMix, tempo, drums, synth, dubplate, borrowedBooth, genreSwitch, delay, backToBack, skip]
+
+    /// Lesson 22, chapter 12, the shop the week before MERIDIAN: in the middle of a blend the
+    /// needle skips (0.4 beat on) and the kicks fall apart. Push them back together with the rim.
+    /// Vinyl on purpose: SYNC would pull a skipped record back by itself.
+    static let skip = Lesson(id: "skip", number: 22, title: "THE SKIP", coach: "LIA",
+                             desk: LessonDesk(crossfader: 0.5, channel: [0.85, 0], sync: [false, false], room: "shop",
+                                              syncAllowed: false, records: ["bastidores", "vibrafone"], chapter: 12, cueBar: 16), steps: [
+        LessonStep(voice: "skip-01",
+                   text: "Nine years ago a needle skipped on the biggest stage in the country, and you froze. Today you learn what to do. Start the left one.",
+                   task: "PRESS PLAY ON THE LEFT DECK", goal: .startDeck(0), target: .play(0)),
+        LessonStep(voice: "skip-02",
+                   text: "Same tempo, a hundred and twenty. Start the right one on the one.",
+                   task: "PRESS PLAY ON THE RIGHT DECK, ON THE ONE", goal: .startOnTheOne(deck: 1, against: 0), target: .play(1),
+                   missVoice: "skip-02-miss", missText: "Not the one. Cue it, and go again.",
+                   missTask: "PRESS CUE ON THE RIGHT DECK, THEN TRY AGAIN", missTarget: .cue(1)),
+        LessonStep(voice: "skip-03",
+                   text: "Lock the kicks with the rim.",
+                   task: "NUDGE THE RIGHT RECORD UNTIL THE KICKS ARE ONE", goal: .phaseHeld(bars: 4), target: .record(1)),
+        LessonStep(voice: "skip-04",
+                   text: "Take its low out first. One bassline.",
+                   task: "RIGHT LOW ALL THE WAY DOWN", goal: .eq(deck: 1, band: 0, 0...0.1), target: .eq(1, 0)),
+        LessonStep(voice: "skip-05",
+                   text: "Now its fader up. Both records in the room.",
+                   task: "RIGHT CHANNEL FADER UP", goal: .channelFader(1, 0.8...1, onThePhrase: false), target: .channel(1)),
+        LessonStep(voice: "skip-06",
+                   text: "Hear that? Two records, one beat. Hold it.",
+                   task: "TWO RECORDS, ONE BEAT", goal: .listen, target: nil),
+        LessonStep(voice: "skip-07",
+                   text: "There! The needle jumped. The kicks are apart. Push the left record back with the rim. Now.",
+                   task: "NUDGE THE LEFT RECORD UNTIL THE KICKS ARE ONE", goal: .phaseHeld(bars: 2), target: .record(0), skip: 0),
+        LessonStep(voice: "skip-08",
+                   text: "That's all a skip is. A nudge, and a cool head. Nine years ago you froze. Not any more.",
+                   task: "THE SKIP", goal: .listen, target: nil),
+    ])
 
     /// What the partner says when a hand lands on her deck (a back-to-back lesson).
     static let handsOff = (voice: "b2b-hands", text: "Hands off. That's my deck.")
@@ -946,6 +982,12 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private var rode = false
     /// For `dubplateCut`: cuts counted when the step began.
     private var cutsSeen: Int?
+    /// A needle skip: the deck whose needle the booth must move (taken once), when it skipped,
+    /// whether the kicks were heard apart since, and how long putting them back took.
+    private var pendingSkip: Int?
+    private var skipAt: Double?
+    private var skipHeardOff = false
+    private var skipFixed: Double?
     /// Back to back: hands on the partner's deck seen so far (each one is a miss).
     private var stepOnsSeen = 0
     private var stepMisses = 0
@@ -991,8 +1033,15 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
         rideAnchor = nil
         cutsSeen = nil
         let step = lesson.steps[i]
+        if let d = step.skip { pendingSkip = d; skipAt = nil; skipHeardOff = false; skipFixed = nil }
         show(text: step.text, task: step.task, target: step.target)
         say(step.voice)
+    }
+
+    /// The deck whose needle skips now, once (the booth moves it).
+    func takeSkip() -> Int? {
+        defer { pendingSkip = nil }
+        return pendingSkip
     }
 
     private func show(text: String, task newTask: String, target newTarget: LessonTarget?) {
@@ -1036,6 +1085,12 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
             show(text: Lessons.handsOff.text, task: step.task, target: goalMet ? nil : step.target)
             if goalMet { taskDone = true }
             say(Lessons.handsOff.voice)
+        }
+        // The skip: from the moment the kicks are heard apart until they are one again.
+        if step.skip != nil && skipFixed == nil {
+            if skipAt == nil { skipAt = facts.time }
+            if abs(facts.phase) > 0.2 { skipHeardOff = true }
+            if skipHeardOff, let at = skipAt, abs(facts.phase) < 0.07 { skipFixed = facts.time - at }
         }
         if !goalMet {
             switch step.goal {
@@ -1310,6 +1365,7 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
             earned = 1
         }
         if outOnThePhrase == false { earned = min(earned, 2) }
+        if let fixed = skipFixed, fixed > 6 { earned = min(earned, 2) } // the room heard it too long
         target = nil
         stars = earned
     }
@@ -1330,6 +1386,9 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
         }
         if let out = outOnThePhrase {
             parts.append(out ? "\(phraseMove): on the phrase" : "\(phraseMove): in the middle of a phrase")
+        }
+        if let fixed = skipFixed {
+            parts.append(String(format: "Skip: fixed in %.1f s", fixed))
         }
         if lesson.desk.partner != nil {
             parts.append(stepMisses == 0 ? "Hands: never on her deck" : "Hands: on her deck \(stepMisses)×")
