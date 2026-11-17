@@ -533,10 +533,13 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
         super.init()
     }
 
+    /// The step to begin with (the screenshot run jumps into the middle of a lesson).
+    var startAt = 0
+
     func begin() {
         guard !started, !lesson.steps.isEmpty else { return }
         started = true
-        enter(0)
+        enter(min(max(0, startAt), lesson.steps.count - 1))
     }
 
     func stop() {
@@ -842,7 +845,17 @@ struct LessonOverlay: View {
                 result(stars)
             } else {
                 VStack(spacing: 0) {
-                    chip
+                    // Top left, after the back button, narrow enough to stay clear of the
+                    // buttons on the right; the count or countdown sits under the task.
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            chip
+                            if !runner.progress.isEmpty { progressTag }
+                        }
+                        .frame(maxWidth: 400, alignment: .leading)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.leading, 48)
                     Spacer(minLength: 4)
                     words
                 }
@@ -865,17 +878,26 @@ struct LessonOverlay: View {
             Text(runner.task)
                 .font(.system(size: 11, weight: .heavy))
                 .tracking(1.5)
-            if !runner.progress.isEmpty {
-                Text(runner.progress)
-                    .font(.system(size: 11, weight: .heavy).monospacedDigit())
-                    .foregroundStyle(.white)
-            }
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .foregroundStyle(colour)
         .padding(.horizontal, 14)
         .padding(.vertical, 7)
-        .background(Capsule().fill(.black.opacity(0.72)))
-        .overlay(Capsule().stroke(colour.opacity(0.6), lineWidth: 1))
+        .background(RoundedRectangle(cornerRadius: 16).fill(.black.opacity(0.72)))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(colour.opacity(0.6), lineWidth: 1))
+    }
+
+    /// The bar count, the countdown to the news, the reason a blend stopped counting.
+    private var progressTag: some View {
+        Text(runner.progress)
+            .font(.system(size: 15, weight: .heavy).monospacedDigit())
+            .tracking(1)
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 5)
+            .background(Capsule().fill(.black.opacity(0.72)))
+            .overlay(Capsule().stroke(Color.white.opacity(0.25), lineWidth: 1))
     }
 
     private var words: some View {

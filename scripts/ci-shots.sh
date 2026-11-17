@@ -71,6 +71,7 @@ shot lesson-long 6 -screen lesson -lesson long-blend
 shot pub-night 10 -screen night -night empty-tuesday -demo 1
 shot chapter5 5 -screen chapter -chapter 5
 shot lesson-air 6 -screen lesson -lesson on-air
+shot lesson-air-news 8 -screen lesson -lesson on-air -lessonStep 4
 shot radio-night 10 -screen night -night thursday-show -demo 1
 shot lesson-requests 6 -screen lesson -lesson requests
 shot garage 10 -screen night -night garage-party -demo 1

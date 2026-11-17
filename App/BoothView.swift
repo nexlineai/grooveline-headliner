@@ -92,6 +92,7 @@ struct BoothView: View {
                 if UserDefaults.standard.bool(forKey: "phones") { phonesOpen = true }
                 if let id = lessonID, let lesson = Lessons.find(id) {
                     let coach = LessonRunner(lesson: lesson)
+                    coach.startAt = UserDefaults.standard.integer(forKey: "lessonStep")
                     made.lesson = coach
                     runner = coach
                 }
