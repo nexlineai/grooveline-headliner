@@ -209,5 +209,25 @@
         {"who": "", "text": "JOLI LENDS YOU HERS. YOU KNOW NONE OF THESE RECORDS."}
       ] }
     ]
+  },
+  {
+    "id": "detroit",
+    "shots": [
+      { "lines": [
+        {"who": "", "text": "DETROIT. A RECORD SHOP ON A STREET WITH NO OTHER SHOPS."},
+        {"who": "", "text": "THE OWNER PLAYS YOU A TEST PRESSING FROM 1991 AND WATCHES YOUR FACE."},
+        {"who": "", "text": "THAT NIGHT YOU PLAY YOUR FORTIETH SET IN FORTY DAYS."}
+      ] }
+    ]
+  },
+  {
+    "id": "chapter-9-end",
+    "shots": [
+      { "lines": [
+        {"who": "", "text": "LISBON. GROOVELINE RECORDS. LIA PUTS ON A RECORD AND SAYS NOTHING FOR AN HOUR."},
+        {"who": "", "text": "THEN: \"WHY DO YOU PLAY, KID?\""},
+        {"who": "", "text": "END OF CHAPTER 9"}
+      ] }
+    ]
   }
 ]

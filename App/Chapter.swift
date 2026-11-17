@@ -45,6 +45,10 @@ enum Chapters {
                     screens: [.lesson("genre-switch")]),
         ChapterStep(id: Nights.ibizaNight.id, kind: .night, title: Nights.ibizaNight.title, detail: "Joli's records. Read the sleeves.",
                     screens: [.night(Nights.ibizaNight.id)]),
+        ChapterStep(id: "detroit", kind: .story, title: "DETROIT", detail: "A test pressing from 1991.",
+                    screens: [.story("detroit")]),
+        ChapterStep(id: Nights.burnout.id, kind: .night, title: Nights.burnout.title, detail: "Forty nights in forty days.",
+                    screens: [.night(Nights.burnout.id), .story("chapter-9-end")]),
     ])
 
     /// Chapter 8: the studio. A drum machine first; bass and chords, the arrangement and your own

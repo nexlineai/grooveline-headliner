@@ -55,6 +55,9 @@ struct NightInfo {
     var mixdownCheck = false
     /// A channel fader that is broken in this booth (stuck where the night starts it).
     var deadFader: Int? = nil
+    /// The night that is stopped (the burnout): at this share Tó says "home", and a few seconds
+    /// later it is over with one star, whatever happened.
+    var stopsAt: Double? = nil
 }
 
 /// What goes wrong in a night: the cable is kicked (the record stops), the needle jumps a groove,
@@ -257,7 +260,28 @@ enum Nights {
                                               "bag": [("ibz-bag", "Joli's records. Read the sleeves: the keys are on them.")]],
                                       bag: ["sal", "praia", "regresso", "tambor", "fita-gasta", "flauta", "terraco", "varanda"],
                                       clockStart: 20 * 60, judgeKeys: true)
-    static let all = [firstParty, garageParty, saturdayShift, emptyTuesday, thursdayShow, caveWarmUp, fridayCave, afterhours, dubplateNight, berlinNight, ibizaNight]
+    /// Chapter 9: the burnout. The fortieth night in forty days, vinyl, a belt that wanders, and
+    /// Tó stops it halfway (one star, whatever happens: the night the career has to pause).
+    static let burnout = NightInfo(id: "burnout", title: "BURNOUT", length: 360, room: "berlin",
+                                   records: ["oito-milhas", "berlim"], chapter: 9, mixesFor3Stars: 2,
+                                   mishapAt: 0.2, mishap: .pitchWander, syncAllowed: false, maxMood: 2,
+                                   remarks: [(at: 0.1, moment: "tired"), (at: 0.32, moment: "tired2")],
+                                   lines: ["wait": [("burn-wait", "Another night, another city. Do you even remember which one?")],
+                                           "start": [("cave-start", "Here we go. Easy does it.")],
+                                           "clean": [("fri-clean-2", "Nobody even blinked. Perfect.")],
+                                           "rough": [("burn-rough", "Your hands are shaking.")],
+                                           "dead": [("burn-dead", "Hey. Hey! You stopped.")],
+                                           "stale": [("fri-stale", "This one's done. Next.")],
+                                           "slip": [("burn-slip", "It's drifting, and you're not catching it.")],
+                                           "wreck": [("fri-wreck", "Ouch. Two kicks fighting.")],
+                                           "clash": [("fri-clash", "Two basslines. Kill a low.")],
+                                           "cable": [("burn-wander", "Even the turntables are tired tonight.")],
+                                           "tired": [("burn-tired", "You look terrible. When did you last sleep?")],
+                                           "tired2": [("burn-tired-2", "Forty nights in a row. The crowd can tell.")],
+                                           "home": [("burn-home", "That's it. We're stopping. I'm taking you home.")]],
+                                   bag: ["oito-milhas", "berlim", "cansaco", "canal", "residente", "coro"],
+                                   clockStart: 4 * 60 + 30, stopsAt: 0.5)
+    static let all = [firstParty, garageParty, saturdayShift, emptyTuesday, thursdayShow, caveWarmUp, fridayCave, afterhours, dubplateNight, berlinNight, ibizaNight, burnout]
     static func find(_ id: String) -> NightInfo? { all.first { $0.id == id } }
 }
 
@@ -289,6 +313,8 @@ final class NightRunner: ObservableObject {
     /// Afterhours: the tempo on air two seconds ago, and the last tempo heard.
     private var bpmAnchor: (time: Double, bpm: Double)?
     private var lastBPM = 0.0
+    /// The burnout: when the night is stopped (clock), once Tó has said so.
+    private var stopAt: Double?
     /// Your dubplate: when it went on air, whether the boom was called, and by when to fix it.
     private var plateOnAirAt: Double?
     private var boomAsked = false
@@ -624,10 +650,26 @@ final class NightRunner: ObservableObject {
             let text = Self.clockText(info.clockStart + Int(min(1, elapsed / length) * 90))
             if text != clock { clock = text }
         }
+        // The burnout: Tó stops the night halfway.
+        if let at = info.stopsAt, stopAt == nil, elapsed >= length * at {
+            stopAt = now + 5
+            say("home", urgent: true)
+        }
+        if let at = stopAt, now >= at {
+            finish(stopped: true)
+            return
+        }
         if elapsed >= length { finish() }
     }
 
-    private func finish() {
+    private func finish(stopped: Bool = false) {
+        if stopped {
+            stop()
+            summary = "You stopped halfway.   ·   Tó took you home."
+            comment = ""
+            stars = 1
+            return
+        }
         let crowd = energySum / max(1, elapsed)
         let earned: Int
         let allRequests = requestsMet >= info.requests.count
