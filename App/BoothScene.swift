@@ -33,6 +33,7 @@ final class BoothScene: SKScene {
     var lesson: LessonRunner?
     /// The night being played here, if any: the crowd's energy follows the mixing.
     var night: NightRunner?
+    var nightInfo: NightInfo?
     private var pointer: SKShapeNode?
     private var pointedAt: LessonTarget?
     private var lessonReady = false
@@ -129,9 +130,10 @@ final class BoothScene: SKScene {
         view.isMultipleTouchEnabled = true
         if let lesson {
             setTheDesk(lesson.lesson.desk)
-        } else if night != nil {
+        } else if let info = nightInfo {
             // A night starts like a gig: the first record ready, the second one's fader down.
-            setTheDesk(LessonDesk(crossfader: 0.5, channel: [0.85, 0], sync: [false, true]))
+            setTheDesk(LessonDesk(crossfader: 0.5, channel: [0.85, 0], sync: [false, true], room: info.room,
+                                  records: info.records, crate: true, chapter: info.chapter))
         }
         applyMix()
     }
@@ -155,10 +157,11 @@ final class BoothScene: SKScene {
         sync = desk.sync
         room = desk.room
         syncAllowed = desk.syncAllowed
-        // Lessons are written for the first two records (122 and 124 BPM); put them back if the
-        // crate was used in free play.
-        for d in 0..<2 where d < game.tracks.count && decks[d].info?.id != game.tracks[d].id {
-            game.load(game.tracks[d], on: decks[d])
+        // The records this lesson or night is written for (default: the first two, 122 and 124
+        // BPM); put them on if the crate swapped them.
+        let wanted = desk.records ?? game.tracks.prefix(2).map { $0.id }
+        for d in 0..<min(2, wanted.count) where decks[d].info?.id != wanted[d] {
+            if let track = game.tracks.first(where: { $0.id == wanted[d] }) { game.load(track, on: decks[d]) }
         }
         if let mix = desk.cueMix { game.cueMix = mix }
         phones = [false, false]
@@ -875,7 +878,9 @@ final class BoothScene: SKScene {
                                  phones: phones,
                                  cueMix: game.cueMix,
                                  bpm: decks.map { $0.bpm },
-                                 phase: MixMath.phaseOffset(decks[0].beat, decks[1].beat)))
+                                 phase: MixMath.phaseOffset(decks[0].beat, decks[1].beat),
+                                 records: decks.map { $0.info?.id },
+                                 sync: sync))
         let wanted: Float = lesson.speaking ? 0.5 : 1
         let now = game.engine.masterVolume
         if abs(wanted - now) > 0.002 {
@@ -886,7 +891,7 @@ final class BoothScene: SKScene {
             pointedAt = lesson.target
             pointer?.removeFromParent()
             pointer = nil
-            if let target = lesson.target, let hit = hits.first(where: { $0.kind == kind(for: target) }) {
+            if let target = lesson.target, target != .crate, let hit = hits.first(where: { $0.kind == kind(for: target) }) {
                 let ring = SKShapeNode(rect: hit.rect.insetBy(dx: -2, dy: -2), cornerRadius: 9)
                 ring.strokeColor = Palette.orange
                 ring.fillColor = .clear
@@ -911,6 +916,8 @@ final class BoothScene: SKScene {
         case .cueMixKnob: return .cueMix
         case .pitch(let d): return .pitch(d)
         case .record(let d): return .platter(d)
+        case .sync(let d): return .sync(d)
+        case .crate: return .cueMix // drawn by SwiftUI (the CRATE pill pulses); no ring here
         }
     }
 
@@ -1060,7 +1067,10 @@ final class BoothScene: SKScene {
             // A night: the crowd answers the mixing, and the room shows its mood.
             // The record on air is the one that is heard; with both heard, the louder one.
             let onAir = snapshots[0].audible ? (snapshots[1].audible ? lead : 0) : 1
-            night.update(dt: dt, state: reading.state, quality: reading.quality, bassClash: reading.bassClash, lead: onAir)
+            night.update(dt: dt, state: reading.state, quality: reading.quality, bassClash: reading.bassClash, lead: onAir,
+                         onAirRecord: reading.state == .silence ? nil : decks[onAir].info?.id)
+            // Things go wrong: somebody kicks the cable and the record on air stops.
+            if night.takeMishap() { decks[onAir].motorOn = false }
             // The music steps back a little while Tó talks, as in the lessons.
             let wanted: Float = night.speaking ? 0.5 : 1
             let level = game.engine.masterVolume

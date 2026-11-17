@@ -14,11 +14,35 @@ struct NightInfo {
     var title: String
     /// Seconds of play.
     var length: Double
+    /// The room above the gear, and the records on the decks at the start (nil: the first two).
+    var room = "bedroom"
+    var records: [String]? = nil
+    /// The crate holds the records of this chapter and the ones before.
+    var chapter = 1
+    /// Mixes needed for three stars.
+    var mixesFor3Stars = 1
+    /// What the room asks for, and when (share of the night): the record, Tó's line.
+    var requests: [NightRequest] = []
+    /// When somebody kicks the cable (share of the night), if they do.
+    var mishapAt: Double? = nil
+}
+
+struct NightRequest {
+    var at: Double
+    var record: String
+    var voice: String
+    var text: String
 }
 
 enum Nights {
     static let firstParty = NightInfo(id: "first-party", title: "FIRST PARTY", length: 270)
-    static let all = [firstParty]
+    /// Chapter 2: Rita's garage. Two requests, and the cable.
+    static let garageParty = NightInfo(id: "garage-party", title: "RITA'S GARAGE", length: 330, room: "garage",
+                                       records: ["telhado", "neon-pluck"], chapter: 2, mixesFor3Stars: 2,
+                                       requests: [NightRequest(at: 0.2, record: "maos-no-ar", voice: "garage-req-1", text: "Request! Somebody wants the one with the piano."),
+                                                  NightRequest(at: 0.55, record: "squelch", voice: "garage-req-2", text: "Rita wants the acid one. Squelch. It's her garage, play it.")],
+                                       mishapAt: 0.75)
+    static let all = [firstParty, garageParty]
     static func find(_ id: String) -> NightInfo? { all.first { $0.id == id } }
 }
 
@@ -26,6 +50,12 @@ final class NightRunner: ObservableObject {
     let title: String
     /// Seconds of play, from the first record to the end of the night.
     let length: Double
+    private let info: NightInfo
+    private var nextRequest = 0
+    private var pending: NightRequest?
+    private var requestsMet = 0
+    private var mishapDue = false
+    private var mishapDone = false
 
     @Published private(set) var energyShown = 0.3
     /// 0 waiting, 1 nodding, 2 dancing, 3 going nuts.
@@ -59,9 +89,17 @@ final class NightRunner: ObservableObject {
 
     static let moods = ["WAITING", "NODDING", "DANCING", "GOING NUTS"]
 
-    init(title: String, length: Double) {
-        self.title = title
+    init(info: NightInfo, length: Double) {
+        self.info = info
+        self.title = info.title
         self.length = length
+    }
+
+    /// True once, when somebody has just kicked the cable: the record on air must stop.
+    func takeMishap() -> Bool {
+        guard mishapDue else { return false }
+        mishapDue = false
+        return true
     }
 
     /// What Tó can say, by moment; where there are several, they take turns.
@@ -80,6 +118,8 @@ final class NightRunner: ObservableObject {
         "clash": [("night-clash", "Two basslines. Kill one of the lows.")],
         "nuts": [("night-nuts-1", "Look at them go!"),
                  ("night-nuts-2", "Mira is dancing on the bed. Mira never dances!")],
+        "requestDone": [("garage-req-done", "Request played. They love you.")],
+        "cable": [("garage-cable", "Somebody kicked the cable! Get it back, quick!")],
     ]
     private var turn: [String: Int] = [:]
     private var voice: AVAudioPlayer?
@@ -92,11 +132,14 @@ final class NightRunner: ObservableObject {
         voice = nil
     }
 
-    private func say(_ moment: String) {
-        guard now >= quietUntil, let options = Self.lines[moment], !options.isEmpty else { return }
+    private func say(_ moment: String, urgent: Bool = false) {
+        guard urgent || now >= quietUntil, let options = Self.lines[moment], !options.isEmpty else { return }
         let n = turn[moment, default: 0]
         turn[moment] = n + 1
-        let line = options[n % options.count]
+        speak(options[n % options.count])
+    }
+
+    private func speak(_ line: (voice: String, text: String)) {
         commentBy = "TÓ"
         comment = line.text
         var seconds = 3.0
@@ -113,8 +156,33 @@ final class NightRunner: ObservableObject {
 
     /// Called every frame with what the room hears: nothing, one record, or two, and for two,
     /// how well they sit together. `lead` is the louder deck.
-    func update(dt: Double, state: MixReading.State, quality: Double, bassClash: Bool, lead: Int) {
+    func update(dt: Double, state: MixReading.State, quality: Double, bassClash: Bool, lead: Int, onAirRecord: String?) {
         guard stars == nil else { return }
+        // Requests and the cable come at their moment of the night, and cannot wait for silence.
+        if began {
+            let share = elapsed / length
+            if nextRequest < info.requests.count && share >= info.requests[nextRequest].at && pending == nil {
+                let request = info.requests[nextRequest]
+                nextRequest += 1
+                if onAirRecord != request.record {
+                    pending = request
+                    speak((request.voice, request.text))
+                } else {
+                    requestsMet += 1 // already playing it
+                }
+            }
+            if let request = pending, onAirRecord == request.record {
+                pending = nil
+                requestsMet += 1
+                energy = min(1, energy + 0.12)
+                say("requestDone", urgent: true)
+            }
+            if let at = info.mishapAt, !mishapDone, share >= at, state != .silence {
+                mishapDone = true
+                mishapDue = true
+                say("cable", urgent: true)
+            }
+        }
         now += dt
         if !comment.isEmpty && now > commentUntil { comment = "" }
         if !began {
@@ -215,7 +283,8 @@ final class NightRunner: ObservableObject {
     private func finish() {
         let crowd = energySum / max(1, elapsed)
         let earned: Int
-        if crowd >= 0.6 && transitions >= 2 && deadAir < 3 && wreck < 4 {
+        let allRequests = requestsMet >= info.requests.count
+        if crowd >= 0.6 && transitions >= info.mixesFor3Stars && deadAir < 3 && wreck < 4 && allRequests {
             earned = 3
         } else if crowd >= 0.42 && transitions >= 1 {
             earned = 2
@@ -225,6 +294,7 @@ final class NightRunner: ObservableObject {
         let mixes = transitions == 1 ? "1 mix" : "\(transitions) mixes"
         stop()
         summary = "\(mixes)   ·   crowd \(Int((crowd * 100).rounded())) %   ·   dead air \(Int(deadAir.rounded())) s"
+        if !info.requests.isEmpty { summary += "   ·   requests \(requestsMet) / \(info.requests.count)" }
         comment = ""
         stars = earned
     }

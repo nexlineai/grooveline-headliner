@@ -15,6 +15,8 @@ enum LessonTarget: Equatable {
     case phones(Int), cueMixKnob
     /// A pitch fader, and a whole record (for the rim).
     case pitch(Int), record(Int)
+    /// A SYNC button, and the CRATE button (top right).
+    case sync(Int), crate
 }
 
 /// What has to happen before the lesson moves on.
@@ -45,6 +47,10 @@ enum LessonGoal: Equatable {
     case phonesCue(Int)
     /// The cue mix knob is in this part of its travel (0 = only the cued record, 1 = only the room).
     case cueMix(ClosedRange<Double>)
+    /// This record is on that deck.
+    case recordLoaded(deck: Int, id: String)
+    /// The deck's SYNC is on.
+    case syncOn(Int)
     /// Both records play at the same tempo, within `tolerance` BPM (pitch faders, no sync).
     case tempoMatched(tolerance: Double)
     /// The kicks land together (within 0.07 of a beat) for this many bars in a row.
@@ -80,6 +86,11 @@ struct LessonDesk {
     var room = "bedroom"
     /// False on vinyl: the SYNC buttons are dim and do nothing.
     var syncAllowed = true
+    /// The records on the left and right decks (ids); nil = the first two records.
+    var records: [String]?
+    /// The crate is open to the player (records up to `chapter`).
+    var crate = false
+    var chapter = 1
 }
 
 struct Lesson {
@@ -94,11 +105,42 @@ struct Lesson {
 enum Lessons {
     static func find(_ id: String) -> Lesson? { all.first { $0.id == id } }
 
-    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars, syncOff]
+    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars, requests, syncOff]
+
+    /// Lesson 5, chapter 2, Rita's garage: a request. Open the crate, put the record on the free
+    /// deck, sync it, bring it in on a phrase.
+    static let requests = Lesson(id: "requests", number: 5, title: "REQUESTS", coach: "TÓ",
+                                 desk: LessonDesk(crossfader: 0.5, channel: [0.85, 0], sync: [false, false], room: "garage",
+                                                  records: ["telhado", "garage-door"], crate: true, chapter: 2), steps: [
+        LessonStep(voice: "req-01",
+                   text: "Rita's garage. Borrowed speakers, two records on the decks, and people already moving. Start the left one.",
+                   task: "PRESS PLAY ON THE LEFT DECK", goal: .startDeck(0), target: .play(0)),
+        LessonStep(voice: "req-02",
+                   text: "Sara wants the one with the congas. Everybody has a request. The good ones, you play. Tap CRATE, top right.",
+                   task: "TAP CRATE (TOP RIGHT)", goal: .listen, target: .crate),
+        LessonStep(voice: "req-03",
+                   text: "Find Conga Line, and put it on the right deck. The right one isn't playing, so it's free.",
+                   task: "CRATE: CONGA LINE ON THE RIGHT DECK", goal: .recordLoaded(deck: 1, id: "conga-line"), target: .crate),
+        LessonStep(voice: "req-04",
+                   text: "Now press SYNC on the right deck, so it follows the left one.",
+                   task: "PRESS SYNC ON THE RIGHT DECK", goal: .syncOn(1), target: .sync(1)),
+        LessonStep(voice: "req-05",
+                   text: "Start it on a new phrase. The fader's down, so nobody hears it yet.",
+                   task: "PRESS PLAY ON THE RIGHT DECK, ON A NEW PHRASE", goal: .startOnThePhrase(deck: 1, against: 0), target: .play(1),
+                   missVoice: "phrase-03-miss",
+                   missText: "Close, but that was the middle of a phrase. Press cue on the right deck, and wait for the whoosh.",
+                   missTask: "PRESS CUE ON THE RIGHT DECK, THEN TRY AGAIN", missTarget: .cue(1)),
+        LessonStep(voice: "req-06",
+                   text: "Now push the right fader up.",
+                   task: "RIGHT CHANNEL FADER UP", goal: .channelFader(1, 0.8...1, onThePhrase: false), target: .channel(1)),
+        LessonStep(voice: "req-07",
+                   text: "Look at her. That's what a request is for.",
+                   task: "REQUEST PLAYED", goal: .listen, target: nil),
+    ])
 
     /// Chapter 3, Lia's shop: no sync button. Hear the gallop, match the tempo with the pitch
     /// fader, lock the kicks with the rim. Both faders are up: the shop hears everything.
-    static let syncOff = Lesson(id: "sync-off", number: 5, title: "SYNC OFF", coach: "LIA",
+    static let syncOff = Lesson(id: "sync-off", number: 6, title: "SYNC OFF", coach: "LIA",
                                 desk: LessonDesk(crossfader: 0.5, channel: [0.85, 0.85], sync: [false, false],
                                                  room: "shop", syncAllowed: false), steps: [
         LessonStep(voice: "sync-01",
@@ -303,6 +345,10 @@ struct BoothFacts {
     var bpm: [Double]
     /// Where the right record's beat falls against the left one's, in beats (0 = together).
     var phase: Double
+    /// The record on each deck (id).
+    var records: [String?]
+    /// SYNC per deck.
+    var sync: [Bool]
 }
 
 /// Walks through a lesson. The booth scene feeds it `BoothFacts` every frame; the overlay shows
@@ -316,7 +362,7 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
     /// Set when the lesson is over: 1 to 3.
     @Published private(set) var stars: Int?
     /// The control to point at right now.
-    private(set) var target: LessonTarget?
+    @Published private(set) var target: LessonTarget?
     /// The coach is talking (the music steps back a little).
     private(set) var speaking = false
 
@@ -423,6 +469,10 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
                 }
             case .eq(let d, let band, let range):
                 if range.contains(facts.eq[d][band]) { met() }
+            case .recordLoaded(let d, let id):
+                if facts.records[d] == id { met() }
+            case .syncOn(let d):
+                if facts.sync[d] { met() }
             case .tempoMatched(let tolerance):
                 let gap = abs(facts.bpm[0] - facts.bpm[1])
                 let text = gap <= tolerance ? "MATCHED" : String(format: "%.1f BPM APART", gap)

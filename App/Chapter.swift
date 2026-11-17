@@ -26,10 +26,21 @@ enum Chapters {
     /// played straight away; on for the release.
     static let locked = false
 
-    static let all: [Chapter] = [bedroom, shop]
+    static let all: [Chapter] = [bedroom, houseParties, shop]
 
-    /// Chapter 3: Lia's shop, where the sync button comes off. (Chapter 2, the house parties,
-    /// is not written yet.)
+    /// Chapter 2: other people's houses. A garage, borrowed speakers, requests, a kicked cable.
+    static let houseParties = Chapter(number: 2, title: "HOUSE PARTIES",
+                                      line: "Borrowed speakers, somebody's garage, a crate of new records and a room that asks for things.",
+                                      steps: [
+        ChapterStep(id: "garage", kind: .story, title: "SARA", detail: "Rita's garage. She'll be right there, in front.",
+                    screens: [.story("garage")]),
+        ChapterStep(id: "requests", kind: .lesson, title: "REQUESTS", detail: "Open the crate. Play what they ask for.",
+                    screens: [.lesson("requests")]),
+        ChapterStep(id: Nights.garageParty.id, kind: .night, title: Nights.garageParty.title, detail: "Two requests, two mixes, one kicked cable.",
+                    screens: [.night(Nights.garageParty.id), .story("chapter-2-end")]),
+    ])
+
+    /// Chapter 3: Lia's shop, where the sync button comes off.
     static let shop = Chapter(number: 3, title: "GROOVELINE RECORDS",
                               line: "A record shop with two old turntables, a rare-groove wall, and Lia, who has heard it all.",
                               steps: [

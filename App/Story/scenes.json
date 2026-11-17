@@ -57,5 +57,24 @@
         {"who": "", "text": "END OF CHAPTER 1"}
       ] }
     ]
+  },
+  {
+    "id": "garage",
+    "shots": [
+      { "art": "scene-sara", "lines": [
+        {"who": "SARA", "clip": "sara-01", "text": "You're the DJ? Good. I'm Sara. I'll be right there, in front. Don't make me stop."},
+        {"who": "TÓ", "voice": "vo-sara-to", "text": "That's Sara. She dances to anything. Don't test it."}
+      ] }
+    ]
+  },
+  {
+    "id": "chapter-2-end",
+    "shots": [
+      { "lines": [
+        {"who": "", "text": "03:40. THE NEIGHBOURS CALL THE POLICE."},
+        {"who": "", "text": "THE POLICE STAY FOR ONE MORE RECORD."},
+        {"who": "", "text": "END OF CHAPTER 2"}
+      ] }
+    ]
   }
 ]

@@ -1,5 +1,6 @@
 import SwiftUI
 import SpriteKit
+import HeadlinerCore
 
 /// The booth screen: the SpriteKit scene full-bleed, a way back to the title, and, during a
 /// lesson, the coach's words and the thing to do over the room.
@@ -47,11 +48,15 @@ struct BoothView: View {
                         .background(Circle().fill(.black.opacity(0.45)))
                 }
                 .padding(.top, 8)
-                // Top right: headphones, and in free play the crate.
+                // Top right: headphones, and the crate (free play, nights, lessons that use it).
                 HStack(spacing: 8) {
                     pill("headphones", ["PHONES", "SPLIT", "SOUND CARD"][min(2, max(0, game.phonesMode))], lit: game.phonesMode != 0) { phonesOpen = true }
-                    if lessonID == nil {
-                        pill("square.stack.fill", "CRATE", lit: false) { crateOpen = true }
+                    if crateShown {
+                        if let runner {
+                            CratePill(runner: runner) { crateOpen = true }
+                        } else {
+                            pill("square.stack.fill", "CRATE", lit: false) { crateOpen = true }
+                        }
                     }
                 }
                 .padding(.top, 8)
@@ -59,9 +64,9 @@ struct BoothView: View {
                 if phonesOpen {
                     PhonesView { phonesOpen = false }
                 }
-                if lessonID == nil {
+                if crateShown {
                     if crateOpen {
-                        CrateView(tracks: game.tracks, decks: game.engine.decks, tick: crateTick, onLoad: { track, d in
+                        CrateView(tracks: crateRecords, decks: game.engine.decks, tick: crateTick, onLoad: { track, d in
                             game.load(track, on: game.engine.decks[d])
                             scene?.recordChanged(on: d)
                             crateTick += 1
@@ -76,7 +81,7 @@ struct BoothView: View {
                 let made = BoothScene(game: game)
                 made.insets = geo.safeAreaInsets
                 // The screenshot run opens the crate by itself.
-                if lessonID == nil && UserDefaults.standard.bool(forKey: "crate") { crateOpen = true }
+                if crateShown && UserDefaults.standard.bool(forKey: "crate") { crateOpen = true }
                 if UserDefaults.standard.bool(forKey: "phones") { phonesOpen = true }
                 if let id = lessonID, let lesson = Lessons.find(id) {
                     let coach = LessonRunner(lesson: lesson)
@@ -84,9 +89,9 @@ struct BoothView: View {
                     runner = coach
                 }
                 if let id = nightID, let info = Nights.find(id) {
-                    // Four and a half minutes: room for three records and two mixes.
-                    let party = NightRunner(title: info.title, length: UserDefaults.standard.bool(forKey: "demo") ? 20 : info.length)
+                    let party = NightRunner(info: info, length: UserDefaults.standard.bool(forKey: "demo") ? 20 : info.length)
                     made.night = party
+                    made.nightInfo = info
                     nightRunner = party
                 }
                 scene = made
@@ -99,6 +104,20 @@ struct BoothView: View {
                 scene?.insets = new
             }
         }
+    }
+
+    /// The crate is there in free play, in nights, and in lessons that teach it.
+    private var crateShown: Bool {
+        if let id = lessonID { return Lessons.find(id)?.desk.crate ?? false }
+        return true
+    }
+
+    /// Free play: every record. A lesson or night: the records of its chapter and the ones before.
+    private var crateRecords: [TrackInfo] {
+        var chapter = Int.max
+        if let id = lessonID, let lesson = Lessons.find(id) { chapter = lesson.desk.chapter }
+        if let id = nightID, let info = Nights.find(id) { chapter = info.chapter }
+        return game.tracks.filter { ($0.chapter ?? 1) <= chapter }
     }
 
     private func pill(_ symbol: String, _ title: String, lit: Bool, action: @escaping () -> Void) -> some View {
@@ -115,6 +134,35 @@ struct BoothView: View {
             .frame(height: 34)
             .background(Capsule().fill(lit ? GroovelineLogo.teal : Color.black.opacity(0.5)))
             .overlay(Capsule().stroke(.white.opacity(lit ? 0 : 0.25), lineWidth: 1))
+        }
+    }
+}
+
+/// The CRATE button in a lesson: it pulses when the coach points at it.
+struct CratePill: View {
+    @ObservedObject var runner: LessonRunner
+    let action: () -> Void
+    @State private var glow = false
+
+    var body: some View {
+        let pointed = runner.target == .crate
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: "square.stack.fill")
+                    .font(.system(size: 12, weight: .bold))
+                Text("CRATE")
+                    .font(.system(size: 11, weight: .heavy))
+                    .tracking(2)
+            }
+            .foregroundStyle(.white.opacity(0.9))
+            .padding(.horizontal, 12)
+            .frame(height: 34)
+            .background(Capsule().fill(Color.black.opacity(0.5)))
+            .overlay(Capsule().stroke(pointed ? Color(Palette.orange) : Color.white.opacity(0.25), lineWidth: pointed ? 2.5 : 1))
+            .shadow(color: pointed ? Color(Palette.orange).opacity(glow ? 0.9 : 0.2) : .clear, radius: 8)
+        }
+        .onAppear {
+            withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) { glow = true }
         }
     }
 }

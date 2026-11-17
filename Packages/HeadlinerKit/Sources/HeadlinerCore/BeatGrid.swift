@@ -47,4 +47,6 @@ public struct TrackInfo: Codable, Identifiable, Equatable, Sendable {
     public var bars: Int
     public var seconds: Double
     public var file: String
+    /// The chapter whose crate the record belongs to (nil: chapter 1).
+    public var chapter: Int?
 }
