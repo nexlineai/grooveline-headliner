@@ -133,5 +133,25 @@
         {"who": "", "text": "END OF CHAPTER 5"}
       ] }
     ]
+  },
+  {
+    "id": "nuno",
+    "shots": [
+      { "art": "scene-nuno-door", "lines": [
+        {"who": "NUNO", "clip": "nuno-01", "text": "Not on the list."},
+        {"who": "TÓ", "voice": "vo-nuno-to", "text": "We're the warm-up! CAVE called us after the radio show! Look again!"},
+        {"who": "NUNO", "clip": "nuno-02", "text": "Warm-up. Downstairs. Mind the step."}
+      ] }
+    ]
+  },
+  {
+    "id": "chapter-6-end",
+    "shots": [
+      { "lines": [
+        {"who": "", "text": "02:00. HELENA VOSS ARRIVES. SHE HEARD YOUR LAST RECORD FROM THE STAIRS."},
+        {"who": "", "text": "ON THE WAY OUT, NUNO HOLDS THE DOOR: \"NEXT TIME, YOU'RE ON THE LIST.\""},
+        {"who": "", "text": "END OF CHAPTER 6"}
+      ] }
+    ]
   }
 ]

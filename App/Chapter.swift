@@ -26,7 +26,19 @@ enum Chapters {
     /// played straight away; on for the release.
     static let locked = false
 
-    static let all: [Chapter] = [bedroom, houseParties, shop, pubs, radio]
+    static let all: [Chapter] = [bedroom, houseParties, shop, pubs, radio, door]
+
+    /// Chapter 6: club CAVE, the warm-up slot. Nuno at the door, a bag of records, the headliner late.
+    static let door = Chapter(number: 6, title: "THE DOOR",
+                              line: "Club CAVE at midnight: the warm-up slot, a bag of records, and a doorman who has never heard of you.",
+                              steps: [
+        ChapterStep(id: "nuno", kind: .story, title: "NUNO", detail: "Not on the list.",
+                    screens: [.story("nuno")]),
+        ChapterStep(id: "warm-up", kind: .lesson, title: "WARM-UP", detail: "Make them want the headliner. Don't be the headliner.",
+                    screens: [.lesson("warm-up")]),
+        ChapterStep(id: Nights.caveWarmUp.id, kind: .night, title: Nights.caveWarmUp.title, detail: "Vinyl, a stuck record, and the headliner is late.",
+                    screens: [.night(Nights.caveWarmUp.id), .story("chapter-6-end")]),
+    ])
 
     /// Chapter 5: Grooveline Radio. Vera's Thursday show, live; jingles, requests, the news.
     static let radio = Chapter(number: 5, title: "GROOVELINE RADIO",

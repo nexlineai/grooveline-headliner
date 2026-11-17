@@ -53,6 +53,8 @@ enum LessonGoal: Equatable {
     case hitThePost(seconds: Double, window: Double)
     /// This record is on that deck.
     case recordLoaded(deck: Int, id: String)
+    /// One of the `good` records is put on that deck; any other record put there is a miss.
+    case pickRecord(deck: Int, good: [String])
     /// The deck's SYNC is on.
     case syncOn(Int)
     /// Both records heard together, kicks within `tolerance` of a beat and one bassline, for this
@@ -105,6 +107,8 @@ struct LessonDesk {
     var hideBPM = false
     /// Where the pitch faders start (0...1, 0.5 = middle, 1 = top = slowest); nil = middle.
     var pitch: [Double]?
+    /// The records you brought (ids): the crate shows only these. nil = the whole chapter.
+    var bag: [String]?
 }
 
 struct Lesson {
@@ -119,7 +123,51 @@ struct Lesson {
 enum Lessons {
     static func find(_ id: String) -> Lesson? { all.first { $0.id == id } }
 
-    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars, requests, syncOff, byEar, holdIt, longBlend, onAir]
+    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars, requests, syncOff, byEar, holdIt, longBlend, onAir, warmUp]
+
+    /// The six records packed for CAVE.
+    static let caveBag = ["porta", "seguranca", "fila", "luz-vermelha", "sem-lista", "cave"]
+
+    /// Lesson 11, chapter 6, club CAVE at midnight: the warm-up. Of the six records in the bag,
+    /// pick the one that is only a step up (the others are for two in the morning), bring it down
+    /// to the room's tempo, lock it, swap.
+    static let warmUp = Lesson(id: "warm-up", number: 11, title: "WARM-UP", coach: "LIA",
+                               desk: LessonDesk(crossfader: 0.5, channel: [0.85, 0.45], sync: [false, false], room: "cave",
+                                                syncAllowed: false, records: ["porta", "sem-lista"], crate: true, chapter: 6,
+                                                bag: caveBag), steps: [
+        LessonStep(voice: "warm-01",
+                   text: "CAVE. I played here in ninety-four. At two in the morning there'll be nine hundred people in this cellar. Right now there's thirty, and they haven't decided to stay. Start the left one.",
+                   task: "PRESS PLAY ON THE LEFT DECK", goal: .startDeck(0), target: .play(0)),
+        LessonStep(voice: "warm-02",
+                   text: "Look what's on the right deck. Sem Lista. That's a two o'clock record. You're the warm-up, kid. Make them want the headliner. Don't try to be her. Tap CRATE.",
+                   task: "TAP CRATE (TOP RIGHT)", goal: .listen, target: .crate),
+        LessonStep(voice: "warm-03",
+                   text: "Pick the next one. Not the biggest. One step up from what's playing. Read the sleeves.",
+                   task: "CRATE: ONE STEP UP, ON THE RIGHT DECK", goal: .pickRecord(deck: 1, good: ["fila"]), target: .crate,
+                   missVoice: "warm-03-miss",
+                   missText: "Too hot. That's a record for two in the morning. Find the one that's only a little warmer."),
+        LessonStep(voice: "warm-04",
+                   text: "Fila. A little faster, a little warmer. Start it on a new phrase. Its fader is halfway, so you can hear it.",
+                   task: "PRESS PLAY ON THE RIGHT DECK, ON A NEW PHRASE", goal: .startOnThePhrase(deck: 1, against: 0), target: .play(1),
+                   missVoice: "warm-04-miss",
+                   missText: "Middle of a phrase. Cue it, wait for the whoosh, and go again.",
+                   missTask: "PRESS CUE ON THE RIGHT DECK, THEN TRY AGAIN", missTarget: .cue(1)),
+        LessonStep(voice: "warm-05",
+                   text: "It's faster than the room. Push the right pitch fader up until both say a hundred and twenty two. Warm-ups don't rush.",
+                   task: "RIGHT PITCH FADER UP UNTIL BOTH SAY 122.0", goal: .tempoMatched(tolerance: 0.3), target: .pitch(1)),
+        LessonStep(voice: "warm-06",
+                   text: "Now lock the kicks with the rim.",
+                   task: "NUDGE THE RIGHT RECORD UNTIL THE KICKS ARE ONE", goal: .phaseHeld(bars: 2, tolerance: 0.08), target: .record(1)),
+        LessonStep(voice: "warm-07",
+                   text: "Locked. Right fader all the way up.",
+                   task: "RIGHT CHANNEL FADER UP", goal: .channelFader(1, 0.8...1, onThePhrase: false), target: .channel(1)),
+        LessonStep(voice: "warm-08",
+                   text: "And at the next phrase, the left fader down.",
+                   task: "LEFT CHANNEL FADER DOWN, AT THE NEXT PHRASE", goal: .channelFader(0, 0...0.04, onThePhrase: true), target: .channel(0)),
+        LessonStep(voice: "warm-09",
+                   text: "Look at them. Nodding, not screaming. That's a warm-up. Leave the screaming for Helena.",
+                   task: "WARM-UP", goal: .listen, target: nil),
+    ])
 
     /// Lesson 10, chapter 5, the radio studio: the station jingle on a phrase, and ending the
     /// music exactly when the news starts.
@@ -522,6 +570,10 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private var jinglesSeen: Int?
     private var postAt: Double?
     private var postRearm = false
+    /// For `pickRecord`: the records on the decks last frame, wrong picks, and whether it was picked.
+    private var recordsSeen: [String?]?
+    private var pickMisses = 0
+    private var picked = false
     private var wasOn = [false, false]
     private var armed = false
     private var fresh = true
@@ -560,6 +612,7 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
         jinglesSeen = nil
         postAt = nil
         postRearm = false
+        recordsSeen = nil
         let step = lesson.steps[i]
         show(text: step.text, task: step.task, target: step.target)
         say(step.voice)
@@ -686,6 +739,21 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
                 if heldBeats >= Double(bars * 4) { met() }
             case .recordLoaded(let d, let id):
                 if facts.records[d] == id { met() }
+            case .pickRecord(let d, let good):
+                if let id = facts.records[d], good.contains(id) {
+                    picked = true
+                    met()
+                } else {
+                    // A record other than the one that was there, and not a good one: too hot.
+                    let seen = recordsSeen ?? facts.records
+                    if facts.records[d] != nil && facts.records[d] != seen[d] {
+                        pickMisses += 1
+                        buzz.notificationOccurred(.warning)
+                        show(text: step.missText ?? step.text, task: step.task, target: step.target)
+                        if let name = step.missVoice { say(name) }
+                    }
+                }
+                recordsSeen = facts.records
             case .syncOn(let d):
                 if facts.sync[d] { met() }
             case .tempoMatched(let tolerance):
@@ -805,6 +873,7 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
         // Stars for what took skill: how close the start was and on which try, and, where the
         // lesson asks for it, taking the old record out at a phrase change.
         var earned: Int
+        let misses = self.misses + pickMisses
         if misses == 0 && oneError <= 0.15 {
             earned = 3
         } else if misses <= 1 && oneError <= 0.3 {
@@ -820,6 +889,9 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
     /// One line about how it went, for the result card.
     var verdict: String {
         var parts: [String] = []
+        if picked {
+            parts.append(pickMisses == 0 ? "Pick: right first time" : "Pick: \(pickMisses) too hot")
+        }
         if startJudged {
             let tries = misses == 0 ? "first try" : (misses == 1 ? "second try" : "try \(misses + 1)")
             let how = oneError <= 0.15 ? "Right on it" : (oneError <= 0.3 ? "Close" : "Near enough")

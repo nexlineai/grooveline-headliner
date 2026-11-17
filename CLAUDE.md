@@ -75,7 +75,12 @@ Design, story, decisions and the build log are in the vault:
   chip says why it stopped. Lessons can hide the numbers (`hideBPM`) and preset pitch faders.
 - Nights (`NightInfo`): room, records, chapter, coach + per-night `lines`, `requests`,
   `mishap` (.cable / .needleSkip), `turnDownAt` (the on-air fader must come down within 8 s),
-  `remarks`, `maxMood` (a small room tops out at 2), `syncAllowed`, `mixesFor3Stars`.
+  `remarks`, `maxMood` (a small room tops out at 2), `syncAllowed`, `mixesFor3Stars`, `bag` (the
+  crate shows only these ids; lessons have `LessonDesk.bag` too), `hot` (records too big for a
+  warm-up: one on air costs the third star), `clockStart` (minutes; CAVE starts at 00:30), and
+  `.stuckGroove` (the record on air repeats one platter turn, 1.8 s, until the needle is lifted
+  or the deck stops; energy drains while the room hears it). Lesson goal `pickRecord(deck, good)`:
+  any other record put on that deck is a miss ("too hot").
 - Chapters (`Chapter.swift`): PLAY opens the chapter screen (steps with best stars, scenes
   seen, CONTINUE = from the first step not done to the end of the chapter). Progress is saved in
   `UserDefaults` under `progress.v1`, recorded at a result card's CONTINUE (never on the back

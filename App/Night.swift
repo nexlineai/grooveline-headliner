@@ -39,9 +39,17 @@ struct NightInfo {
     /// Who comments, and lines of this night that replace the general ones (by moment).
     var coach = "TÓ"
     var lines: [String: [(voice: String, text: String)]] = [:]
+    /// The records you brought (ids): the crate shows only these. nil = the whole chapter.
+    var bag: [String]? = nil
+    /// Records too big for this slot: one of them on air costs the third star (a warm-up).
+    var hot: [String] = []
+    /// Where the clock starts (minutes after midnight of the evening before); the night shows 90 minutes.
+    var clockStart = 23 * 60
 }
 
-enum Mishap { case cable, needleSkip, streamDrop }
+/// What goes wrong in a night: the cable is kicked (the record stops), the needle jumps a groove,
+/// the stream drops, or a scratched record sticks in one groove until the needle is moved on.
+enum Mishap { case cable, needleSkip, streamDrop, stuckGroove }
 
 /// Who the night is for: a room of people, or listeners on the stream.
 enum Audience { case room, listeners }
@@ -117,7 +125,30 @@ enum Nights {
                                                 "requestDone": [("radio-req-done", "Request played. The chat says thank you.")],
                                                 "cable": [("radio-drop", "The stream dropped! It's back. Keep going, don't panic.")],
                                                 "jingle": [("radio-jingle", "Nice jingle.")]])
-    static let all = [firstParty, garageParty, saturdayShift, emptyTuesday, thursdayShow]
+    /// Chapter 6: the warm-up at club CAVE, half past midnight. Warm records and two o'clock
+    /// records in the bag; the room may dance but should not go nuts yet; a scratched record
+    /// sticks; the headliner is late.
+    static let caveWarmUp = NightInfo(id: "cave-warm-up", title: "MIDNIGHT AT CAVE", length: 360, room: "cave",
+                                      records: ["porta", "estatica"], chapter: 6, mixesFor3Stars: 2,
+                                      mishapAt: 0.4, mishap: .stuckGroove, syncAllowed: false,
+                                      maxMood: 2, remarks: [(at: 0.62, moment: "late")],
+                                      lines: ["wait": [("cave-wait", "Thirty people and a smoke machine. Play something.")],
+                                              "start": [("cave-start", "Here we go. Easy does it.")],
+                                              "clean": [("cave-clean-1", "Smooth. They're staying."), ("cave-clean-2", "Nobody heard the join. Lia's nodding.")],
+                                              "rough": [("cave-rough", "Bumpy. Thirty people heard that.")],
+                                              "dead": [("cave-dead", "Silence. In a club. Play something!")],
+                                              "stale": [("cave-stale", "This one's been on a while. Next.")],
+                                              "slip": [("cave-slip", "It's drifting. Nudge it.")],
+                                              "wreck": [("cave-wreck", "Ouch. Two kick drums, fighting.")],
+                                              "clash": [("cave-clash", "Two basslines. Kill a low.")],
+                                              "cable": [("cave-stuck", "The record's stuck! Pick up the needle and move it on!")],
+                                              "stuck": [("cave-stuck-2", "Lift the needle! Carry it a little further in.")],
+                                              "hot": [("cave-hot", "Whoa. That's a two o'clock record. Leave something for Helena.")],
+                                              "late": [("cave-late", "Nuno says Helena's stuck on the bridge. Another half hour. Keep them warm.")]],
+                                      bag: ["porta", "estatica", "antena", "onda-media", "fila", "seguranca", "luz-vermelha", "sem-lista", "cave"],
+                                      hot: ["seguranca", "luz-vermelha", "sem-lista", "cave"],
+                                      clockStart: 30)
+    static let all = [firstParty, garageParty, saturdayShift, emptyTuesday, thursdayShow, caveWarmUp]
     static func find(_ id: String) -> NightInfo? { all.first { $0.id == id } }
 }
 
@@ -136,6 +167,11 @@ final class NightRunner: ObservableObject {
     private var turnDownBy: Double?
     private var jinglesSeen: Int?
     private var lastJingleBonus = -100.0
+    /// The record last on air, and whether a record too big for the slot was played.
+    private var lastOnAirRecord: String?
+    private var hotPlayed = false
+    /// Seconds the room has been hearing a stuck groove.
+    private var stuckRun = 0.0
 
     /// Listeners on the stream, from the energy (radio nights).
     var listeners: Int { Int((40 + energyShown * 1260).rounded()) }
@@ -177,6 +213,11 @@ final class NightRunner: ObservableObject {
         self.info = info
         self.title = info.title
         self.length = length
+        clock = Self.clockText(info.clockStart)
+    }
+
+    private static func clockText(_ minutes: Int) -> String {
+        String(format: "%02d:%02d", (minutes / 60) % 24, minutes % 60)
     }
 
     /// True once, when somebody has just kicked the cable: the record on air must stop.
@@ -239,13 +280,22 @@ final class NightRunner: ObservableObject {
     }
 
     /// Called every frame with what the room hears: nothing, one record, or two, and for two,
-    /// how well they sit together. `lead` is the louder deck.
+    /// how well they sit together. `lead` is the louder deck. `stuck`: the room hears a record
+    /// stuck in one groove.
     func update(dt: Double, state: MixReading.State, quality: Double, bassClash: Bool, lead: Int, onAirRecord: String?, channel: [Double],
-                jingles: Int, beat: Double) {
+                jingles: Int, beat: Double, stuck: Bool = false) {
         guard stars == nil else { return }
         // Requests and the cable come at their moment of the night, and cannot wait for silence.
         if began {
             let share = elapsed / length
+            // A record too big for the slot (a warm-up playing the headliner's records).
+            if let id = onAirRecord, id != lastOnAirRecord {
+                lastOnAirRecord = id
+                if info.hot.contains(id) && !hotPlayed {
+                    hotPlayed = true
+                    say("hot", urgent: true)
+                }
+            }
             if nextRequest < info.requests.count && share >= info.requests[nextRequest].at && pending == nil {
                 let request = info.requests[nextRequest]
                 nextRequest += 1
@@ -375,6 +425,14 @@ final class NightRunner: ObservableObject {
                 clashRun = 0
             }
         }
+        // The same groove over and over: the room notices fast.
+        if stuck {
+            rate = -0.1
+            stuckRun += dt
+            if stuckRun > 6 { say("stuck") }
+        } else {
+            stuckRun = 0
+        }
         // A small room only gets so wild.
         let cap = [0.24, 0.48, 0.75, 1.0][min(3, max(0, info.maxMood))]
         energy = min(cap, max(0, energy + rate * dt))
@@ -393,9 +451,8 @@ final class NightRunner: ObservableObject {
         if elapsed - shownAt >= 0.25 {
             shownAt = elapsed
             energyShown = energy
-            // The night runs from eleven to half past midnight.
-            let minutes = 23 * 60 + Int(min(1, elapsed / length) * 90)
-            let text = String(format: "%02d:%02d", (minutes / 60) % 24, minutes % 60)
+            // The night shows ninety minutes (from eleven to half past midnight, unless it starts later).
+            let text = Self.clockText(info.clockStart + Int(min(1, elapsed / length) * 90))
             if text != clock { clock = text }
         }
         if elapsed >= length { finish() }
@@ -407,7 +464,7 @@ final class NightRunner: ObservableObject {
         let allRequests = requestsMet >= info.requests.count
         // A small room tops out lower, so it needs less for three stars.
         let need = info.maxMood >= 3 ? 0.6 : 0.5
-        if crowd >= need && transitions >= info.mixesFor3Stars && deadAir < 3 && wreck < 4 && allRequests {
+        if crowd >= need && transitions >= info.mixesFor3Stars && deadAir < 3 && wreck < 4 && allRequests && !hotPlayed {
             earned = 3
         } else if crowd >= 0.42 && transitions >= 1 {
             earned = 2
@@ -418,6 +475,7 @@ final class NightRunner: ObservableObject {
         stop()
         summary = "\(mixes)   ·   crowd \(Int((crowd * 100).rounded())) %   ·   dead air \(Int(deadAir.rounded())) s"
         if !info.requests.isEmpty { summary += "   ·   requests \(requestsMet) / \(info.requests.count)" }
+        if !info.hot.isEmpty { summary += hotPlayed ? "   ·   too hot, too early" : "   ·   kept it warm" }
         comment = ""
         stars = earned
     }

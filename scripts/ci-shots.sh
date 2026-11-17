@@ -73,6 +73,11 @@ shot chapter5 5 -screen chapter -chapter 5
 shot lesson-air 6 -screen lesson -lesson on-air
 shot lesson-air-news 8 -screen lesson -lesson on-air -lessonStep 4
 shot radio-night 10 -screen night -night thursday-show -demo 1
+shot chapter6 5 -screen chapter -chapter 6
+shot lesson-warm 6 -screen lesson -lesson warm-up
+shot lesson-warm-pick 6 -screen lesson -lesson warm-up -lessonStep 2 -crate 1
+shot cave-night 10 -screen night -night cave-warm-up -demo 1
+shot story-nuno-door 5 -screen story -scene nuno
 shot lesson-requests 6 -screen lesson -lesson requests
 shot garage 10 -screen night -night garage-party -demo 1
 shot garage-crate 6 -screen night -night garage-party -crate 1

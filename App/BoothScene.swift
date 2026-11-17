@@ -35,6 +35,8 @@ final class BoothScene: SKScene {
     /// The night being played here, if any: the crowd's energy follows the mixing.
     var night: NightRunner?
     var nightInfo: NightInfo?
+    /// A record stuck in one groove (a night's mishap): the deck, and where the groove starts (s).
+    private var stuck: (deck: Int, from: Double)?
     private var pointer: SKShapeNode?
     private var pointedAt: LessonTarget?
     private var lessonReady = false
@@ -1083,16 +1085,30 @@ final class BoothScene: SKScene {
             // A night: the crowd answers the mixing, and the room shows its mood.
             // The record on air is the one that is heard; with both heard, the louder one.
             let onAir = snapshots[0].audible ? (snapshots[1].audible ? lead : 0) : 1
+            // A scratched record: the needle falls back into the same groove, one turn of the
+            // platter (1.8 s at 33 rpm), until it is picked up and moved on or the deck is stopped.
+            if let s = stuck {
+                let deck = decks[s.deck]
+                if deck.lifted || !deck.motorOn {
+                    stuck = nil
+                } else if deck.seconds >= s.from + 1.8 || deck.seconds < s.from - 0.5 {
+                    deck.seek(to: s.from)
+                }
+            }
             night.update(dt: dt, state: reading.state, quality: reading.quality, bassClash: reading.bassClash, lead: onAir,
                          onAirRecord: reading.state == .silence ? nil : decks[onAir].info?.id, channel: channel,
-                         jingles: game.jingleCount, beat: decks[onAir].beat)
+                         jingles: game.jingleCount, beat: decks[onAir].beat,
+                         stuck: stuck.map { snapshots[$0.deck].audible } ?? false)
             // Things go wrong: somebody kicks the cable and the record on air stops.
             if night.takeMishap() {
-                if nightInfo?.mishap == .needleSkip {
+                switch nightInfo?.mishap ?? .cable {
+                case .needleSkip:
                     // The needle jumps a groove: the record lands a little ahead of the beat.
                     let deck = decks[onAir]
                     deck.seek(to: deck.seconds + 0.4 * deck.grid.beatLength)
-                } else {
+                case .stuckGroove:
+                    stuck = (onAir, decks[onAir].seconds)
+                default:
                     decks[onAir].motorOn = false
                 }
             }
