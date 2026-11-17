@@ -39,6 +39,8 @@ final class Game: ObservableObject {
     @Published private(set) var progress = CareerProgress.load()
     /// The screenshot run starts the app with `-demo 1`: the decks start by themselves.
     let demo: Bool
+    /// The studio's drum pattern (chapter 8). Not saved yet.
+    @Published var pattern = DrumPattern()
     /// Headphones: 0 off (the room on both sides), 1 split (room left, headphones right),
     /// 2 a four-output sound card (room on 1-2, headphones on 3-4).
     @Published var phonesMode: Int {
@@ -59,6 +61,7 @@ final class Game: ObservableObject {
     init() {
         let defaults = UserDefaults.standard
         demo = defaults.bool(forKey: "demo")
+        if defaults.bool(forKey: "demoPattern") { pattern = .house }
         phonesMode = defaults.integer(forKey: "phonesMode")
         cueMix = defaults.double(forKey: "cueMix")
         engine.phones = PhonesMode(rawValue: phonesMode) ?? .off

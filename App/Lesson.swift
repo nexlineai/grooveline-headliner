@@ -72,6 +72,8 @@ enum LessonGoal: Equatable {
     /// The deck's tempo is brought down to `to` BPM with its pitch fader, never more than 1.5 BPM
     /// within one bar (faster and the room feels the brakes: a miss, then carry on).
     case rideTempo(deck: Int, to: Double)
+    /// The studio's pattern: exactly these steps (0-based) are on in this row (0 kick, 1 clap, 2 hat).
+    case pattern(row: Int, steps: [Int])
     /// The deck's motor is off.
     case stopDeck(Int)
     /// Nothing to do: the step ends with the coach's line.
@@ -120,6 +122,8 @@ struct LessonDesk {
     /// Where every record in this lesson is cued, in bars from its first beat (also records put
     /// on from the crate): past the drum intro, where the music is. nil = the first beat.
     var cueBar: Int?
+    /// The studio: the step grid over the room, and the left deck plays what it says.
+    var studio = false
 }
 
 struct Lesson {
@@ -134,7 +138,30 @@ struct Lesson {
 enum Lessons {
     static func find(_ id: String) -> Lesson? { all.first { $0.id == id } }
 
-    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars, requests, syncOff, byEar, holdIt, longBlend, onAir, warmUp, keys, filterMix, tempo]
+    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars, requests, syncOff, byEar, holdIt, longBlend, onAir, warmUp, keys, filterMix, tempo, drums]
+
+    /// Lesson 15, chapter 8, the studio: a drum machine. Three rows, sixteen steps, one bar; the
+    /// left deck plays the pattern as a record. Four on the floor, the clap on two and four, the
+    /// hats in between.
+    static let drums = Lesson(id: "drums", number: 15, title: "DRUMS", coach: "LIA",
+                              desk: LessonDesk(crossfader: 0.5, channel: [0.85, 0], sync: [false, false], room: "bedroom",
+                                               chapter: 8, studio: true), steps: [
+        LessonStep(voice: "drums-01",
+                   text: "Playing other people's records is half of it. Now make your own. This is a drum machine: three rows, sixteen steps, one bar. Press play on the left deck.",
+                   task: "PRESS PLAY ON THE LEFT DECK", goal: .startDeck(0), target: .play(0)),
+        LessonStep(voice: "drums-02",
+                   text: "Nothing yet. Tap the kick on every beat: steps 1, 5, 9 and 13. Four on the floor.",
+                   task: "KICK ON 1, 5, 9 AND 13", goal: .pattern(row: 0, steps: [0, 4, 8, 12]), target: nil),
+        LessonStep(voice: "drums-03",
+                   text: "Now the clap, on two and four. Steps 5 and 13.",
+                   task: "CLAP ON 5 AND 13", goal: .pattern(row: 1, steps: [4, 12]), target: nil),
+        LessonStep(voice: "drums-04",
+                   text: "And the hats, between the kicks. Steps 3, 7, 11 and 15. The off-beat.",
+                   task: "HATS ON 3, 7, 11 AND 15", goal: .pattern(row: 2, steps: [2, 6, 10, 14]), target: nil),
+        LessonStep(voice: "drums-05",
+                   text: "Hear that? That's a groove. Every house record you love started exactly like this.",
+                   task: "DRUMS", goal: .listen, target: nil),
+    ])
 
     /// Lesson 14, chapter 7, six in the morning: the tempo comes down. Manhã (120) comes in pushed
     /// up to 128 by SYNC, on its drums-only intro (no notes to clash while it is out of tune),
@@ -660,6 +687,8 @@ struct BoothFacts {
     var time: Double
     /// Filter knob per deck, 0.5 = off.
     var filter: [Double]
+    /// The studio's pattern, per row the steps that are on.
+    var pattern: [[Bool]]
 }
 
 /// Walks through a lesson. The booth scene feeds it `BoothFacts` every frame; the overlay shows
@@ -979,6 +1008,11 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
                 if !facts.motorOn[d] { met() }
             case .filter(let d, let range):
                 if range.contains(facts.filter[d]) { met() }
+            case .pattern(let row, let steps):
+                if facts.pattern.indices.contains(row) {
+                    let on = facts.pattern[row].indices.filter { facts.pattern[row][$0] }
+                    if on == steps.sorted() { met() }
+                }
             case .rideTempo(let d, let target):
                 let bpm = facts.bpm[d], beat = facts.beat[d]
                 if let a = rideAnchor, beat >= a.beat, beat - a.beat < 4 {
@@ -1066,6 +1100,8 @@ struct LessonOverlay: View {
     @ObservedObject var runner: LessonRunner
     /// Height of the room above the gear, from the top of this view.
     let roomHeight: CGFloat
+    /// The coach's words above the gear (off in the studio, where the step grid is).
+    var showWords = true
     let onContinue: () -> Void
 
     var body: some View {
@@ -1086,7 +1122,7 @@ struct LessonOverlay: View {
                     }
                     .padding(.leading, 48)
                     Spacer(minLength: 4)
-                    words
+                    if showWords { words }
                 }
                 .padding(.top, 8)
                 .padding(.bottom, 8)

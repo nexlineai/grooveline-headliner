@@ -164,6 +164,12 @@ final class BoothScene: SKScene {
         needsBuild = true
     }
 
+    /// The studio's pattern was edited: the left deck plays the new version from where it is.
+    func patternChanged() {
+        guard lesson?.lesson.desk.studio == true else { return }
+        Studio.load(game.pattern, on: decks[0], keepPlace: true)
+    }
+
     /// Where a record is cued: `bar` bars after its first beat (when the record is that long),
     /// otherwise on the first beat.
     private func cueAt(_ bar: Int?, on deck: Deck) -> Double {
@@ -191,6 +197,8 @@ final class BoothScene: SKScene {
         for d in 0..<min(2, wanted.count) where decks[d].info?.id != wanted[d] {
             if let track = game.tracks.first(where: { $0.id == wanted[d] }) { game.load(track, on: decks[d]) }
         }
+        // The studio: the left deck plays the drum pattern.
+        if desk.studio { Studio.load(game.pattern, on: decks[0], keepPlace: false) }
         if let mix = desk.cueMix { game.cueMix = mix }
         phones = [false, false]
         for d in 0..<2 {
@@ -950,7 +958,8 @@ final class BoothScene: SKScene {
                                  bassClash: lastReading?.bassClash ?? false,
                                  jingles: game.jingleCount,
                                  time: CACurrentMediaTime(),
-                                 filter: filterSetting))
+                                 filter: filterSetting,
+                                 pattern: game.pattern.rows))
         let wanted: Float = lesson.speaking || game.jinglePlaying ? 0.5 : 1
         let now = game.engine.masterVolume
         if abs(wanted - now) > 0.002 {

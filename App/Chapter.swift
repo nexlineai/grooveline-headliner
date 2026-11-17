@@ -26,7 +26,16 @@ enum Chapters {
     /// played straight away; on for the release.
     static let locked = false
 
-    static let all: [Chapter] = [bedroom, houseParties, shop, pubs, radio, door, resident]
+    static let all: [Chapter] = [bedroom, houseParties, shop, pubs, radio, door, resident, studio]
+
+    /// Chapter 8: the studio. A drum machine first; bass and chords, the arrangement and your own
+    /// record in the crate follow.
+    static let studio = Chapter(number: 8, title: "THE STUDIO",
+                                line: "A drum machine on the desk, your own record in your own crate, and a label that might say no.",
+                                steps: [
+        ChapterStep(id: "drums", kind: .lesson, title: "DRUMS", detail: "Sixteen steps. Four on the floor.",
+                    screens: [.lesson("drums")]),
+    ])
 
     /// Chapter 7: Fridays at CAVE. Helena gives you peak time; club players, keys, a power cut.
     static let resident = Chapter(number: 7, title: "RESIDENT",

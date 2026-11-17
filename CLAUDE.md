@@ -91,6 +91,14 @@ Design, story, decisions and the build log are in the vault:
   more than 2 BPM within 2 s costs energy ("the brakes"). Lesson goal `rideTempo(deck, to)`: bring
   the pitch down to a tempo, never more than 1.5 BPM within one bar. SpriteKit: `SKScene` already
   has `filter` (CIFilter); the scene's own knob values are `filterSetting` (build 34 broke on it).
+- **Studio (chapter 8, `HeadlinerCore/DrumMachine.swift`, `App/Studio.swift`):** a 3 x 16 step
+  grid (kick, clap, hat) over the room in lessons with `LessonDesk.studio`; the voices are
+  arithmetic (no samples, no codec delay); one bar is rendered with wrap-around and repeated 64
+  times at 124 BPM, then `Deck.load(_:left:right:sampleRate:keepPlace:)` puts it on the left deck
+  (grid from sample 0; an edit swaps the buffer in place while it plays). Goal
+  `pattern(row, steps)`. The coach's words are hidden there (the grid needs the room). The pattern
+  is not saved yet; when it is, add it to `CareerProgress` as an Optional (synthesized Codable
+  inside `try?`: a new non-optional field wipes every saved progress).
 - **Keys (`HeadlinerCore/Harmony.swift`):** Camelot neighbours (same, ±1 with 12/1 wrapping, or
   same number other letter). The decks have NO key lock: the pitch fader and SYNC move the key
   too, so `clash` also counts records pitched more than 0.3 semitone apart (128 -> 130 is 0.27,

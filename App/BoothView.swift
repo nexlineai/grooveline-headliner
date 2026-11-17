@@ -26,10 +26,16 @@ struct BoothView: View {
                 // The gear takes the lower 58 % of the whole screen; the room is what is left above.
                 let roomHeight = (geo.size.height + geo.safeAreaInsets.top + geo.safeAreaInsets.bottom) * 0.42 - geo.safeAreaInsets.top
                 if let runner {
-                    LessonOverlay(runner: runner, roomHeight: roomHeight) {
+                    // In the studio the step grid takes the room; the coach is heard, not shown.
+                    LessonOverlay(runner: runner, roomHeight: roomHeight, showWords: !studio) {
                         if let stars = runner.stars { game.record(stars, for: runner.lesson.id) }
                         game.closeBooth()
                     }
+                }
+                if studio && runner?.stars == nil {
+                    StudioGrid(pattern: $game.pattern, deck: game.engine.decks[0])
+                        .frame(maxWidth: .infinity)
+                        .frame(height: max(60, roomHeight - 4), alignment: .bottom)
                 }
                 if let nightRunner {
                     NightOverlay(runner: nightRunner, roomHeight: roomHeight) {
@@ -85,6 +91,8 @@ struct BoothView: View {
             }
             .onAppear {
                 guard scene == nil else { return }
+                // A studio lesson starts from an empty pattern (the screenshot run brings a groove).
+                if studio && !UserDefaults.standard.bool(forKey: "demoPattern") { game.pattern = DrumPattern() }
                 let made = BoothScene(game: game)
                 made.insets = geo.safeAreaInsets
                 // The screenshot run opens the crate by itself.
@@ -111,7 +119,16 @@ struct BoothView: View {
             .onChange(of: geo.safeAreaInsets) { _, new in
                 scene?.insets = new
             }
+            .onChange(of: game.pattern) { _, _ in
+                scene?.patternChanged()
+            }
         }
+    }
+
+    /// The studio (chapter 8): the drum machine's grid over the room.
+    private var studio: Bool {
+        if let id = lessonID { return Lessons.find(id)?.desk.studio ?? false }
+        return false
     }
 
     /// The radio studio has a station jingle.

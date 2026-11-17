@@ -364,3 +364,36 @@ final class FilterTests: XCTestCase {
         XCTAssertEqual(Mixer.filterHz(-0.5), 20_000 * sqrt(100.0 / 20_000), accuracy: 0.01)
     }
 }
+
+final class DrumMachineTests: XCTestCase {
+    func testWholeBarsAndSilenceForAnEmptyPattern() {
+        let audio = DrumMachine.render(DrumPattern(), bpm: 120, bars: 2)
+        XCTAssertEqual(DrumMachine.barFrames(bpm: 120), 88_200)
+        XCTAssertEqual(audio.left.count, 176_400)
+        XCTAssertEqual(audio.right.count, 176_400)
+        XCTAssertEqual(audio.left.map { abs($0) }.max() ?? 1, 0)
+    }
+
+    func testKickOnStepOneStartsAtSampleZero() {
+        var p = DrumPattern()
+        p.rows[0][0] = true
+        let audio = DrumMachine.render(p, bpm: 124, bars: 1)
+        XCTAssertGreaterThan(abs(audio.left[0]), 0.5)
+    }
+
+    func testAHitLandsOnItsStep() {
+        var p = DrumPattern()
+        p.rows[1][4] = true
+        let audio = DrumMachine.render(p, bpm: 120, bars: 1)
+        let at = DrumMachine.stepFrame(4, bpm: 120)
+        XCTAssertEqual(at, 22_050)
+        XCTAssertEqual(audio.left[0..<at].map { abs($0) }.max() ?? 1, 0)
+        XCTAssertGreaterThan(audio.left[at..<(at + 2_205)].map { abs($0) }.max() ?? 0, 0.05)
+    }
+
+    func testTheHouseGroove() {
+        XCTAssertEqual(DrumPattern.house.on(0), [0, 4, 8, 12])
+        XCTAssertEqual(DrumPattern.house.on(1), [4, 12])
+        XCTAssertEqual(DrumPattern.house.on(2), [2, 6, 10, 14])
+    }
+}

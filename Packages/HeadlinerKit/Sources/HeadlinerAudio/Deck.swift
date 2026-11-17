@@ -116,6 +116,49 @@ public final class Deck {
         shared.pointee.frames = frames
     }
 
+    /// Puts a record made in the game (the studio's pattern) on the platter; its grid starts at
+    /// sample 0. With `keepPlace`, a deck that already holds a record of the same length keeps
+    /// turning where it is: an edit is heard as the needle reaches it.
+    public func load(_ track: TrackInfo, left: [Float], right: [Float], sampleRate: Double, keepPlace: Bool = false) throws {
+        let frames = min(left.count, right.count)
+        guard frames > 64,
+              let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 2),
+              let buf = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frames)),
+              let channels = buf.floatChannelData else { throw DeckError.cannotAllocate }
+        buf.frameLength = AVAudioFrameCount(frames)
+        left.withUnsafeBufferPointer { channels[0].update(from: $0.baseAddress!, count: frames) }
+        right.withUnsafeBufferPointer { channels[1].update(from: $0.baseAddress!, count: frames) }
+        let swapInPlace = keepPlace && isLoaded && shared.pointee.frames == frames && fileRate == sampleRate
+        if let old = buffer {
+            retired.append(old)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.retired.removeAll() }
+        }
+        buffer = buf
+        overview = Vinyl.overview(channels[0], count: frames, bins: 240)
+        info = track
+        if swapInPlace {
+            // Same length: the audio thread just reads from the new copy from now on.
+            shared.pointee.left = channels[0]
+            shared.pointee.right = channels[1]
+            return
+        }
+        shared.pointee.frames = 0
+        motorOn = false
+        fileRate = sampleRate
+        duration = Double(frames) / sampleRate
+        grid = BeatGrid(bpm: track.bpm, firstBeat: 0)
+        cuePoint = 0
+        lifted = false
+        pitch = 0; bend = 0
+        shared.pointee.left = channels[0]
+        shared.pointee.right = channels[1]
+        shared.pointee.rate = 0
+        shared.pointee.position = 1
+        shared.pointee.seekTo = -1
+        apply()
+        shared.pointee.frames = frames
+    }
+
     /// Needle position in seconds.
     public var seconds: Double { shared.pointee.position / fileRate }
     /// Needle position in beats on the record's grid.
