@@ -42,6 +42,8 @@ enum Chapters {
                     screens: [.lesson("skip")]),
         ChapterStep(id: "the-bag", kind: .story, title: "THE BAG", detail: "Six records. Your closing set.",
                     screens: [.bag], icon: "bag.fill"),
+        ChapterStep(id: Nights.nightBefore.id, kind: .night, title: Nights.nightBefore.title, detail: "Your old room. Your closing set, once.",
+                    screens: [.story("night-before"), .night(Nights.nightBefore.id)]),
     ])
 
     /// Chapter 11: back to back. Helena first: one booth, two DJs, her deck is hers.

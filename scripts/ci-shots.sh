@@ -119,6 +119,7 @@ shot chapter12 5 -screen chapter -chapter 12
 shot story-carla-meridian 4 -screen story -scene carla-meridian
 shot lesson-skip 8 -screen lesson -lesson skip
 shot bag 5 -screen bag -demoBag 1
+shot before-night 10 -screen night -night night-before -demo 1
 shot lesson-requests 6 -screen lesson -lesson requests
 shot garage 10 -screen night -night garage-party -demo 1
 shot garage-crate 6 -screen night -night garage-party -crate 1

@@ -69,6 +69,9 @@ struct NightInfo {
     var partner: Int? = nil
     var partnerBag: [String] = []
     var partnerStyle = PartnerStyle.helena
+    /// The bag is the one packed in THE BAG (chapter 12): its records are the crate, and the
+    /// first two are on the decks. Without a packed bag, `records` and `bag` as written.
+    var closingSet = false
 }
 
 /// What goes wrong in a night: the cable is kicked (the record stops), the needle jumps a groove,
@@ -418,7 +421,20 @@ enum Nights {
                                   clockStart: 2 * 60, judgeKeys: true,
                                   partner: 0, partnerBag: ["palco-principal", "coro", "residente", "oito-milhas", "encore", "portao"],
                                   partnerStyle: .vex)
-    static let all = [firstParty, garageParty, saturdayShift, emptyTuesday, thursdayShow, caveWarmUp, fridayCave, afterhours, dubplateNight, berlinNight, ibizaNight, burnout, sunsetSlot, threePM, tentRain, forestStage, boatParty, vexB2B]
+    /// Chapter 12: the night before MERIDIAN, in the old bedroom, everyone there. The closing set
+    /// once, on vinyl, from the bag you packed; halfway through the needle skips.
+    static let nightBefore = NightInfo(id: "night-before", title: "THE NIGHT BEFORE", length: 360, room: "bedroom",
+                                       records: ["bastidores", "holofote"], chapter: 12, mixesFor3Stars: 3,
+                                       mishapAt: 0.5, mishap: .needleSkip, syncAllowed: false,
+                                       lines: ["start": [("before-start", "Your closing set, in your old room. Play it like it's sixty thousand.")],
+                                               "clean": [("before-clean", "Sara's dancing on the bed again!"), ("night-clean-3", "Nobody even noticed the change. That's the idea.")],
+                                               "nuts": [("before-nuts", "Mira switched on the old lamp! Look at them!")],
+                                               "dead": [("before-dead", "Hey! Silence! Even in here!")],
+                                               "cable": [("before-skip", "It skipped! Like Lia said: nudge it.")],
+                                               "keys": [("fri-keys", "Sour! Those keys fight. Get out of it, or change it.")]],
+                                       bag: ["bastidores", "holofote", "meridiano", "ponte", "especiaria", "nove-anos"],
+                                       clockStart: 22 * 60, judgeKeys: true, closingSet: true)
+    static let all = [firstParty, garageParty, saturdayShift, emptyTuesday, thursdayShow, caveWarmUp, fridayCave, afterhours, dubplateNight, berlinNight, ibizaNight, burnout, sunsetSlot, threePM, tentRain, forestStage, boatParty, vexB2B, nightBefore]
     static func find(_ id: String) -> NightInfo? { all.first { $0.id == id } }
 }
 

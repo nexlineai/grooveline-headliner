@@ -194,8 +194,11 @@ final class BoothScene: SKScene {
             setTheDesk(lesson.lesson.desk)
         } else if let info = nightInfo {
             // A night starts like a gig: the first record ready, the second one's fader down.
+            // THE NIGHT BEFORE plays the bag you packed: its first two records on the decks.
+            let packed = info.closingSet ? game.progress.closingSet?.filter { id in game.tracks.contains { $0.id == id } } : nil
+            let records = packed.flatMap { $0.count >= 2 ? Array($0.prefix(2)) : nil } ?? info.records
             setTheDesk(LessonDesk(crossfader: 0.5, channel: [0.85, 0], sync: info.syncAllowed ? [false, true] : [false, false],
-                                  room: info.room, syncAllowed: info.syncAllowed, records: info.records, crate: true, chapter: info.chapter,
+                                  room: info.room, syncAllowed: info.syncAllowed, records: records, crate: true, chapter: info.chapter,
                                   deadFader: info.deadFader, echo: info.echo, partner: info.partner, partnerBag: info.partnerBag,
                                   partnerStyle: info.partnerStyle))
         }

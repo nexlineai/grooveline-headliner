@@ -303,5 +303,15 @@
         {"who": "TÓ", "voice": "vo-carla-meridian-to", "text": "MERIDIAN. The closing set. Nine years ago it was a lamp, a bedsheet and Mira. Somebody pinch me."}
       ] }
     ]
+  },
+  {
+    "id": "night-before",
+    "shots": [
+      { "lines": [
+        {"who": "", "text": "THE NIGHT BEFORE MERIDIAN."},
+        {"who": "", "text": "YOUR OLD ROOM. THE SAME LAMP, THE SAME BEDSHEET. EVERYONE CAME."},
+        {"who": "", "text": "PLAY THEM YOUR CLOSING SET. ONCE."}
+      ] }
+    ]
   }
 ]

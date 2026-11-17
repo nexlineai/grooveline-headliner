@@ -185,7 +185,12 @@ struct BoothView: View {
         var chapter = Int.max
         var bag: [String]?
         if let id = lessonID, let lesson = Lessons.find(id) { chapter = lesson.desk.chapter; bag = lesson.desk.bag }
-        if let id = nightID, let info = Nights.find(id) { chapter = info.chapter; bag = info.bag }
+        if let id = nightID, let info = Nights.find(id) {
+            chapter = info.chapter
+            bag = info.bag
+            // THE NIGHT BEFORE: the bag you packed in THE BAG.
+            if info.closingSet, let packed = game.progress.closingSet, packed.count == 6 { bag = packed }
+        }
         if let bag { return game.tracks.filter { bag.contains($0.id) } + (bag.contains("your-dubplate") ? [Studio.cutInfo()] : []) }
         return game.tracks.filter { ($0.chapter ?? 1) <= chapter }
     }
