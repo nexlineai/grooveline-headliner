@@ -91,7 +91,13 @@ Design, story, decisions and the build log are in the vault:
   the cue mix to CUE (Zé corrected this: the cue mix default is CUE, not the middle).
 
 ## Assets
-- `tools/music/make.mjs`: synthesizes the original tracks into `App/Tracks/` (+ `tracks.json`).
+- `tools/music/make.mjs ID [ID ...]`: synthesizes the original tracks into `App/Tracks/` (+
+  `tracks.json`); `--all` re-renders every one, including the approved ones, so name the ids.
+  Each record can choose its own sounds (`kit`: kicks deep/punch, metal hats, shaker, snare,
+  rim, congas, cowbell, piano, organ, Rhodes, pluck, acid/sub/reese/organ bass, vox chops), its
+  own drum patterns (`drums`), sections and mix. Chapter 2's six (`chapter: 2` in tracks.json)
+  use them; keep new records sounding different from the ones before (Zé, 17 Nov). Appending
+  only: lessons use tracks[0] and tracks[1] (122 / 124 BPM).
   Every track starts on a kick at sample 0; the app finds it at load and starts the grid there.
 - `tools/art/imagine.py OUT.jpg "prompt" [--aspect 16:9]`: illustrations in the house style.
   Style tests in `art/style-tests/`; pictures the app uses in `App/Art/`.

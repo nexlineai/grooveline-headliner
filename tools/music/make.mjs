@@ -2,8 +2,8 @@
 // Synthesizes the game's original records. No samples, no outside audio: every sound is
 // computed here, so the music is ours to ship.
 //
-//   node tools/music/make.mjs            all tracks
-//   node tools/music/make.mjs low-tide   one track
+//   node tools/music/make.mjs low-tide [squelch ...]   the named tracks
+//   node tools/music/make.mjs --all                   every track (re-renders the approved ones too)
 //
 // Output: App/Tracks/<id>.m4a (AAC, -14 LUFS) and App/Tracks/tracks.json.
 // Every track starts with a kick on its very first sample: the app finds that kick when it
@@ -11,6 +11,7 @@
 import { mkdirSync, writeFileSync, rmSync, readFileSync, existsSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const SR = 44100;
@@ -114,6 +115,122 @@ const ARRANGEMENT_LONG = [
   { name: 'outro', bars: 16, on: ['kick', 'hat', 'ohat', 'clap', 'bass'] },
   { name: 'outro 2', bars: 16, on: ['kick', 'hat'] },
 ];
+
+// ---------- chapter 2: house parties ----------
+// Six records with sounds of their own (kit), drum patterns of their own (drums: 16 steps, the
+// number is how hard), their own order of sections and their own mix. Same rules as above:
+// a kick on the very first sample, sections in eights, the last bar of each a fill, straight
+// 4/4 kicks at both ends so they can be beatmatched by ear.
+const S = (name, bars, on) => ({ name, bars, on: on.split(' ') });
+const x4 = (a) => [...a, ...a, ...a, ...a];
+const CHAPTER2 = [
+  {
+    id: 'telhado', title: 'Telhado', artist: 'Organo Rua', label: 'Fita Dourada', chapter: 2,
+    genre: 'Organ House', bpm: 124, root: 58, key: 'B♭ minor', camelot: '3A', seed: 71, swing: 0.1,
+    chords: [[0, 3, 7, 10], [-4, 0, 3, 7], [-2, 2, 5, 9], [-5, -2, 2, 5]],
+    chordRhythm: [0, 0, 0.9, 0, 0, 0, 0.8, 0, 0, 0, 0.9, 0, 0, 0.6, 0, 0.7],
+    bass: [0, null, null, null, null, null, 12, null, 0, null, null, 7, null, null, 12, null], bassOct: -24,
+    kit: { kick: 'punch', hat: 'metal', snare: 'clap', chord: 'organ', bass: 'organ', chordOct: 0 },
+    drums: { hat: x4([0, 0.45, 0, 0.6]), ohat: x4([0, 0, 1, 0]), clap: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0.35],
+             perc: { shaker: x4([0.5, 0.3, 0.6, 0.3]), cowbell: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.5, 0, 0, 0, 0] } },
+    style: { sweep: 0.2, delayBeats: 0.75, delayFb: 0.3, delayWet: 0.2, reverb: 0.2, pad: 0.12,
+             openHat: 0.35, closedHat: 0.3, clap: 0.44, perc: 0.3, hiss: 0 },
+    mix: { duck: 0.5, drive: 1.3 },
+    sections: [S('intro', 8, 'kick hat perc'), S('intro 2', 8, 'kick hat ohat clap perc'),
+               S('groove', 16, 'kick hat ohat clap perc bass chord'), S('break', 8, 'chord pad hat'),
+               S('full', 16, 'kick hat ohat clap perc bass chord pad'), S('full 2', 8, 'kick hat ohat clap perc bass chord'),
+               S('outro', 8, 'kick hat ohat clap bass'), S('outro 2', 8, 'kick hat')],
+  },
+  {
+    id: 'squelch', title: 'Squelch', artist: 'Linha 303', label: 'Betão', chapter: 2,
+    genre: 'Acid House', bpm: 125, root: 54, key: 'F♯ minor', camelot: '11A', seed: 83, swing: 0.04,
+    chords: [[0, 3, 7, 10]], chordRhythm: x4([0, 0, 0, 0]),
+    bass: [0, null, 12, 0, null, 3, 0, 15, 0, null, 10, 12, null, 7, 5, null], bassOct: -12,
+    bassAccent: [1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0],
+    bassSlide: [0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0],
+    kit: { hat: 'metal', snare: 'clap', bass: 'acid' },
+    drums: { hat: x4([0.5, 0.3, 0.7, 0.3]), ohat: x4([0, 0, 1, 0]), clap: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+             perc: { rim: [0, 0, 0, 0.6, 0, 0, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 0] } },
+    style: { sweep: 0.6, acidCut: 260, acidEnv: 2400, acidQ: 7, delayBeats: 0.75, delayFb: 0.45, delayWet: 0.25,
+             reverb: 0.18, pad: 0.06, openHat: 0.32, closedHat: 0.26, clap: 0.4, perc: 0.3, hiss: 0 },
+    mix: { duck: 0.45, drive: 1.4 },
+    sections: [S('intro', 16, 'kick hat'), S('intro 2', 8, 'kick hat ohat clap perc'),
+               S('acid', 16, 'kick hat ohat clap perc bass'), S('break', 8, 'bass hat pad'),
+               S('full', 16, 'kick hat ohat clap perc bass pad'), S('outro', 8, 'kick hat ohat clap bass'),
+               S('outro 2', 8, 'kick hat')],
+  },
+  {
+    id: 'garage-door', title: 'Garage Door', artist: 'Os Primos', label: 'Rua Baixa', chapter: 2,
+    genre: 'Deep House', bpm: 121, root: 51, key: 'E♭ minor', camelot: '2A', seed: 97, swing: 0.2,
+    chords: [[0, 3, 7, 10, 14], [-4, 0, 3, 7, 10], [-2, 2, 5, 9], [5, 8, 12, 15]],
+    chordRhythm: [0.8, 0, 0, 0, 0, 0, 0, 0.5, 0, 0, 0.7, 0, 0, 0, 0, 0],
+    bass: [0, null, null, null, null, null, null, 12, null, null, 0, null, null, 7, null, null], bassOct: -12,
+    kit: { kick: 'deep', hat: 'shaker', ohat: 'metal', snare: 'rim', chord: 'rhodes', bass: 'sub', chordOct: 0 },
+    drums: { hat: x4([0.7, 0.3, 0.5, 0.35]), ohat: x4([0, 0, 0.8, 0]), clap: [0, 0, 0, 0, 1, 0, 0, 0.3, 0, 0, 0, 0, 1, 0, 0.4, 0],
+             perc: { congaLo: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 0] } },
+    style: { sweep: 0.2, delayBeats: 0.75, delayFb: 0.35, delayWet: 0.3, reverb: 0.32, pad: 0.16,
+             openHat: 0.22, closedHat: 0.3, clap: 0.45, perc: 0.3, hiss: 0.006 },
+    mix: { duck: 0.55, drive: 1.1 },
+    sections: [S('intro', 8, 'kick hat clap'), S('intro 2', 8, 'kick hat ohat clap perc bass'),
+               S('groove', 16, 'kick hat ohat clap perc bass chord'), S('break', 16, 'chord pad hat'),
+               S('full', 16, 'kick hat ohat clap perc bass chord pad'), S('outro', 8, 'kick hat ohat clap bass'),
+               S('outro 2', 8, 'kick hat')],
+  },
+  {
+    id: 'conga-line', title: 'Conga Line', artist: 'Batucada FM', label: 'Cais Dub', chapter: 2,
+    genre: 'Tribal House', bpm: 126, root: 49, key: 'C♯ minor', camelot: '12A', seed: 109, swing: 0.08,
+    chords: [[0, 3, 7, 10]], chordRhythm: x4([0, 0, 0, 0]),
+    bass: [0, null, null, 0, null, null, 0, null, null, 0, null, null, 3, null, null, null], bassOct: -12,
+    vox: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0.6, 0], vowel: 'hey', voxOct: 12, voxLen: 0.16,
+    kit: { kick: 'punch', snare: 'snare', bass: 'sub' },
+    drums: { hat: x4([0.5, 0.4, 0.8, 0.4]), ohat: [0, 0, 0, 0, 0, 0, 0.7, 0, 0, 0, 0, 0, 0, 0, 0.7, 0],
+             clap: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.7, 0, 0, 0],
+             perc: { congaHi: [0, 0, 0.7, 0, 0, 0.5, 0, 0.8, 0, 0, 0.7, 0, 0, 0.6, 0.5, 0],
+                     congaLo: [0, 0, 0, 0.6, 0, 0, 0, 0, 0, 0.7, 0, 0.5, 0, 0, 0, 0.8],
+                     cowbell: [0, 0, 0, 0, 0, 0, 0.6, 0, 0, 0, 0, 0, 0, 0, 0, 0.5], shaker: x4([0.4, 0.2, 0.5, 0.2]) } },
+    style: { sweep: 0.3, delayBeats: 0.75, delayFb: 0.4, delayWet: 0.3, reverb: 0.22, pad: 0.08,
+             openHat: 0.3, closedHat: 0.22, clap: 0.4, perc: 0.45, vox: 0.35, hiss: 0 },
+    mix: { duck: 0.5, drive: 1.35 },
+    sections: [S('intro', 8, 'kick hat perc'), S('intro 2', 8, 'kick hat ohat perc clap'),
+               S('drums', 16, 'kick hat ohat clap perc bass'), S('voices', 16, 'kick hat ohat clap perc bass vox'),
+               S('break', 8, 'perc vox pad hat'), S('full', 16, 'kick hat ohat clap perc bass vox'),
+               S('outro', 8, 'kick hat perc')],
+  },
+  {
+    id: 'neon-pluck', title: 'Neon Pluck', artist: 'Marta Vidro', label: 'Fita Dourada', chapter: 2,
+    genre: 'Melodic House', bpm: 123, root: 56, key: 'G♯ minor', camelot: '1A', seed: 131, swing: 0,
+    chords: [[0, 3, 7, 10], [-4, 0, 3, 7], [3, 7, 10, 14], [-2, 2, 5, 9]], chordRhythm: x4([0, 0, 0, 0]),
+    arp: [0, 1, 2, 3, 2, 1, 0, 1, 0, 1, 2, 3, 4, 3, 2, 1],
+    bass: [0, null, null, null, null, null, null, null, 0, null, null, null, null, null, 12, null], bassOct: -12,
+    kit: { kick: 'deep', hat: 'metal', snare: 'clap', bass: 'reese' },
+    drums: { hat: x4([0, 0.4, 0.6, 0.4]), ohat: x4([0, 0, 1, 0]), clap: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0] },
+    style: { sweep: 0.5, delayBeats: 0.75, delayFb: 0.5, delayWet: 0.35, reverb: 0.38, pad: 0.2,
+             openHat: 0.28, closedHat: 0.24, clap: 0.38, arp: 0.3, hiss: 0 },
+    mix: { duck: 0.65, drive: 1.15 },
+    sections: [S('intro', 8, 'kick hat'), S('intro 2', 8, 'kick hat ohat clap arp'),
+               S('groove', 16, 'kick hat ohat clap arp bass'), S('break', 16, 'arp pad'),
+               S('full', 16, 'kick hat ohat clap arp bass pad'), S('outro', 8, 'kick hat ohat clap bass'),
+               S('outro 2', 8, 'kick hat')],
+  },
+  {
+    id: 'maos-no-ar', title: 'Mãos no Ar', artist: 'Clube Sete', label: 'Rua Baixa', chapter: 2,
+    genre: 'Piano House', bpm: 122, root: 59, key: 'B minor', camelot: '10A', seed: 151, swing: 0.12,
+    chords: [[0, 3, 7, 10], [-4, 0, 3, 7], [-2, 2, 5, 9], [-5, -2, 2, 5]],
+    chordRhythm: [0, 0, 0.8, 0, 0, 0, 0.9, 0, 0, 0, 0.8, 0, 0, 0.5, 0.9, 0],
+    bass: [0, null, null, 0, null, null, 12, null, 0, null, null, 0, null, 10, null, 7], bassOct: -24,
+    vox: [0.8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], vowel: 'ah', voxOct: 12, voxLen: 0.45,
+    kit: { snare: 'clap', chord: 'piano', chordOct: 0 },
+    drums: { perc: { rim: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.4, 0, 0, 0, 0] } },
+    style: { sweep: 0.25, bassCut: 420, delayBeats: 0.75, delayFb: 0.35, delayWet: 0.22, reverb: 0.26, pad: 0.14,
+             openHat: 0.38, closedHat: 0.26, clap: 0.42, perc: 0.3, vox: 0.3, hiss: 0 },
+    mix: { duck: 0.6, drive: 1.2 },
+    sections: [S('intro', 8, 'kick hat'), S('intro 2', 8, 'kick hat ohat clap perc'),
+               S('groove', 16, 'kick hat ohat clap perc bass chord'), S('full', 16, 'kick hat ohat clap perc bass chord pad vox'),
+               S('break', 8, 'chord vox pad'), S('full 2', 16, 'kick hat ohat clap perc bass chord'),
+               S('outro', 8, 'kick hat ohat clap bass')],
+  },
+];
+TRACKS.push(...CHAPTER2);
 
 // ---------- small DSP kit ----------
 function rng(seed) { // mulberry32
@@ -299,11 +416,209 @@ function reverb(b, wet, room = 0.86, damp = 0.35) {
   }
 }
 
+// ---------- more instruments (chapter 2 on: each record picks its own with `kit`) ----------
+function sine(freq, phase = 0) { // recursive sine: cheap enough to run dozens at once
+  const w = 2 * Math.PI * freq / SR, k = 2 * Math.cos(w);
+  let y1 = Math.sin(phase - w), y2 = Math.sin(phase - 2 * w);
+  return () => { const y = k * y1 - y2; y2 = y1; y1 = y; return y; };
+}
+const add = (b, i, y, pan = 0) => { b.L[i] += y * (1 - pan * 0.5); b.R[i] += y * (1 + pan * 0.5); };
+
+function kickDeep(b, t0, amp) { // long and round, little click
+  const n = Math.floor(0.5 * SR);
+  let ph = 0;
+  for (let i = 0; i < n && t0 + i < b.L.length; i++) {
+    const t = i / SR;
+    ph += 2 * Math.PI * (42 + 80 * Math.exp(-t * 20) + 260 * Math.exp(-t * 260)) / SR;
+    add(b, t0 + i, amp * Math.tanh(1.4 * Math.sin(ph)) * Math.exp(-t * 5.5) * (1 - Math.exp(-t * 6000)));
+  }
+}
+function kickPunch(b, t0, amp) { // short, hard, driven
+  const n = Math.floor(0.26 * SR);
+  let ph = 0;
+  for (let i = 0; i < n && t0 + i < b.L.length; i++) {
+    const t = i / SR;
+    ph += 2 * Math.PI * (54 + 170 * Math.exp(-t * 48) + 700 * Math.exp(-t * 420)) / SR;
+    add(b, t0 + i, 0.92 * amp * Math.tanh(2.8 * Math.sin(ph)) * Math.exp(-t * 13) * (1 - Math.exp(-t * 6000)));
+  }
+}
+const METAL = [205.3, 304.4, 369.6, 522.7, 540.0, 800.0]; // six square waves, as in the old drum machines
+function hatMetal(b, t0, amp, decay, pan = 0, cut = 7200) {
+  const n = Math.floor(decay * 6 * SR), f = new Biquad('hp', cut, 0.9), f2 = new Biquad('hp', cut * 1.15, 0.7), ph = METAL.map(() => 0);
+  for (let i = 0; i < n && t0 + i < b.L.length; i++) {
+    let x = 0;
+    for (let k = 0; k < 6; k++) { ph[k] += METAL[k] * 1.4 / SR; if (ph[k] >= 1) ph[k] -= 1; x += ph[k] < 0.5 ? 1 : -1; }
+    add(b, t0 + i, f2.run(f.run(x / 6)) * Math.exp(-(i / SR) / decay) * amp * 1.6, pan);
+  }
+}
+function shaker(b, t0, amp, rnd, pan = 0) {
+  const n = Math.floor(0.09 * SR), f = new Biquad('bp', 6500, 1.2), f2 = new Biquad('hp', 3000, 0.7);
+  for (let i = 0; i < n && t0 + i < b.L.length; i++) {
+    const t = i / SR;
+    add(b, t0 + i, f2.run(f.run(rnd() * 2 - 1)) * Math.min(1, t / 0.008) * Math.exp(-t * 35) * amp * 2.2, pan);
+  }
+}
+function snare(b, t0, amp, rnd) {
+  const n = Math.floor(0.25 * SR), s1 = sine(185), s2 = sine(330), fn = new Biquad('bp', 3200, 0.8), hp = new Biquad('hp', 180, 0.7);
+  for (let i = 0; i < n && t0 + i < b.L.length; i++) {
+    const t = i / SR;
+    const tone = (s1() * 0.6 + s2() * 0.4) * Math.exp(-t * 22), noise = fn.run(rnd() * 2 - 1) * Math.exp(-t * 16) * 1.8;
+    add(b, t0 + i, hp.run(tone + noise) * amp);
+  }
+}
+function rim(b, t0, amp, rnd, pan = 0) {
+  const n = Math.floor(0.05 * SR), s1 = sine(1720), s2 = sine(830);
+  for (let i = 0; i < n && t0 + i < b.L.length; i++) {
+    const t = i / SR;
+    add(b, t0 + i, ((s1() * 0.6 + s2() * 0.5) * Math.exp(-t * 110) + (rnd() - 0.5) * Math.exp(-t * 500) * 0.4) * amp, pan);
+  }
+}
+function conga(b, t0, amp, f0, pan, rnd) {
+  const n = Math.floor(0.35 * SR);
+  let ph = 0;
+  for (let i = 0; i < n && t0 + i < b.L.length; i++) {
+    const t = i / SR;
+    ph += 2 * Math.PI * f0 * (1 + 0.5 * Math.exp(-t * 90)) / SR;
+    add(b, t0 + i, (Math.sin(ph) * Math.exp(-t * (f0 > 250 ? 16 : 11)) + (rnd() * 2 - 1) * Math.exp(-t * 400) * 0.3) * amp, pan);
+  }
+}
+function cowbell(b, t0, amp) {
+  const n = Math.floor(0.3 * SR), f = new Biquad('bp', 2400, 1.2);
+  let p1 = 0, p2 = 0;
+  for (let i = 0; i < n && t0 + i < b.L.length; i++) {
+    const t = i / SR;
+    p1 += 587 / SR; p2 += 845 / SR; p1 -= Math.floor(p1); p2 -= Math.floor(p2);
+    const x = (p1 < 0.5 ? 1 : -1) + (p2 < 0.5 ? 1 : -1);
+    add(b, t0 + i, f.run(x) * (Math.exp(-t * 30) * 0.6 + Math.exp(-t * 8) * 0.4) * amp * 2, 0.25);
+  }
+}
+function piano(b, t0, notes, amp, len, rnd) { // house piano: bright partials, a hammer, a short release
+  const n = Math.floor((len + 0.25) * SR), parts = [], fn = new Biquad('bp', 2500, 1.5);
+  for (const m of notes) for (let k = 1; k <= 5; k++)
+    parts.push({ o: sine(hz(m) * k * (1 + 0.0005 * k * k), rnd() * 6.28), a: 1 / k ** 1.5, e: 1, d: Math.exp(-(2.2 + 1.3 * k) / SR) });
+  for (let i = 0; i < n && t0 + i < b.L.length; i++) {
+    const t = i / SR;
+    let x = 0;
+    for (const p of parts) { x += p.o() * p.a * p.e; p.e *= p.d; }
+    const rel = t < len ? 1 : Math.exp(-(t - len) * 14);
+    const y = (x / notes.length + fn.run(rnd() * 2 - 1) * Math.exp(-t * 300) * 0.4) * Math.min(1, t * 2000) * rel * amp;
+    b.L[t0 + i] += y * 0.95; b.R[t0 + i] += y;
+  }
+}
+function organ(b, t0, notes, amp, rnd) { // the classic 90s house organ stab
+  const n = Math.floor(0.42 * SR), oscs = [];
+  for (const m of notes) for (const [k, a] of [[1, 1], [2, 0.7], [3, 0.2], [4, 0.3]]) oscs.push([sine(hz(m) * k, rnd() * 6.28), a]);
+  for (let i = 0; i < n && t0 + i < b.L.length; i++) {
+    const t = i / SR;
+    let x = 0;
+    for (const [o, a] of oscs) x += o() * a;
+    const env = Math.min(1, t * 700) * Math.exp(-t * 9);
+    add(b, t0 + i, Math.tanh(1.5 * (x / notes.length * 0.6 * env + (rnd() * 2 - 1) * Math.exp(-t * 900) * 0.15)) * amp);
+  }
+}
+function rhodes(b, t0, notes, amp, rnd) { // FM electric piano with a slow stereo tremolo
+  const n = Math.floor(1.6 * SR), v = notes.map((m) => ({ f: hz(m), pc: rnd() * 6.28, pm: 0, pt: 0 }));
+  for (let i = 0; i < n && t0 + i < b.L.length; i++) {
+    const t = i / SR, idx = 1.6 * Math.exp(-t * 7) + 0.25, bell = 0.6 * Math.exp(-t * 30);
+    let x = 0;
+    for (const o of v) {
+      o.pc += 2 * Math.PI * o.f / SR; o.pm += 2 * Math.PI * o.f / SR; o.pt += 2 * Math.PI * o.f * 14 / SR;
+      x += Math.sin(o.pc + idx * Math.sin(o.pm) + bell * Math.sin(o.pt));
+    }
+    const y = x / notes.length * Math.exp(-t * 1.7) * Math.min(1, t * 330) * amp, pan = 0.35 * Math.sin(2 * Math.PI * 4.2 * t);
+    b.L[t0 + i] += y * (1 - pan); b.R[t0 + i] += y * (1 + pan);
+  }
+}
+function pluck(b, t0, m, amp, rnd, pan = 0, ring = 0.996) { // plucked string (Karplus-Strong)
+  const N = Math.max(2, Math.round(SR / hz(m))), buf = new Float32Array(N), n = Math.floor(0.9 * SR);
+  let lp = 0;
+  for (let k = 0; k < N; k++) { lp += ((rnd() * 2 - 1) - lp) * 0.6; buf[k] = lp; }
+  let j = 0;
+  for (let i = 0; i < n && t0 + i < b.L.length; i++) {
+    const y = buf[j], nx = buf[(j + 1) % N];
+    buf[j] = (y + nx) * 0.5 * ring;
+    j = (j + 1) % N;
+    add(b, t0 + i, y * amp * Math.min(1, i / 40), pan);
+  }
+}
+function acidNote(b, t0, m, len, amp, accent, from, st, open) { // the squelchy little bass box
+  const n = Math.floor((len + 0.05) * SR), f = new SVF(), f1 = hz(m), fA = from != null ? hz(from) : f1;
+  let ph = 0;
+  for (let i = 0; i < n && t0 + i < b.L.length; i++) {
+    const t = i / SR, fq = f1 + (fA - f1) * Math.exp(-t * 40), dt = fq / SR;
+    ph += dt; if (ph >= 1) ph -= 1;
+    let s = 2 * ph - 1;
+    if (ph < dt) { const u = ph / dt; s -= u + u - u * u - 1; } else if (ph > 1 - dt) { const u = (ph - 1) / dt; s -= u * u + u + u + 1; }
+    if ((i & 7) === 0) f.set(st.acidCut * (0.4 + open) + st.acidEnv * (accent ? 1.7 : 1) * Math.exp(-t * (accent ? 8 : 14)), st.acidQ);
+    const env = Math.min(1, t * 400) * (t < len ? 1 : Math.exp(-(t - len) * 60));
+    add(b, t0 + i, Math.tanh(1.8 * f.lp(s)) * env * amp * (accent ? 1.25 : 1));
+  }
+}
+function subNote(b, t0, m, len, amp) {
+  const n = Math.floor((len + 0.05) * SR), o1 = sine(hz(m)), o2 = sine(hz(m) * 2);
+  for (let i = 0; i < n && t0 + i < b.L.length; i++) {
+    const t = i / SR, env = Math.min(1, t * 300) * (t < len ? 1 : Math.exp(-(t - len) * 50));
+    add(b, t0 + i, Math.tanh(1.3 * (o1() + 0.3 * o2())) * env * amp);
+  }
+}
+function reeseNote(b, t0, m, len, amp, rnd) {
+  const n = Math.floor((len + 0.08) * SR), a = saw(hz(m), -14, rnd()), c = saw(hz(m), 14, rnd()), o = sine(hz(m) / 2), f = new SVF();
+  f.set(420, 0.9);
+  for (let i = 0; i < n && t0 + i < b.L.length; i++) {
+    const t = i / SR, env = Math.min(1, t * 200) * (t < len ? 1 : Math.exp(-(t - len) * 40));
+    add(b, t0 + i, Math.tanh(1.2 * (f.lp((a() + c()) * 0.5) + 0.5 * o())) * env * amp);
+  }
+}
+function organBass(b, t0, m, len, amp) {
+  const n = Math.floor((len + 0.05) * SR), o1 = sine(hz(m)), o2 = sine(hz(m) * 2);
+  for (let i = 0; i < n && t0 + i < b.L.length; i++) {
+    const t = i / SR, env = Math.min(1, t * 500) * Math.exp(-t * 4) * (t < len ? 1 : Math.exp(-(t - len) * 40));
+    add(b, t0 + i, Math.tanh(1.6 * (o1() + 0.6 * o2())) * env * amp);
+  }
+}
+const VOWELS = { ah: [800, 1150, 2900], oh: [450, 800, 2830], hey: [600, 1900, 2600] };
+function vox(b, t0, m, len, amp, vowel, rnd, pan = 0) { // a sung or shouted syllable from a buzz and three formants
+  const n = Math.floor((len + 0.1) * SR), fm = VOWELS[vowel] || VOWELS.ah;
+  const fs = fm.map((f, k) => new Biquad('bp', f, [6, 8, 10][k])), w = [1, 0.6, 0.3];
+  let ph = 0;
+  for (let i = 0; i < n && t0 + i < b.L.length; i++) {
+    const t = i / SR, fq = hz(m) * (1 + (vowel === 'hey' ? 0.12 * Math.exp(-t * 10) : 0.006 * Math.sin(2 * Math.PI * 5.5 * t))), dt = fq / SR;
+    ph += dt; if (ph >= 1) ph -= 1;
+    const src = 2 * ph - 1 + (rnd() - 0.5) * 0.15;
+    let y = 0;
+    for (let k = 0; k < 3; k++) y += fs[k].run(src) * w[k];
+    const env = Math.min(1, t * 80) * (t < len ? 1 : Math.exp(-(t - len) * 25));
+    add(b, t0 + i, y * env * amp * 2.5, pan);
+  }
+}
+function hatVoice(kind, b, t0, amp, decay, rnd, pan) {
+  if (kind === 'metal') hatMetal(b, t0, amp, decay, pan);
+  else if (kind === 'shaker') shaker(b, t0, amp, rnd, pan);
+  else hat(b, t0, amp, decay, rnd, pan);
+}
+function snareVoice(kind, b, t0, amp, rnd) {
+  if (kind === 'snare') snare(b, t0, amp, rnd);
+  else if (kind === 'rim') rim(b, t0, amp, rnd);
+  else clap(b, t0, amp, rnd);
+}
+function perc(name, b, t0, amp, rnd, s) {
+  if (name === 'congaHi') conga(b, t0, amp, 290, 0.35, rnd);
+  else if (name === 'congaLo') conga(b, t0, amp, 190, -0.3, rnd);
+  else if (name === 'cowbell') cowbell(b, t0, amp * 0.6);
+  else if (name === 'shaker') shaker(b, t0, amp * 0.6, rnd, s % 2 ? 0.3 : -0.3);
+  else if (name === 'rim') rim(b, t0, amp * 0.8, rnd, -0.2);
+  else if (name === 'ride') hatMetal(b, t0, amp * 0.5, 0.09, 0.15, 5200);
+}
+
 // ---------- one track ----------
 function render(tr) {
   const rnd = rng(tr.seed), st = tr.style;
   const beat = 60 / tr.bpm, step = beat / 4, barLen = beat * 4;
-  const sections = tr.arrangement === 'long' ? ARRANGEMENT_LONG : ARRANGEMENT;
+  const sections = tr.sections || (tr.arrangement === 'long' ? ARRANGEMENT_LONG : ARRANGEMENT);
+  const kit = tr.kit || {}, dr = tr.drums || {}, mx = tr.mix || {};
+  const kickFn = kit.kick === 'deep' ? kickDeep : kit.kick === 'punch' ? kickPunch : kick;
+  const duckDepth = mx.duck ?? 0.6, drive = mx.drive ?? 1.15;
+  let lastBass = null;
   const bars = sections.reduce((a, s) => a + s.bars, 0);
   const N = Math.ceil((bars * barLen + 0.02) * SR); // the last sound stops with the last bar
   const drums = bus(N), low = bus(N), keys = bus(N), air = bus(N);
@@ -320,20 +635,48 @@ function render(tr) {
       for (let s = 0; s < 16; s++) {
         const t0 = at(bar, s);
         if (has('kick') && s % 4 === 0 && !(fill && s === 12)) {
-          kick(drums, t0, 0.95);
+          kickFn(drums, t0, 0.95);
           const n = Math.floor(0.3 * SR);
-          for (let i = 0; i < n && t0 + i < N; i++) duck[t0 + i] = Math.min(duck[t0 + i], 1 - 0.6 * Math.exp(-(i / SR) * 11));
+          for (let i = 0; i < n && t0 + i < N; i++) duck[t0 + i] = Math.min(duck[t0 + i], 1 - duckDepth * Math.exp(-(i / SR) * 11));
         }
-        if (has('hat')) hat(drums, t0, st.closedHat * (s % 4 === 2 ? 1 : 0.55) * (0.85 + 0.3 * rnd()), 0.012, rnd, s % 2 ? 0.4 : -0.3);
-        if (has('ohat') && s % 4 === 2) hat(drums, t0, st.openHat, 0.05, rnd, 0.2);
-        if (has('clap') && s % 8 === 4) clap(drums, t0, st.clap, rnd);
+        if (has('hat')) {
+          if (dr.hat) { if (dr.hat[s] > 0) hatVoice(kit.hat, drums, t0, st.closedHat * dr.hat[s] * (0.85 + 0.3 * rnd()), 0.012, rnd, s % 2 ? 0.4 : -0.3); }
+          else hat(drums, t0, st.closedHat * (s % 4 === 2 ? 1 : 0.55) * (0.85 + 0.3 * rnd()), 0.012, rnd, s % 2 ? 0.4 : -0.3);
+        }
+        if (has('ohat')) {
+          if (dr.ohat) { if (dr.ohat[s] > 0) hatVoice(kit.ohat || kit.hat, drums, t0, st.openHat * dr.ohat[s], 0.05, rnd, 0.2); }
+          else if (s % 4 === 2) hat(drums, t0, st.openHat, 0.05, rnd, 0.2);
+        }
+        if (has('clap')) {
+          if (dr.clap) { if (dr.clap[s] > 0) snareVoice(kit.snare, drums, t0, st.clap * dr.clap[s], rnd); }
+          else if (s % 8 === 4) clap(drums, t0, st.clap, rnd);
+        }
+        if (has('perc') && dr.perc) for (const [name, pat] of Object.entries(dr.perc)) if (pat[s] > 0) perc(name, drums, t0, st.perc * pat[s], rnd, s);
         if (has('bass') && tr.bass[s] != null) {
           let len = step * 0.9;
           for (let j = s + 1; j < 16 && tr.bass[j] == null && len < step * 2.6; j++) len += step;
-          bassNote(low, t0, tr.root + tr.bassOct + chord[0] + tr.bass[s], len, 0.5, st.bassCut);
+          const m = tr.root + tr.bassOct + chord[0] + tr.bass[s];
+          if (kit.bass === 'acid') acidNote(low, t0, m, len, 0.42, tr.bassAccent?.[s], tr.bassSlide?.[s] ? lastBass : null, st, open);
+          else if (kit.bass === 'sub') subNote(low, t0, m, len, 0.6);
+          else if (kit.bass === 'reese') reeseNote(low, t0, m, len, 0.45, rnd);
+          else if (kit.bass === 'organ') organBass(low, t0, m, len, 0.55);
+          else bassNote(low, t0, m, len, 0.5, st.bassCut);
+          lastBass = m;
         }
-        if (has('chord') && tr.chordRhythm[s] > 0)
-          stab(keys, t0, chord.map((c) => tr.root + 12 + c), tr.chordRhythm[s] * 0.42, st, open * (sec.name === 'break' ? 1.25 : 1), rnd);
+        if (has('chord') && tr.chordRhythm[s] > 0) {
+          const v = tr.chordRhythm[s], notes = chord.map((c) => tr.root + (kit.chordOct ?? 12) + c);
+          if (kit.chord === 'piano') piano(keys, t0, notes, v * 0.5, step * 1.6, rnd);
+          else if (kit.chord === 'organ') organ(keys, t0, notes, v * 0.45, rnd);
+          else if (kit.chord === 'rhodes') rhodes(keys, t0, notes, v * 0.5, rnd);
+          else if (kit.chord === 'pluck') notes.forEach((m, k) => pluck(keys, t0 + Math.round(k * 0.012 * SR), m, v * 0.3, rnd, (k - 1.5) * 0.3));
+          else stab(keys, t0, chord.map((c) => tr.root + 12 + c), v * 0.42, st, open * (sec.name === 'break' ? 1.25 : 1), rnd);
+        }
+        if (has('arp') && tr.arp && tr.arp[s] != null) {
+          const tones = chord.slice(0, 4), k = tr.arp[s];
+          pluck(keys, t0, tr.root + 12 * (1 + Math.floor(k / tones.length)) + tones[k % tones.length], st.arp * (0.7 + 0.6 * open), rnd, s % 2 ? 0.35 : -0.35);
+        }
+        if (has('vox') && tr.vox && tr.vox[s] > 0)
+          vox(keys, t0, tr.root + (tr.voxOct ?? 12) + chord[0], tr.voxLen ?? 0.18, st.vox * tr.vox[s], tr.vowel, rnd, s % 4 ? 0.3 : -0.2);
       }
       if (has('pad')) pad(air, at(bar, 0), chord.slice(0, 4).map((c) => tr.root + c), barLen, st.pad, rnd);
       if (fill) riser(air, at(bar, 0), barLen, 0.1, rnd);
@@ -351,7 +694,7 @@ function render(tr) {
     const d = duck[i], hiss = st.hiss ? hissF.run(rnd() * 2 - 1) * st.hiss * (0.7 + 0.3 * Math.sin(i / SR * 0.7)) : 0;
     const l = drums.L[i] + low.L[i] * d + (keys.L[i] + air.L[i]) * (0.35 + 0.65 * d) + hiss;
     const r = drums.R[i] + low.R[i] * d + (keys.R[i] + air.R[i]) * (0.35 + 0.65 * d) + hiss;
-    mix.L[i] = Math.tanh(l * 1.15); mix.R[i] = Math.tanh(r * 1.15);
+    mix.L[i] = Math.tanh(l * drive); mix.R[i] = Math.tanh(r * drive);
     peak = Math.max(peak, Math.abs(mix.L[i]), Math.abs(mix.R[i]));
   }
   // The file ends on the bar line; a 30 ms fade keeps the cut silent.
@@ -385,14 +728,18 @@ function loudness(file) {
 }
 
 mkdirSync(outDir, { recursive: true });
-const only = process.argv[2];
+const ids = process.argv.slice(2).filter((a) => !a.startsWith('--'));
+if (!ids.length && !process.argv.includes('--all')) {
+  console.error('name the tracks to make (or --all, which re-renders the approved ones too):\n  ' + TRACKS.map((t) => t.id).join(' '));
+  process.exit(1);
+}
 const listFile = join(outDir, 'tracks.json');
 const list = existsSync(listFile) ? JSON.parse(readFileSync(listFile, 'utf8')) : [];
 for (const tr of TRACKS) {
-  if (only && tr.id !== only) continue;
+  if (ids.length && !ids.includes(tr.id)) continue;
   const t0 = Date.now();
   const { mix, bars, seconds } = render(tr);
-  const tmp = join(outDir, tr.id + '.tmp.wav'), out = join(outDir, tr.id + '.m4a');
+  const tmp = join(tmpdir(), 'headliner-' + tr.id + '.wav'), out = join(outDir, tr.id + '.m4a');
   writeFileSync(tmp, wav(mix));
   const before = loudness(tmp);
   const gain = Math.min(-14 - before.lufs, -1 - before.peak); // to -14 LUFS, never past -1 dB true peak
@@ -402,6 +749,7 @@ for (const tr of TRACKS) {
   const after = loudness(out);
   const entry = { id: tr.id, title: tr.title, artist: tr.artist, label: tr.label, genre: tr.genre, bpm: tr.bpm,
     key: tr.key, camelot: tr.camelot, bars, seconds: Math.round(seconds * 100) / 100, file: tr.id + '.m4a' };
+  if (tr.chapter) entry.chapter = tr.chapter;
   const at = list.findIndex((x) => x.id === tr.id);
   if (at >= 0) list[at] = entry; else list.push(entry);
   console.log(`${tr.id}: ${bars} bars, ${seconds.toFixed(1)} s, ${after.lufs} LUFS, peak ${after.peak} dB, ${((Date.now() - t0) / 1000).toFixed(1)} s to make`);
