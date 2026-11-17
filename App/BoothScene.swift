@@ -82,7 +82,7 @@ final class BoothScene: SKScene {
     private var crossNode: FaderNode?
     private var knob: [[KnobNode]] = []
     /// The one-knob filter per channel (0.5 = off), shown from chapter 7 on and in free play.
-    private var filter = [0.5, 0.5]
+    private var filterSetting = [0.5, 0.5]
     private var filterKnob: [KnobNode] = []
     private var hasFilter = true
     private var playButton: [ButtonNode] = []
@@ -180,7 +180,7 @@ final class BoothScene: SKScene {
         pitchFader = desk.pitch ?? [0.5, 0.5]
         hideNumbers = desk.hideBPM
         eq = [[0.5, 0.5, 0.5], [0.5, 0.5, 0.5]]
-        filter = [0.5, 0.5]
+        filterSetting = [0.5, 0.5]
         hasFilter = desk.chapter >= 7
         sync = desk.sync
         room = desk.room
@@ -611,7 +611,7 @@ final class BoothScene: SKScene {
                 let kx = d == 0 ? rect.minX + 27 * u : rect.maxX - 27 * u, ky = rect.minY + 27 * u
                 let node = KnobNode(radius: 10 * u, tint: d == 0 ? Palette.teal : Palette.magenta, title: "FILTER")
                 node.position = CGPoint(x: kx, y: ky)
-                node.value = filter[d]
+                node.value = filterSetting[d]
                 node.zPosition = 4
                 addChild(node)
                 filterKnob.append(node)
@@ -672,7 +672,7 @@ final class BoothScene: SKScene {
         case .channel(let d): return channel[d]
         case .cross: return cross
         case .eq(let d, let band): return eq[d][band]
-        case .filter(let d): return filter[d]
+        case .filter(let d): return filterSetting[d]
         case .cueMix: return game.cueMix
         default: return 0
         }
@@ -749,7 +749,7 @@ final class BoothScene: SKScene {
             case .filter(let d):
                 // A double tap switches the filter off (the middle).
                 if touch.tapCount >= 2 {
-                    filter[d] = 0.5
+                    filterSetting[d] = 0.5
                     if d < filterKnob.count { filterKnob[d].value = 0.5 }
                     decks[d].setFilter(0.5)
                     grab.startValue = 0.5
@@ -828,7 +828,7 @@ final class BoothScene: SKScene {
             case .filter(let d):
                 var v = min(1, max(0, grab.startValue + Double((p.y - grab.start.y) / knobTravel)))
                 if abs(v - 0.5) < 0.03 { v = 0.5 }
-                filter[d] = v
+                filterSetting[d] = v
                 if d < filterKnob.count { filterKnob[d].value = v }
                 decks[d].setFilter(v)
             default:
@@ -950,7 +950,7 @@ final class BoothScene: SKScene {
                                  bassClash: lastReading?.bassClash ?? false,
                                  jingles: game.jingleCount,
                                  time: CACurrentMediaTime(),
-                                 filter: filter))
+                                 filter: filterSetting))
         let wanted: Float = lesson.speaking || game.jinglePlaying ? 0.5 : 1
         let now = game.engine.masterVolume
         if abs(wanted - now) > 0.002 {
@@ -1158,7 +1158,8 @@ final class BoothScene: SKScene {
             night.update(dt: dt, state: reading.state, quality: reading.quality, bassClash: reading.bassClash, lead: onAir,
                          onAirRecord: reading.state == .silence ? nil : decks[onAir].info?.id, channel: channel,
                          jingles: game.jingleCount, beat: decks[onAir].beat,
-                         stuck: stuck.map { snapshots[$0.deck].audible } ?? false, keyClash: keyClash)
+                         stuck: stuck.map { snapshots[$0.deck].audible } ?? false, keyClash: keyClash,
+                         onAirBPM: decks[onAir].bpm)
             // Things go wrong: somebody kicks the cable and the record on air stops.
             if night.takeMishap() {
                 switch nightInfo?.mishap ?? .cable {
