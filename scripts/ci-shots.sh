@@ -63,6 +63,9 @@ shot lesson2 6 -screen lesson -lesson on-the-phrase
 shot lesson3 6 -screen lesson -lesson bass-swap
 shot lesson4 6 -screen lesson -lesson in-your-ears
 shot lesson-sync 6 -screen lesson -lesson sync-off
+shot lesson-ear 6 -screen lesson -lesson by-ear
+shot lesson-hold 6 -screen lesson -lesson hold-it
+shot shop-night 10 -screen night -night saturday-shift -demo 1
 shot lesson-requests 6 -screen lesson -lesson requests
 shot garage 10 -screen night -night garage-party -demo 1
 shot garage-crate 6 -screen night -night garage-party -crate 1

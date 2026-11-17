@@ -23,9 +23,17 @@ struct NightInfo {
     var mixesFor3Stars = 1
     /// What the room asks for, and when (share of the night): the record, Tó's line.
     var requests: [NightRequest] = []
-    /// When somebody kicks the cable (share of the night), if they do.
+    /// When something goes wrong (share of the night), if it does, and what.
     var mishapAt: Double? = nil
+    var mishap = Mishap.cable
+    /// False on vinyl nights: no SYNC.
+    var syncAllowed = true
+    /// Who comments, and lines of this night that replace the general ones (by moment).
+    var coach = "TÓ"
+    var lines: [String: [(voice: String, text: String)]] = [:]
 }
+
+enum Mishap { case cable, needleSkip }
 
 struct NightRequest {
     var at: Double
@@ -41,8 +49,26 @@ enum Nights {
                                        records: ["telhado", "neon-pluck"], chapter: 2, mixesFor3Stars: 2,
                                        requests: [NightRequest(at: 0.2, record: "maos-no-ar", voice: "garage-req-1", text: "Request! Somebody wants the one with the piano."),
                                                   NightRequest(at: 0.55, record: "squelch", voice: "garage-req-2", text: "Rita wants the acid one. Squelch. It's her garage, play it.")],
-                                       mishapAt: 0.75)
-    static let all = [firstParty, garageParty]
+                                       mishapAt: 0.75,
+                                       // The bedroom friends are not here.
+                                       lines: ["clean": [("night-clean-1", "Oh, that was smooth."), ("night-clean-3", "Nobody even noticed the change. That's the idea.")],
+                                               "nuts": [("night-nuts-1", "Look at them go!")]])
+    /// Chapter 3: a Saturday shift in Lia's shop. Vinyl, no sync, Baptista listening, the needle skips.
+    static let saturdayShift = NightInfo(id: "saturday-shift", title: "SATURDAY SHIFT", length: 300, room: "shop",
+                                         records: ["varanda", "dubplate"], chapter: 3, mixesFor3Stars: 1,
+                                         mishapAt: 0.6, mishap: .needleSkip, syncAllowed: false, coach: "LIA",
+                                         lines: ["wait": [("shop-wait", "The shop is yours, kid. Play something.")],
+                                                 "start": [("shop-start", "There it is. Keep it going.")],
+                                                 "clean": [("shop-clean-1", "Smooth. Nobody heard the join."), ("shop-clean-2", "Baptista nodded. He never nods.")],
+                                                 "rough": [("shop-rough", "Bumpy. Listen first, then move.")],
+                                                 "dead": [("shop-dead", "Silence in a record shop. The worst sound there is.")],
+                                                 "stale": [("shop-stale", "This one's been on long enough. Next.")],
+                                                 "slip": [("shop-slip", "It's drifting. Ride the pitch.")],
+                                                 "wreck": [("shop-wreck", "Ouch. Horses again.")],
+                                                 "clash": [("shop-wreck", "Ouch. Horses again.")],
+                                                 "nuts": [("shop-nuts", "Look at them. Dancing between the bins."), ("shop-dance-1", "Even Baptista's foot is tapping.")],
+                                                 "cable": [("shop-skip", "The needle jumped! Nudge it back in line.")]])
+    static let all = [firstParty, garageParty, saturdayShift]
     static func find(_ id: String) -> NightInfo? { all.first { $0.id == id } }
 }
 
@@ -133,14 +159,14 @@ final class NightRunner: ObservableObject {
     }
 
     private func say(_ moment: String, urgent: Bool = false) {
-        guard urgent || now >= quietUntil, let options = Self.lines[moment], !options.isEmpty else { return }
+        guard urgent || now >= quietUntil, let options = info.lines[moment] ?? Self.lines[moment], !options.isEmpty else { return }
         let n = turn[moment, default: 0]
         turn[moment] = n + 1
         speak(options[n % options.count])
     }
 
     private func speak(_ line: (voice: String, text: String)) {
-        commentBy = "TÓ"
+        commentBy = info.coach
         comment = line.text
         var seconds = 3.0
         if let url = Bundle.main.url(forResource: line.voice, withExtension: "m4a"),

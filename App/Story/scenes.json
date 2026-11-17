@@ -76,5 +76,24 @@
         {"who": "", "text": "END OF CHAPTER 2"}
       ] }
     ]
+  },
+  {
+    "id": "baptista",
+    "shots": [
+      { "art": "scene-baptista", "lines": [
+        {"who": "BAPTISTA", "clip": "baptista-01", "text": "So you're Lia's new kid. No sync, she says. Saturday I'll be listening. Every join."},
+        {"who": "LIA", "voice": "vo-baptista-lia", "text": "Don't mind him. He's been coming in every Saturday for thirty years. He's never bought anything."}
+      ] }
+    ]
+  },
+  {
+    "id": "chapter-3-end",
+    "shots": [
+      { "lines": [
+        {"who": "", "text": "18:00. LIA HANDS YOU A KEY."},
+        {"who": "", "text": "THURSDAYS, THE SHOP IS YOURS."},
+        {"who": "", "text": "END OF CHAPTER 3"}
+      ] }
+    ]
   }
 ]

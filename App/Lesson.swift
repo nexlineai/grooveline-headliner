@@ -53,8 +53,8 @@ enum LessonGoal: Equatable {
     case syncOn(Int)
     /// Both records play at the same tempo, within `tolerance` BPM (pitch faders, no sync).
     case tempoMatched(tolerance: Double)
-    /// The kicks land together (within 0.07 of a beat) for this many bars in a row.
-    case phaseHeld(bars: Int)
+    /// The kicks land together (within `tolerance` of a beat) for this many bars in a row.
+    case phaseHeld(bars: Int, tolerance: Double = 0.07)
     /// The deck's motor is off.
     case stopDeck(Int)
     /// Nothing to do: the step ends with the coach's line.
@@ -91,6 +91,10 @@ struct LessonDesk {
     /// The crate is open to the player (records up to `chapter`).
     var crate = false
     var chapter = 1
+    /// Ear training: no BPM readouts, no phase dot, no verdict word.
+    var hideBPM = false
+    /// Where the pitch faders start (0...1, 0.5 = middle, 1 = top = slowest); nil = middle.
+    var pitch: [Double]?
 }
 
 struct Lesson {
@@ -105,7 +109,56 @@ struct Lesson {
 enum Lessons {
     static func find(_ id: String) -> Lesson? { all.first { $0.id == id } }
 
-    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars, requests, syncOff]
+    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars, requests, syncOff, byEar, holdIt]
+
+    /// Lesson 7: the numbers are covered. Which record is ahead, how far, locked: all by ear.
+    static let byEar = Lesson(id: "by-ear", number: 7, title: "BY EAR", coach: "LIA",
+                              desk: LessonDesk(crossfader: 0.5, channel: [0.85, 0.85], sync: [false, false], room: "shop",
+                                               syncAllowed: false, records: ["mexe", "varanda"], chapter: 3, hideBPM: true), steps: [
+        LessonStep(voice: "ear-01",
+                   text: "No numbers today, kid. I've covered them up. Records don't come with a screen. Start the left one.",
+                   task: "PRESS PLAY ON THE LEFT DECK", goal: .startDeck(0), target: .play(0)),
+        LessonStep(voice: "ear-02",
+                   text: "Now the right one, on the one. Both faders are up.",
+                   task: "PRESS PLAY ON THE RIGHT DECK, ON THE ONE", goal: .startOnTheOne(deck: 1, against: 0), target: .play(1),
+                   missVoice: "ear-02-miss", missText: "Not the one. Cue it, and try again.",
+                   missTask: "PRESS CUE ON THE RIGHT DECK, THEN TRY AGAIN", missTarget: .cue(1)),
+        LessonStep(voice: "ear-03",
+                   text: "Listen. Which one is running ahead? Don't look for an answer. Listen for it.",
+                   task: "LISTEN: WHICH ONE IS AHEAD?", goal: .listen, target: nil),
+        LessonStep(voice: "ear-04",
+                   text: "Bring them to the same speed with the right pitch fader. Small moves, finger to the side. When the galloping slows to a crawl, you're close.",
+                   task: "MATCH THE SPEED WITH THE RIGHT PITCH FADER", goal: .tempoMatched(tolerance: 0.3), target: .pitch(1)),
+        LessonStep(voice: "ear-05",
+                   text: "Now lock the kicks with the rim, and keep them there. By ear.",
+                   task: "NUDGE THE RIGHT RECORD UNTIL THE KICKS ARE ONE", goal: .phaseHeld(bars: 4), target: .record(1)),
+        LessonStep(voice: "ear-06",
+                   text: "That's it. You did that without a single number. Now you're a DJ.",
+                   task: "BY EAR", goal: .listen, target: nil),
+    ])
+
+    /// Lesson 8: a blend that drifts. The right record starts a hair slow; keep it locked for
+    /// eight bars with little pitch rides and nudges.
+    static let holdIt = Lesson(id: "hold-it", number: 8, title: "HOLD IT", coach: "LIA",
+                               desk: LessonDesk(crossfader: 0.5, channel: [0.85, 0.85], sync: [false, false], room: "shop",
+                                                syncAllowed: false, records: ["dubplate", "mexe"], chapter: 3,
+                                                // Mexe (124) pitched to about 123.3 against Dubplate's 123: close, never still.
+                                                pitch: [0.5, 0.5353]), steps: [
+        LessonStep(voice: "hold-01",
+                   text: "Two records at the same tempo never stay together for long. Belts slip, motors wander. Start both, the right one on the one.",
+                   task: "PRESS PLAY ON THE LEFT DECK", goal: .startDeck(0), target: .play(0)),
+        LessonStep(voice: "ear-02",
+                   text: "Now the right one, on the one. Both faders are up.",
+                   task: "PRESS PLAY ON THE RIGHT DECK, ON THE ONE", goal: .startOnTheOne(deck: 1, against: 0), target: .play(1),
+                   missVoice: "ear-02-miss", missText: "Not the one. Cue it, and try again.",
+                   missTask: "PRESS CUE ON THE RIGHT DECK, THEN TRY AGAIN", missTarget: .cue(1)),
+        LessonStep(voice: "hold-02",
+                   text: "Match them, then lock them. Then hold it. Eight bars, and don't let it slip. Little touches. Listen for the flam before it becomes a gallop.",
+                   task: "HOLD THE BLEND FOR EIGHT BARS", goal: .phaseHeld(bars: 8, tolerance: 0.08), target: .record(1)),
+        LessonStep(voice: "hold-03",
+                   text: "Eight bars. Steady hands. That's how you hold a blend for a whole record.",
+                   task: "HOLD IT", goal: .listen, target: nil),
+    ])
 
     /// Lesson 5, chapter 2, Rita's garage: a request. Open the crate, put the record on the free
     /// deck, sync it, bring it in on a phrase.
@@ -475,12 +528,12 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
                 if facts.sync[d] { met() }
             case .tempoMatched(let tolerance):
                 let gap = abs(facts.bpm[0] - facts.bpm[1])
-                let text = gap <= tolerance ? "MATCHED" : String(format: "%.1f BPM APART", gap)
+                let text = lesson.desk.hideBPM ? "BY EAR" : (gap <= tolerance ? "MATCHED" : String(format: "%.1f BPM APART", gap))
                 if text != progress { progress = text }
                 if gap <= tolerance && facts.turning[0] && facts.turning[1] { met() }
-            case .phaseHeld(let bars):
+            case .phaseHeld(let bars, let tolerance):
                 // Counted in beats of the left record; a slip starts the count again.
-                if facts.turning[0] && facts.turning[1] && abs(facts.phase) < 0.07 {
+                if facts.turning[0] && facts.turning[1] && abs(facts.phase) < tolerance {
                     let from = startBeat ?? facts.beat[0]
                     startBeat = from
                     let held = (facts.beat[0] - from) / 4
@@ -489,7 +542,7 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
                     if held >= Double(bars) { met() }
                 } else {
                     startBeat = nil
-                    let text = facts.turning[0] && facts.turning[1] ? String(format: "%+.2f BEAT", facts.phase) : ""
+                    let text = facts.turning[0] && facts.turning[1] && !lesson.desk.hideBPM ? String(format: "%+.2f BEAT", facts.phase) : ""
                     if text != progress { progress = text }
                 }
             case .phonesReady:

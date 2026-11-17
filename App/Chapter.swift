@@ -48,6 +48,12 @@ enum Chapters {
                     screens: [.story("white-label")]),
         ChapterStep(id: "sync-off", kind: .lesson, title: "SYNC OFF", detail: "Hear the gallop. Pitch it, nudge it, lock it.",
                     screens: [.lesson("sync-off")]),
+        ChapterStep(id: "by-ear", kind: .lesson, title: "BY EAR", detail: "No numbers. Which one is ahead?",
+                    screens: [.lesson("by-ear")]),
+        ChapterStep(id: "hold-it", kind: .lesson, title: "HOLD IT", detail: "Blends drift. Eight bars without a slip.",
+                    screens: [.lesson("hold-it")]),
+        ChapterStep(id: Nights.saturdayShift.id, kind: .night, title: Nights.saturdayShift.title, detail: "Vinyl only. Baptista is listening.",
+                    screens: [.story("baptista"), .night(Nights.saturdayShift.id), .story("chapter-3-end")]),
     ])
 
     static func find(_ number: Int) -> Chapter? { all.first { $0.number == number } }

@@ -103,6 +103,8 @@ final class BoothScene: SKScene {
     private var room = "bedroom"
     /// False on vinyl: SYNC is dim and does nothing.
     private var syncAllowed = true
+    /// Ear training: the tempo readouts, the phase dot and the verdict are hidden.
+    private var hideNumbers = false
     private var roomVideos: [SKVideoNode?] = [nil, nil, nil, nil]
     private var roomPlayers: [AVQueuePlayer?] = [nil, nil, nil, nil]
     private var roomLoopers: [AVPlayerLooper?] = [nil, nil, nil, nil]
@@ -132,8 +134,8 @@ final class BoothScene: SKScene {
             setTheDesk(lesson.lesson.desk)
         } else if let info = nightInfo {
             // A night starts like a gig: the first record ready, the second one's fader down.
-            setTheDesk(LessonDesk(crossfader: 0.5, channel: [0.85, 0], sync: [false, true], room: info.room,
-                                  records: info.records, crate: true, chapter: info.chapter))
+            setTheDesk(LessonDesk(crossfader: 0.5, channel: [0.85, 0], sync: info.syncAllowed ? [false, true] : [false, false],
+                                  room: info.room, syncAllowed: info.syncAllowed, records: info.records, crate: true, chapter: info.chapter))
         }
         applyMix()
     }
@@ -152,7 +154,8 @@ final class BoothScene: SKScene {
     private func setTheDesk(_ desk: LessonDesk) {
         cross = desk.crossfader
         channel = desk.channel
-        pitchFader = [0.5, 0.5]
+        pitchFader = desk.pitch ?? [0.5, 0.5]
+        hideNumbers = desk.hideBPM
         eq = [[0.5, 0.5, 0.5], [0.5, 0.5, 0.5]]
         sync = desk.sync
         room = desk.room
@@ -168,7 +171,7 @@ final class BoothScene: SKScene {
         for d in 0..<2 {
             let deck = decks[d]
             deck.motorOn = false
-            deck.pitch = 0
+            deck.pitch = (0.5 - pitchFader[d]) * 2 * Self.pitchRange
             deck.bend = 0
             deck.cuePoint = deck.grid.firstBeat
             deck.seek(to: deck.cuePoint)
@@ -480,12 +483,14 @@ final class BoothScene: SKScene {
             let label = gearLabel("---.-", size: 14 * u, color: tints[d], mono: true)
             label.position = CGPoint(x: d == 0 ? rect.minX + 32 * u : rect.maxX - 32 * u, y: rect.maxY - 15 * u)
             addChild(label)
+            label.isHidden = hideNumbers
             bpmLabel.append(label)
         }
         let word = gearLabel("", size: 11.5 * u, color: Palette.dim)
         word.position = CGPoint(x: rect.midX, y: rect.maxY - 13 * u)
         addChild(word)
         verdict = word
+        word.isHidden = hideNumbers
         phaseWidth = min(104 * u, rect.width * 0.5)
         let track = SKShapeNode(rectOf: CGSize(width: phaseWidth, height: 3 * u), cornerRadius: 1.5 * u)
         track.fillColor = Palette.slot
@@ -504,6 +509,9 @@ final class BoothScene: SKScene {
         dot.zPosition = 5
         addChild(dot)
         phaseDot = dot
+        dot.isHidden = hideNumbers
+        track.isHidden = hideNumbers
+        centreMark.isHidden = hideNumbers
 
         // Channel strips: EQ knobs on the outside, fader inside, meters in the middle.
         knobTravel = 90 * u
@@ -1070,7 +1078,15 @@ final class BoothScene: SKScene {
             night.update(dt: dt, state: reading.state, quality: reading.quality, bassClash: reading.bassClash, lead: onAir,
                          onAirRecord: reading.state == .silence ? nil : decks[onAir].info?.id)
             // Things go wrong: somebody kicks the cable and the record on air stops.
-            if night.takeMishap() { decks[onAir].motorOn = false }
+            if night.takeMishap() {
+                if nightInfo?.mishap == .needleSkip {
+                    // The needle jumps a groove: the record lands a little ahead of the beat.
+                    let deck = decks[onAir]
+                    deck.seek(to: deck.seconds + 0.4 * deck.grid.beatLength)
+                } else {
+                    decks[onAir].motorOn = false
+                }
+            }
             // The music steps back a little while Tó talks, as in the lessons.
             let wanted: Float = night.speaking ? 0.5 : 1
             let level = game.engine.masterVolume

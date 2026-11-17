@@ -343,6 +343,122 @@ const CHAPTER3 = [
 ];
 TRACKS.push(...CHAPTER3);
 
+// ---------- chapter 4: pubs and beach bars ----------
+// Sunny, wooden, played-by-hand sounds: marimba, strummed guitar, flute, toms. The last six
+// major keys.
+const CHAPTER4 = [
+  {
+    id: 'praia', title: 'Praia', artist: 'Areia Fina', label: 'Fita Dourada', chapter: 4,
+    genre: 'Balearic House', bpm: 118, root: 57, key: 'A major', camelot: '11B', seed: 307, swing: 0.1,
+    chords: [[0, 4, 7, 11, 14], [5, 9, 12, 16], [-3, 0, 4, 7], [7, 11, 14, 17]],
+    chordRhythm: [0.8, 0, 0, 0, 0, 0, 0.6, 0, 0, 0, 0.7, 0, 0, 0, 0.5, 0],
+    arp: [0, null, 2, null, 1, null, 3, null, 2, null, 4, null, 3, null, 1, null],
+    bass: [0, null, null, null, null, null, 7, null, 0, null, null, null, null, null, 12, null], bassOct: -12,
+    kit: { kick: 'deep', hat: 'shaker', snare: 'rim', chord: 'guitar', arp: 'marimba', bass: 'sub', chordOct: -12 },
+    drums: { hat: x4([0.6, 0.3, 0.45, 0.3]), clap: [0, 0, 0, 0, 0.9, 0, 0, 0, 0, 0, 0, 0, 0.9, 0, 0, 0],
+             perc: { congaHi: [0, 0, 0, 0.4, 0, 0, 0.5, 0, 0, 0, 0, 0.4, 0, 0.5, 0, 0] } },
+    style: { sweep: 0.2, delayBeats: 0.75, delayFb: 0.4, delayWet: 0.28, reverb: 0.32, pad: 0.1, arp: 0.22,
+             openHat: 0.25, closedHat: 0.3, clap: 0.42, perc: 0.3, hiss: 0.004 },
+    mix: { duck: 0.45, drive: 1.1 },
+    sections: [S('intro', 8, 'kick hat clap'), S('intro 2', 8, 'kick hat clap perc bass'),
+               S('guitar', 16, 'kick hat clap perc bass chord'), S('marimba', 16, 'kick hat clap perc bass chord arp'),
+               S('break', 8, 'chord arp pad'), S('full', 16, 'kick hat clap perc bass chord arp'),
+               S('outro', 8, 'kick hat clap bass')],
+  },
+  {
+    id: 'tambor', title: 'Tambor', artist: 'Kizomba Club', label: 'Cais Dub', chapter: 4,
+    genre: 'Afro House', bpm: 122, root: 49, key: 'D♭ major', camelot: '3B', seed: 331, swing: 0.08,
+    chords: [[0, 4, 7, 11], [-3, 0, 4, 7]], chordRhythm: x4([0, 0, 0, 0]),
+    arp: [0, null, null, 2, null, null, 1, null, 0, null, null, 3, null, 2, null, null],
+    bass: [0, null, null, 0, null, null, null, null, 0, null, null, null, 7, null, null, null], bassOct: -12,
+    vox: [0, 0, 0, 0, 0, 0, 0, 0, 0.9, 0, 0, 0, 0, 0, 0, 0], vowel: 'oh', voxOct: 12, voxLen: 0.5,
+    kit: { kick: 'punch', snare: 'rim', arp: 'marimba', bass: 'sub' },
+    drums: { hat: x4([0.4, 0.3, 0.6, 0.3]), ohat: x4([0, 0, 0.5, 0]), clap: [0, 0, 0, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 0.8, 0, 0, 0],
+             perc: { tomHi: [0, 0, 0, 0, 0, 0, 0.6, 0, 0, 0, 0, 0, 0, 0, 0.5, 0], tomLo: [0, 0, 0, 0.7, 0, 0, 0, 0, 0, 0, 0.6, 0, 0, 0, 0, 0.7],
+                     congaHi: [0, 0, 0.6, 0, 0, 0.5, 0, 0, 0, 0, 0.6, 0, 0, 0.4, 0, 0], shaker: x4([0.4, 0.2, 0.5, 0.2]) } },
+    style: { sweep: 0.3, delayBeats: 0.75, delayFb: 0.4, delayWet: 0.25, reverb: 0.3, pad: 0.12, arp: 0.24, vox: 0.3,
+             openHat: 0.24, closedHat: 0.24, clap: 0.4, perc: 0.42, hiss: 0 },
+    mix: { duck: 0.5, drive: 1.3 },
+    sections: [S('intro', 8, 'kick hat perc'), S('intro 2', 8, 'kick hat ohat perc clap bass'),
+               S('drums', 16, 'kick hat ohat clap perc bass arp'), S('voices', 16, 'kick hat ohat clap perc bass arp vox'),
+               S('break', 8, 'perc vox pad arp'), S('full', 16, 'kick hat ohat clap perc bass arp vox'),
+               S('outro', 8, 'kick hat perc')],
+  },
+  {
+    id: 'flauta', title: 'Flauta', artist: 'Sopro', label: 'Rua Baixa', chapter: 4,
+    genre: 'Lounge House', bpm: 119, root: 51, key: 'E♭ major', camelot: '5B', seed: 353, swing: 0.16,
+    chords: [[0, 4, 7, 11, 14], [5, 9, 12, 16], [2, 5, 9, 12], [7, 11, 14, 17]],
+    chordRhythm: [0.6, 0, 0, 0, 0, 0, 0, 0.4, 0, 0, 0.5, 0, 0, 0, 0, 0],
+    lead: [7, null, null, 9, null, 11, null, null, 12, null, 11, 9, null, 7, null, null], leadOct: 12,
+    leadSlide: [0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0],
+    bass: [0, null, null, null, null, null, null, 7, null, null, 0, null, null, null, null, null], bassOct: -12,
+    kit: { kick: 'deep', hat: 'shaker', ohat: 'metal', snare: 'rim', chord: 'rhodes', bass: 'sub', lead: 'flute', chordOct: 0 },
+    drums: { hat: x4([0.6, 0.3, 0.4, 0.3]), ohat: x4([0, 0, 0.5, 0]), clap: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0.3, 0] },
+    style: { sweep: 0.2, delayBeats: 0.75, delayFb: 0.45, delayWet: 0.3, reverb: 0.36, pad: 0.12, lead: 0.15,
+             openHat: 0.22, closedHat: 0.28, clap: 0.42, perc: 0.3, hiss: 0.005 },
+    mix: { duck: 0.45, drive: 1.05 },
+    sections: [S('intro', 8, 'kick hat clap'), S('intro 2', 8, 'kick hat ohat clap bass'),
+               S('groove', 16, 'kick hat ohat clap bass chord'), S('flute', 16, 'kick hat ohat clap bass chord lead'),
+               S('break', 8, 'chord lead pad'), S('full', 16, 'kick hat ohat clap bass chord lead pad'),
+               S('outro', 8, 'kick hat clap bass')],
+  },
+  {
+    id: 'bar-funk', title: 'Bar Funk', artist: 'Os Metais', label: 'Fita Dourada', chapter: 4,
+    genre: 'Funky House', bpm: 126, root: 56, key: 'A♭ major', camelot: '4B', seed: 379, swing: 0.1,
+    chords: [[0, 4, 7, 10], [5, 9, 12, 15], [0, 4, 7, 10], [7, 10, 14, 17]],
+    chordRhythm: [0, 0, 0.7, 0, 0, 0.5, 0, 0.7, 0, 0, 0.7, 0, 0, 0.5, 0, 0],
+    bass: [0, null, 12, null, 0, 10, null, 12, 0, null, 12, null, 7, null, 10, 12], bassOct: -24,
+    kit: { kick: 'punch', snare: 'clap', chord: 'guitar', bass: 'disco', chordOct: 0 },
+    drums: { hat: x4([0.6, 0.3, 0.5, 0.3]), ohat: x4([0, 0, 0.9, 0]), clap: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+             perc: { cowbell: [0, 0, 0, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 0, 0, 0.4, 0], tambourine: x4([0, 0, 0.6, 0]) } },
+    style: { sweep: 0.25, delayBeats: 0.5, delayFb: 0.25, delayWet: 0.15, reverb: 0.2, pad: 0.08,
+             openHat: 0.32, closedHat: 0.28, clap: 0.45, perc: 0.32, hiss: 0 },
+    mix: { duck: 0.45, drive: 1.35 },
+    sections: [S('intro', 8, 'kick hat'), S('intro 2', 8, 'kick hat ohat clap perc bass'),
+               S('groove', 16, 'kick hat ohat clap perc bass chord'), S('full', 16, 'kick hat ohat clap perc bass chord pad'),
+               S('break', 8, 'chord perc bass'), S('full 2', 16, 'kick hat ohat clap perc bass chord'),
+               S('outro', 8, 'kick hat ohat clap bass')],
+  },
+  {
+    id: 'terraco', title: 'Terraço', artist: 'Sol das Seis', label: 'Rua Baixa', chapter: 4,
+    genre: 'Nu Disco', bpm: 120, root: 59, key: 'B major', camelot: '1B', seed: 397, swing: 0.04,
+    chords: [[0, 4, 7, 11], [-3, 0, 4, 7], [-7, -3, 0, 4], [-5, -1, 2, 5]],
+    chordRhythm: [0, 0, 0.6, 0, 0, 0, 0.6, 0, 0, 0, 0.6, 0, 0, 0, 0.6, 0],
+    lead: [4, null, 7, null, 11, null, null, 9, null, 7, null, null, 4, null, 2, null], leadOct: 0,
+    leadSlide: [0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0],
+    bass: x4([0, 12, 0, 12]), bassOct: -24,
+    kit: { snare: 'clap', chord: 'guitar', bass: 'disco', lead: 'square', chordOct: -12 },
+    drums: { hat: x4([0.4, 0.3, 0.6, 0.3]), ohat: x4([0, 0, 0.7, 0]), clap: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+             perc: { cowbell: [0, 0, 0, 0, 0, 0, 0.4, 0, 0, 0, 0, 0, 0, 0, 0, 0] } },
+    style: { sweep: 0.3, delayBeats: 0.75, delayFb: 0.35, delayWet: 0.25, reverb: 0.28, pad: 0.08, strings: 0.11, lead: 0.1,
+             openHat: 0.28, closedHat: 0.24, clap: 0.42, perc: 0.3, hiss: 0 },
+    mix: { duck: 0.55, drive: 1.2 },
+    sections: [S('intro', 8, 'kick hat'), S('intro 2', 8, 'kick hat ohat clap bass'),
+               S('groove', 16, 'kick hat ohat clap perc bass chord'), S('strings', 16, 'kick hat ohat clap perc bass chord strings lead'),
+               S('break', 8, 'strings lead'), S('full', 16, 'kick hat ohat clap perc bass chord strings lead'),
+               S('outro', 8, 'kick hat clap bass')],
+  },
+  {
+    id: 'madrugada', title: 'Madrugada', artist: 'Linha Norte', label: 'Betão', chapter: 4,
+    genre: 'Speed Garage', bpm: 128, root: 54, key: 'F♯ major', camelot: '2B', seed: 419, swing: 0.17,
+    chords: [[0, 4, 7, 11], [-3, 0, 4, 7], [5, 9, 12, 16], [7, 11, 14, 17]],
+    chordRhythm: [0, 0, 0.8, 0, 0, 0, 0, 0, 0, 0, 0.8, 0, 0, 0, 0, 0.5],
+    bass: [0, null, null, 0, null, null, 12, null, null, 0, null, null, 7, null, 12, null], bassOct: -12,
+    vox: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.8, 0], vowel: 'hey', voxOct: 12, voxLen: 0.15,
+    kit: { hat: 'metal', ohat: 'metal', snare: 'snare', chord: 'organ', bass: 'reese', chordOct: 0 },
+    drums: { hat: x4([0.6, 0.4, 0.8, 0.4]), ohat: x4([0, 0, 1, 0]), clap: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0.4, 1, 0, 0, 0],
+             perc: { rim: [0, 0, 0, 0.5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.4, 0] } },
+    style: { sweep: 0.5, delayBeats: 0.75, delayFb: 0.3, delayWet: 0.2, reverb: 0.2, pad: 0.06, vox: 0.3,
+             openHat: 0.3, closedHat: 0.26, clap: 0.42, perc: 0.3, hiss: 0 },
+    mix: { duck: 0.55, drive: 1.35 },
+    sections: [S('intro', 8, 'kick hat'), S('intro 2', 8, 'kick hat ohat clap perc'),
+               S('groove', 16, 'kick hat ohat clap perc bass'), S('organ', 16, 'kick hat ohat clap perc bass chord vox'),
+               S('break', 8, 'bass chord hat'), S('full', 16, 'kick hat ohat clap perc bass chord vox'),
+               S('outro', 8, 'kick hat ohat clap')],
+  },
+];
+TRACKS.push(...CHAPTER4);
+
 // ---------- small DSP kit ----------
 function rng(seed) { // mulberry32
   let s = seed >>> 0;
@@ -756,9 +872,10 @@ function lead(b, t0, m, len, amp, from, kind, rnd, pan = 0) { // a monophonic sy
     ph += dt; if (ph >= 1) ph -= 1;
     let x;
     if (kind === 'reed') x = Math.sin(2 * Math.PI * ph) + 0.5 * Math.sin(4 * Math.PI * ph) + 0.35 * Math.sin(6 * Math.PI * ph); // breathy and soft
+    else if (kind === 'flute') x = Math.sin(2 * Math.PI * ph) + 0.12 * Math.sin(4 * Math.PI * ph) + (rnd() - 0.5) * 0.18 * Math.exp(-t * 6);
     else x = ph < 0.5 ? 1 : -1; // square
-    if ((i & 15) === 0) f.set(kind === 'reed' ? 2400 : 1800 + 1600 * Math.exp(-t * 8), 1);
-    const env = Math.min(1, t * (kind === 'reed' ? 40 : 300)) * (t < len ? 1 : Math.exp(-(t - len) * 30));
+    if ((i & 15) === 0) f.set(kind === 'reed' ? 2400 : kind === 'flute' ? 3500 : 1800 + 1600 * Math.exp(-t * 8), 1);
+    const env = Math.min(1, t * (kind === 'reed' ? 40 : kind === 'flute' ? 25 : 300)) * (t < len ? 1 : Math.exp(-(t - len) * 30));
     add(b, t0 + i, (f.lp(x) + (kind === 'reed' ? (rnd() - 0.5) * 0.05 : 0)) * env * amp, pan);
   }
 }
@@ -767,6 +884,31 @@ function tambourine(b, t0, amp, rnd, pan = 0) { // shaken jingles: bright noise 
   for (let i = 0; i < n && t0 + i < b.L.length; i++) {
     const t = i / SR, x = rnd() * 2 - 1;
     add(b, t0 + i, (f.run(x) + f2.run(x) * 0.7 + (s1() + s2()) * 0.04) * Math.min(1, t / 0.004) * Math.exp(-t * 26) * amp * 2.2, pan);
+  }
+}
+
+// ---------- chapter 4 sounds: pubs, beach bars, terraces ----------
+function marimba(b, t0, m, amp, pan = 0) { // a wooden bar: a sine and its bright fourth partial, both dying fast
+  const n = Math.floor(0.7 * SR), o1 = sine(hz(m)), o4 = sine(hz(m) * 3.93), o10 = sine(hz(m) * 9.2);
+  let e1 = 1, e4 = 1, e10 = 1;
+  const d1 = Math.exp(-5 / SR), d4 = Math.exp(-22 / SR), d10 = Math.exp(-60 / SR);
+  for (let i = 0; i < n && t0 + i < b.L.length; i++) {
+    const y = (o1() * e1 + 0.35 * o4() * e4 + 0.12 * o10() * e10) * Math.min(1, i / 30) * amp;
+    e1 *= d1; e4 *= d4; e10 *= d10;
+    add(b, t0 + i, y, pan);
+  }
+}
+function guitarStrum(b, t0, notes, amp, rnd, up = false) { // six plucked strings, a few ms apart, brighter than `pluck`
+  const order = up ? [...notes].reverse() : notes;
+  order.forEach((m, k) => pluck(b, t0 + Math.round(k * 0.009 * SR), m, amp / Math.sqrt(notes.length), rnd, (k / Math.max(1, notes.length - 1) - 0.5) * 0.5, 0.993));
+}
+function tom(b, t0, amp, f0, pan, rnd) {
+  const n = Math.floor(0.45 * SR);
+  let ph = 0;
+  for (let i = 0; i < n && t0 + i < b.L.length; i++) {
+    const t = i / SR;
+    ph += 2 * Math.PI * f0 * (1 + 0.6 * Math.exp(-t * 25)) / SR;
+    add(b, t0 + i, (Math.tanh(1.5 * Math.sin(ph)) * Math.exp(-t * 7) + (rnd() - 0.5) * Math.exp(-t * 200) * 0.4) * amp, pan);
   }
 }
 function hatVoice(kind, b, t0, amp, decay, rnd, pan) {
@@ -787,6 +929,8 @@ function perc(name, b, t0, amp, rnd, s) {
   else if (name === 'rim') rim(b, t0, amp * 0.8, rnd, -0.2);
   else if (name === 'ride') hatMetal(b, t0, amp * 0.5, 0.09, 0.15, 5200);
   else if (name === 'tambourine') tambourine(b, t0, amp * 0.6, rnd, s % 2 ? 0.25 : -0.15);
+  else if (name === 'tomHi') tom(b, t0, amp * 0.7, 165, 0.3, rnd);
+  else if (name === 'tomLo') tom(b, t0, amp * 0.8, 105, -0.3, rnd);
   else if (name === 'clapRoll') { clap(b, t0, amp * 0.5, rnd); clap(b, t0 + Math.round(0.03 * SR), amp * 0.35, rnd); }
 }
 
@@ -851,12 +995,15 @@ function render(tr) {
           else if (kit.chord === 'rhodes') rhodes(keys, t0, notes, v * 0.5, rnd);
           else if (kit.chord === 'pluck') notes.forEach((m, k) => pluck(keys, t0 + Math.round(k * 0.012 * SR), m, v * 0.3, rnd, (k - 1.5) * 0.3, kit.pluckRing ?? 0.996));
           else if (kit.chord === 'brass') brass(keys, t0, notes, v * 0.45, rnd);
+          else if (kit.chord === 'guitar') guitarStrum(keys, t0, notes, v * 0.55, rnd, s % 4 === 2);
           else if (kit.chord === 'clav') notes.slice(0, 3).forEach((m, k) => clav(keys, t0, m, v * 0.3, rnd, (k - 1) * 0.3));
           else stab(keys, t0, chord.map((c) => tr.root + 12 + c), v * 0.42, st, open * (sec.name === 'break' ? 1.25 : 1), rnd);
         }
         if (has('arp') && tr.arp && tr.arp[s] != null) {
           const tones = chord.slice(0, 4), k = tr.arp[s];
-          pluck(keys, t0, tr.root + 12 * (1 + Math.floor(k / tones.length)) + tones[k % tones.length], st.arp * (0.7 + 0.6 * open), rnd, s % 2 ? 0.35 : -0.35);
+          const m = tr.root + 12 * (1 + Math.floor(k / tones.length)) + tones[k % tones.length];
+          if (kit.arp === 'marimba') marimba(keys, t0, m, st.arp * (0.7 + 0.6 * open), s % 2 ? 0.35 : -0.35);
+          else pluck(keys, t0, m, st.arp * (0.7 + 0.6 * open), rnd, s % 2 ? 0.35 : -0.35);
         }
         if (has('lead') && tr.lead && tr.lead[s] != null) {
           let len = step * 0.85;
