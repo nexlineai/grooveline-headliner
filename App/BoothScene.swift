@@ -626,6 +626,23 @@ final class BoothScene: SKScene {
                 tap.impactOccurred()
                 phones[d].toggle()
                 decks[d].cue = phones[d]
+            case .eq(let d, let band):
+                // A double tap puts a knob back at its default: EQ flat, in the middle.
+                if touch.tapCount >= 2 {
+                    eq[d][band] = 0.5
+                    knob[d][band].value = 0.5
+                    decks[d].setEQ(band: band, value: 0.5)
+                    grab.startValue = 0.5
+                    detent.selectionChanged()
+                }
+            case .cueMix:
+                // The cue mix's default is CUE: only the cued record in the headphones.
+                if touch.tapCount >= 2 {
+                    game.cueMix = 0
+                    cueMixKnob?.value = 0
+                    grab.startValue = 0
+                    detent.selectionChanged()
+                }
             default:
                 break
             }
