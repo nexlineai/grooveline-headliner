@@ -69,6 +69,9 @@ shot shop-night 10 -screen night -night saturday-shift -demo 1
 shot chapter4 5 -screen chapter -chapter 4
 shot lesson-long 6 -screen lesson -lesson long-blend
 shot pub-night 10 -screen night -night empty-tuesday -demo 1
+shot chapter5 5 -screen chapter -chapter 5
+shot lesson-air 6 -screen lesson -lesson on-air
+shot radio-night 10 -screen night -night thursday-show -demo 1
 shot lesson-requests 6 -screen lesson -lesson requests
 shot garage 10 -screen night -night garage-party -demo 1
 shot garage-crate 6 -screen night -night garage-party -crate 1

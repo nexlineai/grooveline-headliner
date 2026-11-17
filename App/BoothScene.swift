@@ -1,4 +1,5 @@
 import SpriteKit
+import QuartzCore
 import SwiftUI
 import AVFoundation
 import HeadlinerCore
@@ -892,8 +893,10 @@ final class BoothScene: SKScene {
                                  records: decks.map { $0.info?.id },
                                  sync: sync,
                                  blend: lastReading?.state == .blend,
-                                 bassClash: lastReading?.bassClash ?? false))
-        let wanted: Float = lesson.speaking ? 0.5 : 1
+                                 bassClash: lastReading?.bassClash ?? false,
+                                 jingles: game.jingleCount,
+                                 time: CACurrentMediaTime()))
+        let wanted: Float = lesson.speaking || game.jinglePlaying ? 0.5 : 1
         let now = game.engine.masterVolume
         if abs(wanted - now) > 0.002 {
             game.engine.masterVolume = now + (wanted - now) * Float(min(1, dt * 6))
@@ -903,7 +906,7 @@ final class BoothScene: SKScene {
             pointedAt = lesson.target
             pointer?.removeFromParent()
             pointer = nil
-            if let target = lesson.target, target != .crate, let hit = hits.first(where: { $0.kind == kind(for: target) }) {
+            if let target = lesson.target, target != .crate, target != .jingle, let hit = hits.first(where: { $0.kind == kind(for: target) }) {
                 let ring = SKShapeNode(rect: hit.rect.insetBy(dx: -2, dy: -2), cornerRadius: 9)
                 ring.strokeColor = Palette.orange
                 ring.fillColor = .clear
@@ -929,7 +932,7 @@ final class BoothScene: SKScene {
         case .pitch(let d): return .pitch(d)
         case .record(let d): return .platter(d)
         case .sync(let d): return .sync(d)
-        case .crate: return .cueMix // drawn by SwiftUI (the CRATE pill pulses); no ring here
+        case .crate, .jingle: return .cueMix // drawn by SwiftUI (the pill pulses); no ring here
         }
     }
 
@@ -1081,7 +1084,8 @@ final class BoothScene: SKScene {
             // The record on air is the one that is heard; with both heard, the louder one.
             let onAir = snapshots[0].audible ? (snapshots[1].audible ? lead : 0) : 1
             night.update(dt: dt, state: reading.state, quality: reading.quality, bassClash: reading.bassClash, lead: onAir,
-                         onAirRecord: reading.state == .silence ? nil : decks[onAir].info?.id, channel: channel)
+                         onAirRecord: reading.state == .silence ? nil : decks[onAir].info?.id, channel: channel,
+                         jingles: game.jingleCount, beat: decks[onAir].beat)
             // Things go wrong: somebody kicks the cable and the record on air stops.
             if night.takeMishap() {
                 if nightInfo?.mishap == .needleSkip {
@@ -1093,7 +1097,7 @@ final class BoothScene: SKScene {
                 }
             }
             // The music steps back a little while Tó talks, as in the lessons.
-            let wanted: Float = night.speaking ? 0.5 : 1
+            let wanted: Float = night.speaking || game.jinglePlaying ? 0.5 : 1
             let level = game.engine.masterVolume
             if abs(wanted - level) > 0.002 {
                 game.engine.masterVolume = level + (wanted - level) * Float(min(1, dt * 6))

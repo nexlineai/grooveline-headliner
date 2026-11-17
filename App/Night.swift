@@ -34,12 +34,17 @@ struct NightInfo {
     var turnDownAt: Double? = nil
     /// Things the coach just says at a moment of the night (share, moment of `lines`).
     var remarks: [(at: Double, moment: String)] = []
+    /// A room, or radio listeners (the meter shows their number).
+    var audience = Audience.room
     /// Who comments, and lines of this night that replace the general ones (by moment).
     var coach = "TÓ"
     var lines: [String: [(voice: String, text: String)]] = [:]
 }
 
-enum Mishap { case cable, needleSkip }
+enum Mishap { case cable, needleSkip, streamDrop }
+
+/// Who the night is for: a room of people, or listeners on the stream.
+enum Audience { case room, listeners }
 
 struct NightRequest {
     var at: Double
@@ -93,7 +98,26 @@ enum Nights {
                                                 "loudOk": [("pub-loud-ok", "Thank you. Rui's happy. Rui is never happy.")],
                                                 "loudNo": [("pub-loud-no", "He asked twice. Now he's angry. Fader down!")],
                                                 "drunk": [("pub-drunk", "That man wants a song we don't have. Smile and nod.")]])
-    static let all = [firstParty, garageParty, saturdayShift, emptyTuesday]
+    /// Chapter 5: Thursday on Grooveline Radio. Listeners, not dancers; a request from the chat;
+    /// the stream drops once; the jingle helps if it lands on a phrase.
+    static let thursdayShow = NightInfo(id: "thursday-show", title: "THURSDAY SHOW", length: 300, room: "studio",
+                                        records: ["onda-media", "antena"], chapter: 5, mixesFor3Stars: 2,
+                                        requests: [NightRequest(at: 0.3, record: "frequencia", voice: "radio-req-1", text: "The chat wants Frequência. Play it.")],
+                                        mishapAt: 0.65, mishap: .streamDrop, audience: .listeners,
+                                        lines: ["wait": [("radio-wait", "We're live. Play something!")],
+                                                "start": [("radio-start", "And we're on air.")],
+                                                "clean": [("radio-clean-1", "Smooth. The chat loves it."), ("radio-clean-2", "Clean mix. Listeners going up.")],
+                                                "rough": [("radio-rough", "Bumpy. Two hundred people heard that.")],
+                                                "dead": [("radio-dead", "Dead air! On the radio! Play something!")],
+                                                "stale": [("radio-stale", "Long one. The chat's getting bored.")],
+                                                "slip": [("radio-slip", "It's drifting. Nudge it.")],
+                                                "wreck": [("radio-wreck", "Train wreck, live on air. Ouch.")],
+                                                "clash": [("radio-wreck", "Train wreck, live on air. Ouch.")],
+                                                "nuts": [("radio-nuts", "The chat is going crazy!")],
+                                                "requestDone": [("radio-req-done", "Request played. The chat says thank you.")],
+                                                "cable": [("radio-drop", "The stream dropped! It's back. Keep going, don't panic.")],
+                                                "jingle": [("radio-jingle", "Nice jingle.")]])
+    static let all = [firstParty, garageParty, saturdayShift, emptyTuesday, thursdayShow]
     static func find(_ id: String) -> NightInfo? { all.first { $0.id == id } }
 }
 
@@ -110,6 +134,12 @@ final class NightRunner: ObservableObject {
     private var nextRemark = 0
     private var turnDownAsked = false
     private var turnDownBy: Double?
+    private var jinglesSeen: Int?
+    private var lastJingleBonus = -100.0
+
+    /// Listeners on the stream, from the energy (radio nights).
+    var listeners: Int { Int((40 + energyShown * 1260).rounded()) }
+    var audience: Audience { info.audience }
 
     @Published private(set) var energyShown = 0.3
     /// 0 waiting, 1 nodding, 2 dancing, 3 going nuts.
@@ -210,7 +240,8 @@ final class NightRunner: ObservableObject {
 
     /// Called every frame with what the room hears: nothing, one record, or two, and for two,
     /// how well they sit together. `lead` is the louder deck.
-    func update(dt: Double, state: MixReading.State, quality: Double, bassClash: Bool, lead: Int, onAirRecord: String?, channel: [Double]) {
+    func update(dt: Double, state: MixReading.State, quality: Double, bassClash: Bool, lead: Int, onAirRecord: String?, channel: [Double],
+                jingles: Int, beat: Double) {
         guard stars == nil else { return }
         // Requests and the cable come at their moment of the night, and cannot wait for silence.
         if began {
@@ -235,6 +266,18 @@ final class NightRunner: ObservableObject {
                 say(info.remarks[nextRemark].moment, urgent: true)
                 nextRemark += 1
             }
+            // A jingle between two phrases sounds like a real station: a small lift, once a minute.
+            let seen = jinglesSeen ?? jingles
+            jinglesSeen = jingles
+            if jingles > seen {
+                var into = beat.truncatingRemainder(dividingBy: Lessons.phrase)
+                if into < 0 { into += Lessons.phrase }
+                if min(into, Lessons.phrase - into) <= 4 && now - lastJingleBonus > 60 && state != .silence {
+                    lastJingleBonus = now
+                    energy = min(1, energy + 0.04)
+                    say("jingle")
+                }
+            }
             // The owner wants it quieter: the fader on air has to come down within eight seconds.
             if let at = info.turnDownAt, !turnDownAsked, share >= at, state != .silence {
                 turnDownAsked = true
@@ -255,6 +298,7 @@ final class NightRunner: ObservableObject {
             if let at = info.mishapAt, !mishapDone, share >= at, state != .silence {
                 mishapDone = true
                 mishapDue = true
+                if info.mishap == .streamDrop { energy = max(0, energy - 0.1) } // listeners leave
                 say("cable", urgent: true)
             }
         }
@@ -418,7 +462,7 @@ struct NightOverlay: View {
             }
             .frame(width: 150, height: 7)
             .animation(.linear(duration: 0.25), value: runner.energyShown)
-            Text(NightRunner.moods[min(3, max(0, runner.mood))])
+            Text(runner.audience == .listeners ? "\(runner.listeners) LISTENERS" : NightRunner.moods[min(3, max(0, runner.mood))])
                 .font(.system(size: 10, weight: .heavy))
                 .tracking(2)
                 .foregroundStyle(tint)

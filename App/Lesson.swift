@@ -15,8 +15,8 @@ enum LessonTarget: Equatable {
     case phones(Int), cueMixKnob
     /// A pitch fader, and a whole record (for the rim).
     case pitch(Int), record(Int)
-    /// A SYNC button, and the CRATE button (top right).
-    case sync(Int), crate
+    /// A SYNC button, the CRATE button and the JINGLE button (top right).
+    case sync(Int), crate, jingle
 }
 
 /// What has to happen before the lesson moves on.
@@ -47,6 +47,10 @@ enum LessonGoal: Equatable {
     case phonesCue(Int)
     /// The cue mix knob is in this part of its travel (0 = only the cued record, 1 = only the room).
     case cueMix(ClosedRange<Double>)
+    /// The station jingle is fired (with `onThePhrase`, within a bar of a phrase change).
+    case jinglePlayed(onThePhrase: Bool)
+    /// A countdown of `seconds`: both channel faders must be down within `window` seconds of zero.
+    case hitThePost(seconds: Double, window: Double)
     /// This record is on that deck.
     case recordLoaded(deck: Int, id: String)
     /// The deck's SYNC is on.
@@ -76,6 +80,9 @@ struct LessonStep {
     var missText: String?
     var missTask: String?
     var missTarget: LessonTarget?
+    /// For a step that can also be missed the other way (too late): what is said then.
+    var lateVoice: String?
+    var lateText: String?
 }
 
 /// How the desk is set when a lesson starts (both records stopped on their first beat).
@@ -112,7 +119,38 @@ struct Lesson {
 enum Lessons {
     static func find(_ id: String) -> Lesson? { all.first { $0.id == id } }
 
-    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars, requests, syncOff, byEar, holdIt, longBlend]
+    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars, requests, syncOff, byEar, holdIt, longBlend, onAir]
+
+    /// Lesson 10, chapter 5, the radio studio: the station jingle on a phrase, and ending the
+    /// music exactly when the news starts.
+    static let onAir = Lesson(id: "on-air", number: 10, title: "ON AIR", coach: "TÓ",
+                              desk: LessonDesk(crossfader: 0.5, channel: [0.85, 0], sync: [false, true], room: "studio",
+                                               records: ["onda-media", "antena"], chapter: 5), steps: [
+        LessonStep(voice: "air-01",
+                   text: "This is radio. Nobody can see you, so every second counts. Start the left record.",
+                   task: "PRESS PLAY ON THE LEFT DECK", goal: .startDeck(0), target: .play(0)),
+        LessonStep(voice: "air-02",
+                   text: "Top right, there's a JINGLE button. The station ID. Fire it at the end of a phrase, so it lands between two blocks.",
+                   task: "JINGLE (TOP RIGHT) AT THE END OF A PHRASE", goal: .jinglePlayed(onThePhrase: true), target: .jingle,
+                   missVoice: "air-02-miss", missText: "Middle of a phrase. Wait for the whoosh, then fire it."),
+        LessonStep(voice: "air-03",
+                   text: "Now the next record, on a new phrase. Its fader's down, sync is on.",
+                   task: "PRESS PLAY ON THE RIGHT DECK, ON A NEW PHRASE", goal: .startOnThePhrase(deck: 1, against: 0), target: .play(1),
+                   missVoice: "phrase-03-miss",
+                   missText: "Close, but that was the middle of a phrase. Press cue on the right deck, and wait for the whoosh.",
+                   missTask: "PRESS CUE ON THE RIGHT DECK, THEN TRY AGAIN", missTarget: .cue(1)),
+        LessonStep(voice: "air-04",
+                   text: "Bring it in. Right fader up.",
+                   task: "RIGHT CHANNEL FADER UP", goal: .channelFader(1, 0.8...1, onThePhrase: false), target: .channel(1)),
+        LessonStep(voice: "air-05",
+                   text: "Now the hard part. The news starts on the hour. When the countdown hits zero, your music is out. Not before, not after. Both faders down, right on zero.",
+                   task: "BOTH FADERS DOWN WHEN THE COUNTDOWN HITS ZERO", goal: .hitThePost(seconds: 30, window: 1.5), target: nil,
+                   missVoice: "air-05-early", missText: "Too early. That's dead air before the news. Faders back up, and try again.",
+                   lateVoice: "air-05-late", lateText: "Too late. You stepped on the news. Faders back up, and try again."),
+        LessonStep(voice: "air-06",
+                   text: "Bang on time. That's radio.",
+                   task: "ON AIR", goal: .listen, target: nil),
+    ])
 
     /// Lesson 9, chapter 4, the pub: a long blend. Bass out of the new record, start it audible
     /// but quiet, lock it, fader up, sixteen bars of both, the bass swap, out.
@@ -444,6 +482,9 @@ struct BoothFacts {
     /// The room hears both records, and they have two basslines.
     var blend: Bool
     var bassClash: Bool
+    /// Station jingles fired so far, and the clock (seconds).
+    var jingles: Int
+    var time: Double
 }
 
 /// Walks through a lesson. The booth scene feeds it `BoothFacts` every frame; the overlay shows
@@ -476,6 +517,11 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
     /// For `blendHeld`: beats counted so far, and where the left record was last frame.
     private var heldBeats = 0.0
     private var lastBeat: Double?
+    /// For `jinglePlayed`: jingles counted when the step began. For `hitThePost`: when zero is,
+    /// and whether the faders must come back up before the next try.
+    private var jinglesSeen: Int?
+    private var postAt: Double?
+    private var postRearm = false
     private var wasOn = [false, false]
     private var armed = false
     private var fresh = true
@@ -508,6 +554,9 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
         startBeat = nil
         heldBeats = 0
         lastBeat = nil
+        jinglesSeen = nil
+        postAt = nil
+        postRearm = false
         let step = lesson.steps[i]
         show(text: step.text, task: step.task, target: step.target)
         say(step.voice)
@@ -569,6 +618,52 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
                 }
             case .eq(let d, let band, let range):
                 if range.contains(facts.eq[d][band]) { met() }
+            case .jinglePlayed(let onThePhrase):
+                let seen = jinglesSeen ?? facts.jingles
+                jinglesSeen = facts.jingles
+                if facts.jingles > seen {
+                    var into = facts.beat[0].truncatingRemainder(dividingBy: Lessons.phrase)
+                    if into < 0 { into += Lessons.phrase }
+                    if !onThePhrase || min(into, Lessons.phrase - into) <= 4 {
+                        met()
+                    } else {
+                        misses += 1
+                        buzz.notificationOccurred(.warning)
+                        show(text: step.missText ?? step.text, task: step.task, target: step.target)
+                        if let name = step.missVoice { say(name) }
+                    }
+                }
+                if !goalMet { showBar(facts.beat[0]) }
+            case .hitThePost(let seconds, let window):
+                let out = facts.channel[0] <= 0.04 && facts.channel[1] <= 0.04
+                if postRearm {
+                    // After a miss: faders back up, then a fresh countdown.
+                    if !out {
+                        postRearm = false
+                        postAt = facts.time + seconds
+                        show(text: step.text, task: step.task, target: step.target)
+                    }
+                    break
+                }
+                let zero = postAt ?? facts.time + seconds
+                postAt = zero
+                let left = zero - facts.time
+                let text = left > 0 ? String(format: "NEWS IN %d:%02d", Int(left.rounded(.up)) / 60, Int(left.rounded(.up)) % 60) : "NEWS NOW"
+                if text != progress { progress = text }
+                if out || left < -window {
+                    if out && abs(left) <= window {
+                        oneError = abs(left) / 4 // the result card reads it like a start: closer is better
+                        startJudged = true
+                        met()
+                    } else {
+                        misses += 1
+                        buzz.notificationOccurred(.warning)
+                        postRearm = true
+                        let early = out && left > window
+                        show(text: (early ? step.missText : step.lateText) ?? step.text, task: "BOTH FADERS BACK UP, THEN TRY AGAIN", target: nil)
+                        if let name = early ? step.missVoice : step.lateVoice { say(name) }
+                    }
+                }
             case .blendHeld(let bars, let tolerance):
                 let beat = facts.beat[0]
                 let moved = lastBeat.map { max(0, min(0.5, beat - $0)) } ?? 0

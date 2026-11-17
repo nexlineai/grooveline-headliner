@@ -51,9 +51,16 @@ struct BoothView: View {
                 // Top right: headphones, and the crate (free play, nights, lessons that use it).
                 HStack(spacing: 8) {
                     pill("headphones", ["PHONES", "SPLIT", "SOUND CARD"][min(2, max(0, game.phonesMode))], lit: game.phonesMode != 0) { phonesOpen = true }
+                    if inStudio {
+                        if let runner {
+                            CratePill(runner: runner, target: .jingle, symbol: "dot.radiowaves.left.and.right", title: "JINGLE") { game.playJingle() }
+                        } else {
+                            pill("dot.radiowaves.left.and.right", "JINGLE", lit: false) { game.playJingle() }
+                        }
+                    }
                     if crateShown {
                         if let runner {
-                            CratePill(runner: runner) { crateOpen = true }
+                            CratePill(runner: runner, target: .crate, symbol: "square.stack.fill", title: "CRATE") { crateOpen = true }
                         } else {
                             pill("square.stack.fill", "CRATE", lit: false) { crateOpen = true }
                         }
@@ -106,6 +113,13 @@ struct BoothView: View {
         }
     }
 
+    /// The radio studio has a station jingle.
+    private var inStudio: Bool {
+        if let id = lessonID { return Lessons.find(id)?.desk.room == "studio" }
+        if let id = nightID { return Nights.find(id)?.room == "studio" }
+        return false
+    }
+
     /// The crate is there in free play, in nights, and in lessons that teach it.
     private var crateShown: Bool {
         if let id = lessonID { return Lessons.find(id)?.desk.crate ?? false }
@@ -138,19 +152,22 @@ struct BoothView: View {
     }
 }
 
-/// The CRATE button in a lesson: it pulses when the coach points at it.
+/// A top-right button in a lesson (CRATE, JINGLE): it pulses when the coach points at it.
 struct CratePill: View {
     @ObservedObject var runner: LessonRunner
+    let target: LessonTarget
+    let symbol: String
+    let title: String
     let action: () -> Void
     @State private var glow = false
 
     var body: some View {
-        let pointed = runner.target == .crate
+        let pointed = runner.target == target
         Button(action: action) {
             HStack(spacing: 6) {
-                Image(systemName: "square.stack.fill")
+                Image(systemName: symbol)
                     .font(.system(size: 12, weight: .bold))
-                Text("CRATE")
+                Text(title)
                     .font(.system(size: 11, weight: .heavy))
                     .tracking(2)
             }

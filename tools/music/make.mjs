@@ -561,6 +561,109 @@ const CHAPTER5 = [
 ];
 TRACKS.push(...CHAPTER5);
 
+// ---------- chapter 6: club CAVE ----------
+// Darker and harder: rumbling kicks, industrial clangs, rave stabs, acid. The warm-up records
+// first, peak time last.
+const CHAPTER6 = [
+  {
+    id: 'porta', title: 'Porta', artist: 'Lista Fechada', label: 'Betão', chapter: 6,
+    genre: 'Warm-up Minimal', bpm: 122, root: 52, key: 'E minor', camelot: '9A', seed: 541, swing: 0.1,
+    chords: [[0, 3, 7, 10]], chordRhythm: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.6, 0, 0, 0, 0, 0],
+    bass: [0, null, null, null, null, null, 0, null, null, null, null, 0, null, null, null, null], bassOct: -12,
+    kit: { kick: 'deep', hat: 'metal', snare: 'rim', chord: 'bell', bass: 'sub', chordOct: 12 },
+    drums: { hat: x4([0, 0.3, 0.5, 0.3]), clap: [0, 0, 0, 0, 0, 0, 0, 0.4, 0, 0, 0, 0, 0.7, 0, 0, 0],
+             perc: { shaker: x4([0.3, 0.15, 0.3, 0.15]), rim: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.4, 0] } },
+    style: { sweep: 0.3, delayBeats: 0.75, delayFb: 0.55, delayWet: 0.35, reverb: 0.3, pad: 0.08,
+             openHat: 0.22, closedHat: 0.24, clap: 0.38, perc: 0.3, hiss: 0.006 },
+    mix: { duck: 0.5, drive: 1.1 },
+    sections: [S('intro', 16, 'kick hat perc'), S('groove', 16, 'kick hat clap perc bass'),
+               S('bells', 16, 'kick hat clap perc bass chord'), S('break', 8, 'chord pad perc'),
+               S('full', 16, 'kick hat clap perc bass chord'), S('outro', 8, 'kick hat perc')],
+  },
+  {
+    id: 'seguranca', title: 'Segurança', artist: 'Nuno M.', label: 'Betão', chapter: 6,
+    genre: 'Dark Techno', bpm: 128, root: 50, key: 'D minor', camelot: '7A', seed: 557, swing: 0,
+    chords: [[0, 3, 7]], chordRhythm: x4([0, 0, 0, 0]),
+    bass: x4([null, 0, 0, 0]), bassOct: -12,
+    kit: { kick: 'rumble', hat: 'metal', ohat: 'metal', snare: 'clap', bass: 'sub' },
+    drums: { hat: x4([0.5, 0.4, 0.7, 0.4]), ohat: x4([0, 0, 0.8, 0]), clap: [0, 0, 0, 0, 0.8, 0, 0, 0, 0, 0, 0, 0, 0.8, 0, 0, 0],
+             perc: { clang: [0, 0, 0, 0, 0, 0, 0, 0.6, 0, 0, 0, 0, 0, 0, 0, 0.5], ride: x4([0.4, 0, 0.6, 0]) } },
+    style: { sweep: 0.4, delayBeats: 0.75, delayFb: 0.5, delayWet: 0.3, reverb: 0.32, pad: 0.06,
+             openHat: 0.28, closedHat: 0.26, clap: 0.4, perc: 0.38, hiss: 0.008 },
+    mix: { duck: 0.55, drive: 1.45 },
+    sections: [S('intro', 16, 'kick hat'), S('rumble', 16, 'kick hat ohat perc bass'),
+               S('clap', 16, 'kick hat ohat clap perc bass'), S('break', 8, 'perc pad bass'),
+               S('full', 16, 'kick hat ohat clap perc bass'), S('outro', 8, 'kick hat')],
+  },
+  {
+    id: 'fila', title: 'Fila', artist: 'Os Porteiros', label: 'Rua Baixa', chapter: 6,
+    genre: 'Tech House', bpm: 125, root: 55, key: 'G minor', camelot: '6A', seed: 571, swing: 0.14,
+    chords: [[0, 3, 7, 10]], chordRhythm: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.7, 0],
+    bass: [0, null, 0, null, null, 12, 0, null, 0, null, 10, null, null, 7, 0, null], bassOct: -24,
+    vox: [0, 0, 0, 0, 0, 0, 0.7, 0, 0, 0, 0, 0, 0, 0, 0, 0], vowel: 'hey', voxOct: 12, voxLen: 0.12,
+    kit: { kick: 'punch', snare: 'clap', chord: 'organ', bass: 'acid', vox: 'robot', chordOct: 0 },
+    bassAccent: [1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0], bassSlide: [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+    drums: { hat: x4([0.6, 0.3, 0.6, 0.3]), ohat: x4([0, 0, 0.9, 0]), clap: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+             perc: { shaker: x4([0.4, 0.2, 0.4, 0.2]) } },
+    style: { sweep: 0.4, acidCut: 220, acidEnv: 1500, acidQ: 5, delayBeats: 0.5, delayFb: 0.3, delayWet: 0.2, reverb: 0.2, pad: 0.06, vox: 0.25,
+             openHat: 0.3, closedHat: 0.28, clap: 0.44, perc: 0.3, hiss: 0 },
+    mix: { duck: 0.5, drive: 1.35 },
+    sections: [S('intro', 8, 'kick hat'), S('intro 2', 8, 'kick hat ohat clap perc'),
+               S('groove', 16, 'kick hat ohat clap perc bass'), S('hey', 16, 'kick hat ohat clap perc bass vox chord'),
+               S('break', 8, 'bass vox perc'), S('full', 16, 'kick hat ohat clap perc bass vox chord'),
+               S('outro', 8, 'kick hat ohat clap')],
+  },
+  {
+    id: 'luz-vermelha', title: 'Luz Vermelha', artist: 'Sala 2', label: 'Betão', chapter: 6,
+    genre: 'Acid Techno', bpm: 127, root: 53, key: 'F minor', camelot: '4A', seed: 593, swing: 0.02,
+    chords: [[0, 3, 7]], chordRhythm: x4([0, 0, 0, 0]),
+    bass: x4([0, 0, 12, 0]), bassOct: -12,
+    bassAccent: [1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0], bassSlide: [0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0],
+    kit: { kick: 'rumble', hat: 'metal', ohat: 'metal', snare: 'clap', bass: 'acid' },
+    drums: { hat: x4([0.6, 0.4, 0.7, 0.4]), ohat: x4([0, 0, 0.9, 0]), clap: [0, 0, 0, 0, 0.9, 0, 0, 0, 0, 0, 0, 0, 0.9, 0, 0, 0],
+             perc: { clang: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.6] } },
+    style: { sweep: 0.8, acidCut: 200, acidEnv: 3000, acidQ: 9, delayBeats: 0.75, delayFb: 0.5, delayWet: 0.3, reverb: 0.22, pad: 0.05,
+             openHat: 0.3, closedHat: 0.26, clap: 0.4, perc: 0.35, hiss: 0 },
+    mix: { duck: 0.5, drive: 1.5 },
+    sections: [S('intro', 16, 'kick hat ohat'), S('acid', 16, 'kick hat ohat clap bass'),
+               S('acid 2', 16, 'kick hat ohat clap bass perc'), S('break', 8, 'bass hat'),
+               S('full', 16, 'kick hat ohat clap bass perc'), S('outro', 8, 'kick hat')],
+  },
+  {
+    id: 'sem-lista', title: 'Sem Lista', artist: 'Rave Velho', label: 'Fita Dourada', chapter: 6,
+    genre: 'Rave', bpm: 128, root: 57, key: 'A minor', camelot: '8A', seed: 613, swing: 0,
+    chords: [[0, 3, 7], [-4, 0, 3], [-2, 2, 5], [-5, -2, 2]],
+    chordRhythm: [0.9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.8, 0, 0, 0, 0, 0],
+    bass: x4([null, 0, null, 0]), bassOct: -24,
+    kit: { kick: 'punch', hat: 'metal', ohat: 'metal', snare: 'snare', chord: 'hoover', bass: 'reese', chordOct: 0 },
+    drums: { hat: x4([0.5, 0.4, 0.8, 0.4]), ohat: x4([0, 0, 1, 0]), clap: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0.5],
+             perc: { tomLo: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.6, 0.6] } },
+    style: { sweep: 0.4, delayBeats: 0.75, delayFb: 0.3, delayWet: 0.2, reverb: 0.25, pad: 0.06,
+             openHat: 0.32, closedHat: 0.26, clap: 0.42, perc: 0.38, hiss: 0 },
+    mix: { duck: 0.6, drive: 1.45 },
+    sections: [S('intro', 8, 'kick hat'), S('intro 2', 8, 'kick hat ohat clap'),
+               S('stabs', 16, 'kick hat ohat clap bass chord'), S('break', 8, 'chord pad'),
+               S('rave', 16, 'kick hat ohat clap perc bass chord'), S('groove', 16, 'kick hat ohat clap bass'),
+               S('outro', 8, 'kick hat ohat clap')],
+  },
+  {
+    id: 'cave', title: 'Cave', artist: 'Subsolo', label: 'Cais Dub', chapter: 6,
+    genre: 'Peak-time Techno', bpm: 128, root: 48, key: 'C minor', camelot: '5A', seed: 631, swing: 0,
+    chords: [[0, 3, 7, 10]], chordRhythm: [0, 0, 0.8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    bass: x4([null, 0, 0, null]), bassOct: -12,
+    kit: { kick: 'rumble', hat: 'metal', ohat: 'metal', snare: 'clap', chord: 'stab', bass: 'wobble' },
+    drums: { hat: x4([0.5, 0.5, 0.8, 0.5]), ohat: x4([0, 0, 1, 0]), clap: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+             perc: { ride: x4([0.5, 0, 0.7, 0]), clang: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.5, 0, 0, 0, 0] } },
+    style: { chordCut: 1600, chordFloor: 220, chordQ: 2.6, chordDecay: 0.3, sweep: 0.7, delayBeats: 0.75, delayFb: 0.6, delayWet: 0.45,
+             reverb: 0.36, pad: 0.06, openHat: 0.3, closedHat: 0.26, clap: 0.4, perc: 0.36, hiss: 0.006 },
+    mix: { duck: 0.6, drive: 1.4 },
+    sections: [S('intro', 16, 'kick hat perc'), S('peak', 16, 'kick hat ohat clap perc bass chord'),
+               S('break', 8, 'chord pad'), S('peak 2', 16, 'kick hat ohat clap perc bass chord'),
+               S('groove', 16, 'kick hat ohat clap perc bass'), S('outro', 8, 'kick hat perc')],
+  },
+];
+TRACKS.push(...CHAPTER6);
+
 // ---------- small DSP kit ----------
 function rng(seed) { // mulberry32
   let s = seed >>> 0;
@@ -1061,6 +1164,42 @@ function robot(b, t0, m, len, amp, vowel, pan = 0) { // a vocoded syllable: a sq
     add(b, t0 + i, y * env * amp * 2, pan);
   }
 }
+
+// ---------- chapter 6 sounds: club CAVE, the door, the dark room ----------
+function rumbleKick(b, t0, amp, rnd) { // a kick with a long, filtered, rolling low tail
+  kick(b, t0, amp);
+  const n = Math.floor(0.45 * SR), f = new SVF();
+  f.set(110, 1.4);
+  let ph = 0;
+  for (let i = 0; i < n && t0 + i < b.L.length; i++) {
+    const t = i / SR;
+    ph += 2 * Math.PI * 48 / SR;
+    const x = Math.sin(ph) * 0.6 + (rnd() * 2 - 1) * 0.4;
+    add(b, t0 + i, f.lp(x) * Math.min(1, t / 0.05) * Math.exp(-t * 6) * amp * 0.7);
+  }
+}
+function clang(b, t0, amp, rnd, pan = 0) { // an industrial hit: noise ringing in a short comb
+  const n = Math.floor(0.4 * SR), d = Math.round(SR / 410), buf = new Float32Array(d), hp = new Biquad('hp', 300, 0.7);
+  let j = 0;
+  for (let i = 0; i < n && t0 + i < b.L.length; i++) {
+    const t = i / SR, x = (rnd() * 2 - 1) * Math.exp(-t * 60);
+    const y = x + buf[j] * 0.93;
+    buf[j] = y; j = (j + 1) % d;
+    add(b, t0 + i, hp.run(y) * Math.exp(-t * 7) * amp * 0.35, pan);
+  }
+}
+function hoover(b, t0, notes, amp, rnd, len = 0.5) { // the rave stab: fat detuned saws diving in pitch
+  const n = Math.floor((len + 0.1) * SR), f = new SVF(), v = [];
+  for (const m of notes) for (const d of [-25, -9, 9, 25]) v.push({ f: hz(m) * 2 ** (d / 1200), ph: rnd() });
+  for (let i = 0; i < n && t0 + i < b.L.length; i++) {
+    const t = i / SR, bend = 2 ** ((-5 * (1 - Math.exp(-t * 6))) / 12);
+    let x = 0;
+    for (const o of v) { o.ph += o.f * bend / SR; if (o.ph >= 1) o.ph -= 1; x += 2 * o.ph - 1; }
+    if ((i & 15) === 0) f.set(700 + 2600 * Math.exp(-t * 5), 1.3);
+    const env = Math.min(1, t * 200) * (t < len ? 1 : Math.exp(-(t - len) * 25));
+    add(b, t0 + i, Math.tanh(1.3 * f.lp(x / v.length)) * env * amp);
+  }
+}
 function hatVoice(kind, b, t0, amp, decay, rnd, pan) {
   if (kind === 'metal') hatMetal(b, t0, amp, decay, pan);
   else if (kind === 'shaker') shaker(b, t0, amp, rnd, pan);
@@ -1081,6 +1220,7 @@ function perc(name, b, t0, amp, rnd, s) {
   else if (name === 'tambourine') tambourine(b, t0, amp * 0.6, rnd, s % 2 ? 0.25 : -0.15);
   else if (name === 'tomHi') tom(b, t0, amp * 0.7, 165, 0.3, rnd);
   else if (name === 'tomLo') tom(b, t0, amp * 0.8, 105, -0.3, rnd);
+  else if (name === 'clang') clang(b, t0, amp, rnd, s % 2 ? 0.4 : -0.4);
   else if (name === 'clapRoll') { clap(b, t0, amp * 0.5, rnd); clap(b, t0 + Math.round(0.03 * SR), amp * 0.35, rnd); }
 }
 
@@ -1090,7 +1230,7 @@ function render(tr) {
   const beat = 60 / tr.bpm, step = beat / 4, barLen = beat * 4;
   const sections = tr.sections || (tr.arrangement === 'long' ? ARRANGEMENT_LONG : ARRANGEMENT);
   const kit = tr.kit || {}, dr = tr.drums || {}, mx = tr.mix || {};
-  const kickFn = kit.kick === 'deep' ? kickDeep : kit.kick === 'punch' ? kickPunch : kick;
+  const kickFn = kit.kick === 'deep' ? kickDeep : kit.kick === 'punch' ? kickPunch : kit.kick === 'rumble' ? (b, t, a) => rumbleKick(b, t, a, rnd) : kick;
   const duckDepth = mx.duck ?? 0.6, drive = mx.drive ?? 1.15;
   let lastBass = null, lastLead = null;
   const bars = sections.reduce((a, s) => a + s.bars, 0);
@@ -1148,6 +1288,7 @@ function render(tr) {
           else if (kit.chord === 'brass') brass(keys, t0, notes, v * 0.45, rnd);
           else if (kit.chord === 'guitar') guitarStrum(keys, t0, notes, v * 0.55, rnd, s % 4 === 2);
           else if (kit.chord === 'supersaw') supersaw(keys, t0, notes, v * 0.4, rnd, step * 1.5);
+          else if (kit.chord === 'hoover') hoover(keys, t0, notes, v * 0.4, rnd, step * 2);
           else if (kit.chord === 'bell') notes.forEach((m, k) => bell(keys, t0 + Math.round(k * 0.02 * SR), m, v * 0.18, (k - 1.5) * 0.3));
           else if (kit.chord === 'clav') notes.slice(0, 3).forEach((m, k) => clav(keys, t0, m, v * 0.3, rnd, (k - 1) * 0.3));
           else stab(keys, t0, chord.map((c) => tr.root + 12 + c), v * 0.42, st, open * (sec.name === 'break' ? 1.25 : 1), rnd);
@@ -1238,8 +1379,13 @@ for (const tr of TRACKS) {
   const gain = Math.min(-14 - before.lufs, -1 - before.peak); // to -14 LUFS, never past -1 dB true peak
   execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-i', tmp, '-af', `volume=${gain.toFixed(2)}dB`,
     '-c:a', 'aac', '-b:a', '160k', '-movflags', '+faststart', out]);
+  let after = loudness(out);
+  if (after.peak > -1) { // the encoder can overshoot: take a little more off and encode again
+    execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-i', tmp, '-af', `volume=${(gain - after.peak - 1.3).toFixed(2)}dB`,
+      '-c:a', 'aac', '-b:a', '160k', '-movflags', '+faststart', out]);
+    after = loudness(out);
+  }
   rmSync(tmp);
-  const after = loudness(out);
   const entry = { id: tr.id, title: tr.title, artist: tr.artist, label: tr.label, genre: tr.genre, bpm: tr.bpm,
     key: tr.key, camelot: tr.camelot, bars, seconds: Math.round(seconds * 100) / 100, file: tr.id + '.m4a' };
   if (tr.chapter) entry.chapter = tr.chapter;

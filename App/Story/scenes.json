@@ -114,5 +114,24 @@
         {"who": "", "text": "END OF CHAPTER 4"}
       ] }
     ]
+  },
+  {
+    "id": "vera",
+    "shots": [
+      { "art": "scene-vera", "lines": [
+        {"who": "VERA", "clip": "vera-01", "text": "Thursday, eleven to midnight. Live. Dead air is a sin. And the news starts on the hour. Not a second late."},
+        {"who": "TÓ", "voice": "vo-vera-to", "text": "On the hour. No pressure, then."}
+      ] }
+    ]
+  },
+  {
+    "id": "chapter-5-end",
+    "shots": [
+      { "lines": [
+        {"who": "", "text": "VERA: SAME TIME NEXT WEEK."},
+        {"who": "", "text": "1,204 LISTENERS. YOUR MUM WAS ONE OF THEM."},
+        {"who": "", "text": "END OF CHAPTER 5"}
+      ] }
+    ]
   }
 ]

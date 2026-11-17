@@ -12,6 +12,19 @@ final class Game: ObservableObject {
     enum Screen: Equatable { case title, chapter(Int), story(String), booth, lesson(String), night(String) }
 
     @Published var screen: Screen = .title { didSet { updateMenuMusic() } }
+    /// The radio station's ID, fired with the JINGLE button in the studio.
+    private var jinglePlayer: AVAudioPlayer?
+    private(set) var jingleCount = 0
+    var jinglePlaying: Bool { jinglePlayer?.isPlaying ?? false }
+
+    func playJingle() {
+        guard !jinglePlaying, let url = Bundle.main.url(forResource: "jingle", withExtension: "m4a"),
+              let player = try? AVAudioPlayer(contentsOf: url) else { return }
+        jinglePlayer = player
+        player.play()
+        jingleCount += 1
+    }
+
     /// Music under the title and chapter screens: sixteen bars of Saturday Job, looping.
     private var menuMusic: AVAudioPlayer?
     private var menuMusicStop: DispatchWorkItem?
