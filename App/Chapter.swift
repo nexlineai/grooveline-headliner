@@ -39,6 +39,10 @@ enum Chapters {
                     screens: [.lesson("delay")]),
         ChapterStep(id: Nights.sunsetSlot.id, kind: .night, title: Nights.sunsetSlot.title, detail: "Start slow, end at 126. The generator.",
                     screens: [.night(Nights.sunsetSlot.id)]),
+        ChapterStep(id: Nights.threePM.id, kind: .night, title: Nights.threePM.title, detail: "Two hundred people on a field for twenty thousand.",
+                    screens: [.story("three-pm"), .night(Nights.threePM.id)]),
+        ChapterStep(id: Nights.tentRain.id, kind: .night, title: Nights.tentRain.title, detail: "The sky turns black. Everyone runs in.",
+                    screens: [.night(Nights.tentRain.id)]),
     ])
 
     /// Chapter 9: on the road. Other people's booths, other cities; Berlin first.

@@ -238,5 +238,14 @@
         {"who": "TÓ", "voice": "vo-carla-to", "text": "A manager. We have a manager. Mum is going to love this."}
       ] }
     ]
+  },
+  {
+    "id": "three-pm",
+    "shots": [
+      { "lines": [
+        {"who": "", "text": "FESTIVAL TWO. YOUR SLOT IS 3 PM."},
+        {"who": "", "text": "TWO HUNDRED PEOPLE ON A FIELD MADE FOR TWENTY THOUSAND."}
+      ] }
+    ]
   }
 ]

@@ -67,10 +67,10 @@ struct NightInfo {
 /// What goes wrong in a night: the cable is kicked (the record stops), the needle jumps a groove,
 /// the stream drops, a scratched record sticks in one groove until the needle is moved on, or the
 /// power goes (both decks stop; a few seconds of silence are nobody's fault).
-enum Mishap { case cable, needleSkip, streamDrop, stuckGroove, powerCut, pitchWander }
+enum Mishap { case cable, needleSkip, streamDrop, stuckGroove, powerCut, pitchWander, rainRush }
 
 /// Who the night is for: a room of people, or listeners on the stream.
-enum Audience { case room, listeners }
+enum Audience { case room, listeners, field }
 
 struct NightRequest {
     var at: Double
@@ -306,7 +306,41 @@ enum Nights {
                                               "climb": [("fest-climb", "Sunset slot. Start slow, end at a hundred and twenty six. Take them up.")]],
                                       bag: ["por-do-sol", "chuva", "floresta", "tenda", "encore", "palco-principal", "onda-media", "fila"],
                                       clockStart: 19 * 60, echo: 0.12, climbTo: 126)
-    static let all = [firstParty, garageParty, saturdayShift, emptyTuesday, thursdayShow, caveWarmUp, fridayCave, afterhours, dubplateNight, berlinNight, ibizaNight, burnout, sunsetSlot]
+    /// Chapter 10: a 3 pm slot, two hundred people on a field made for twenty thousand. The meter
+    /// counts people: good mixing brings them over from the other stages.
+    static let threePM = NightInfo(id: "three-pm", title: "3 PM", length: 360, room: "field",
+                                   records: ["floresta", "tenda"], chapter: 10, mixesFor3Stars: 2, audience: .field,
+                                   lines: ["wait": [("pm-wait", "Three in the afternoon. Two hundred people and a lot of grass. Play something.")],
+                                           "start": [("cave-start", "Here we go. Easy does it.")],
+                                           "clean": [("pm-clean", "Smooth. People are walking over from the other stage."), ("fri-clean-2", "Nobody even blinked. Perfect.")],
+                                           "rough": [("pm-rough", "Bumpy. The few who are here heard that.")],
+                                           "dead": [("pm-dead", "Silence on a festival stage. They'll go to the food trucks.")],
+                                           "stale": [("fri-stale", "This one's done. Next.")],
+                                           "slip": [("fri-slip", "It's drifting. Nudge it.")],
+                                           "wreck": [("fri-wreck", "Ouch. Two kicks fighting.")],
+                                           "clash": [("fri-clash", "Two basslines. Kill a low.")],
+                                           "nuts": [("pm-nuts", "Look! The whole field is coming over!")]],
+                                   bag: ["floresta", "tenda", "por-do-sol", "chuva", "encore", "palco-principal", "fila", "onda-media"],
+                                   clockStart: 15 * 60)
+    /// Chapter 10: a tent at night; at a third of the set the sky opens and everyone outside
+    /// runs in (the room gets a big lift).
+    static let tentRain = NightInfo(id: "tent-rain", title: "THE TENT", length: 360, room: "tent",
+                                    records: ["chuva", "por-do-sol"], chapter: 10, mixesFor3Stars: 2,
+                                    mishapAt: 0.35, mishap: .rainRush,
+                                    lines: ["wait": [("tent-wait", "A tent, a festival, and the sky is turning black. Play something.")],
+                                            "start": [("cave-start", "Here we go. Easy does it.")],
+                                            "clean": [("tent-clean", "Smooth. Even the wet ones are dancing."), ("fri-clean-2", "Nobody even blinked. Perfect.")],
+                                            "rough": [("fri-rough", "Bumpy. Nine hundred people heard that.")],
+                                            "dead": [("fri-dead", "Silence! At peak time! Play!")],
+                                            "stale": [("fri-stale", "This one's done. Next.")],
+                                            "slip": [("fri-slip", "It's drifting. Nudge it.")],
+                                            "wreck": [("fri-wreck", "Ouch. Two kicks fighting.")],
+                                            "clash": [("fri-clash", "Two basslines. Kill a low.")],
+                                            "nuts": [("tent-nuts", "The tent is shaking!")],
+                                            "cable": [("tent-rain", "It's pouring! Everyone's running into the tent!")]],
+                                    bag: ["chuva", "por-do-sol", "floresta", "tenda", "encore", "palco-principal", "residente", "portao"],
+                                    clockStart: 22 * 60)
+    static let all = [firstParty, garageParty, saturdayShift, emptyTuesday, thursdayShow, caveWarmUp, fridayCave, afterhours, dubplateNight, berlinNight, ibizaNight, burnout, sunsetSlot, threePM, tentRain]
     static func find(_ id: String) -> NightInfo? { all.first { $0.id == id } }
 }
 
@@ -347,6 +381,8 @@ final class NightRunner: ObservableObject {
 
     /// Listeners on the stream, from the energy (radio nights).
     var listeners: Int { Int((40 + energyShown * 1260).rounded()) }
+    /// People in front of a festival stage, from the energy (a 3 pm slot starts with two hundred).
+    var people: Int { Int((200 + max(0, energyShown - 0.3) / 0.7 * 4800).rounded()) }
     var audience: Audience { info.audience }
 
     @Published private(set) var energyShown = 0.3
@@ -543,6 +579,7 @@ final class NightRunner: ObservableObject {
                 mishapDue = true
                 if info.mishap == .streamDrop { energy = max(0, energy - 0.1) } // listeners leave
                 if info.mishap == .powerCut { graceUntil = now + 6 }
+                if info.mishap == .rainRush { energy = min(1, energy + 0.15) } // everybody runs into the tent
                 say("cable", urgent: true)
             }
         }
@@ -762,7 +799,8 @@ struct NightOverlay: View {
             }
             .frame(width: 150, height: 7)
             .animation(.linear(duration: 0.25), value: runner.energyShown)
-            Text(runner.audience == .listeners ? "\(runner.listeners) LISTENERS" : NightRunner.moods[min(3, max(0, runner.mood))])
+            Text(runner.audience == .listeners ? "\(runner.listeners) LISTENERS"
+                 : runner.audience == .field ? "\(runner.people) PEOPLE" : NightRunner.moods[min(3, max(0, runner.mood))])
                 .font(.system(size: 10, weight: .heavy))
                 .tracking(2)
                 .foregroundStyle(tint)
