@@ -1128,7 +1128,10 @@ final class BoothScene: SKScene {
                 pitchFader[d] = 0.5 - p / (2 * Self.pitchRange)
                 if d < pitchNode.count { pitchNode[d].value = pitchFader[d] }
             }
-            if deck.motorOn && !deck.held && !deck.lifted && deck.rate > 0.5 && other.rate > 0.5 {
+            // Back to back: never chase the partner's deck while her fader is down (her silent
+            // spin-up would pull your record on air).
+            let partnerSilent = (1 - d) == partnerDeck && channel[1 - d] <= 0.04
+            if deck.motorOn && !deck.held && !deck.lifted && deck.rate > 0.5 && other.rate > 0.5 && !partnerSilent {
                 let behind = MixMath.phaseOffset(other.beat, deck.beat)
                 deck.bend = max(-0.06, min(0.06, behind * 0.8))
             } else if deck.bend != 0 {
