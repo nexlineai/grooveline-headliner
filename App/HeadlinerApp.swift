@@ -32,6 +32,7 @@ struct RootView: View {
             case .booth: BoothView(lessonID: nil, nightID: nil)
             case .lesson(let id): BoothView(lessonID: id, nightID: nil).id(id)
             case .night(let id): BoothView(lessonID: nil, nightID: id).id(id)
+            case .bag: BagView()
             case .story(let id):
                 if let scene = game.scene(id) {
                     StoryView(scene: scene) { game.sceneEnded(id) }

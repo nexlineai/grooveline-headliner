@@ -66,7 +66,7 @@ struct CrateView: View {
     private func row(_ track: TrackInfo) -> some View {
         let on = deck(of: track)
         return HStack(spacing: 12) {
-            sleeve(track)
+            Self.sleeve(track)
             VStack(alignment: .leading, spacing: 2) {
                 Text(track.title)
                     .font(.system(size: 15, weight: .bold))
@@ -90,7 +90,7 @@ struct CrateView: View {
     }
 
     /// A small sleeve in the record's own colour (always the same for the same record).
-    private func sleeve(_ track: TrackInfo) -> some View {
+    static func sleeve(_ track: TrackInfo) -> some View {
         var sum = 0
         for scalar in track.id.unicodeScalars { sum = (sum * 31 + Int(scalar.value)) % 360 }
         let colour = Color(hue: Double(sum) / 360, saturation: 0.6, brightness: 0.85)

@@ -13,6 +13,8 @@ struct ChapterStep: Identifiable {
     var detail: String
     /// What is played for this step, one screen after the other.
     var screens: [Game.Screen]
+    /// An icon other than the kind's (THE BAG is a story step with a bag on it).
+    var icon: String? = nil
 }
 
 struct Chapter {
@@ -38,6 +40,8 @@ enum Chapters {
                     screens: [.story("carla-meridian")]),
         ChapterStep(id: "skip", kind: .lesson, title: "THE SKIP", detail: "It skipped once. This time you know what to do.",
                     screens: [.lesson("skip")]),
+        ChapterStep(id: "the-bag", kind: .story, title: "THE BAG", detail: "Six records. Your closing set.",
+                    screens: [.bag], icon: "bag.fill"),
     ])
 
     /// Chapter 11: back to back. Helena first: one booth, two DJs, her deck is hers.
@@ -240,6 +244,8 @@ struct CareerProgress: Codable, Equatable {
     /// The pattern of the record cut in the studio (chapter 8). Optional, so saves from before it
     /// existed still load (a new non-optional field would make every old save fail to decode).
     var track: DrumPattern?
+    /// THE BAG (chapter 12): the closing set, six record ids in order. Optional, like `track`.
+    var closingSet: [String]?
 
     private static let key = "progress.v1"
 
@@ -373,12 +379,13 @@ struct ChapterView: View {
         case .lesson: icon = "slider.horizontal.3"
         case .night: icon = "party.popper.fill"
         }
+        let symbol = step.icon ?? icon
 
         return Button {
             game.run(step.screens, home: .chapter(chapter.number))
         } label: {
             HStack(spacing: 12) {
-                Image(systemName: open ? icon : "lock.fill")
+                Image(systemName: open ? symbol : "lock.fill")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(isNext ? Color.black : GroovelineLogo.teal)
                     .frame(width: 30, height: 30)
