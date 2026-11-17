@@ -76,20 +76,14 @@ public final class DeckEngine {
         }
     }
 
-    /// The sound is going to the phone's own speaker (SPLIT is then held off: one ear of a
-    /// phone speaker is no use to anybody).
-    public private(set) var speakerOnly = false
-
+    /// SPLIT stays on whatever the output is. (Build 16 held it off on the phone's speaker; that
+    /// silenced the cued record in lesson 4, since without SPLIT the cue goes nowhere. Removed.)
     private func applySplit() {
-        mixer.pointee.split = phones == .split && !speakerOnly
+        mixer.pointee.split = phones == .split
     }
 
-    /// Something was plugged in or pulled out: look at the outputs again.
+    /// Something was plugged in or pulled out.
     public func routeChanged() {
-        #if os(iOS)
-        let ports = AVAudioSession.sharedInstance().currentRoute.outputs
-        speakerOnly = !ports.isEmpty && ports.allSatisfy { $0.portType == .builtInSpeaker || $0.portType == .builtInReceiver }
-        #endif
         applySplit()
     }
 
