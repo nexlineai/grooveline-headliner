@@ -26,7 +26,19 @@ enum Chapters {
     /// played straight away; on for the release.
     static let locked = false
 
-    static let all: [Chapter] = [bedroom, houseParties, shop]
+    static let all: [Chapter] = [bedroom, houseParties, shop, pubs]
+
+    /// Chapter 4: pubs and bars. Rui Prata pays "in exposure"; six people on a Tuesday; long blends.
+    static let pubs = Chapter(number: 4, title: "PUBS AND BARS",
+                              line: "Your own records in a bag, a pub with six people in it, and a promoter who pays in exposure.",
+                              steps: [
+        ChapterStep(id: "rui", kind: .story, title: "RUI PRATA", detail: "No money. But exposure. Lots of exposure.",
+                    screens: [.story("rui")]),
+        ChapterStep(id: "long-blend", kind: .lesson, title: "LONG BLEND", detail: "Sixteen bars of two records. Nobody notices. That's the job.",
+                    screens: [.lesson("long-blend")]),
+        ChapterStep(id: Nights.emptyTuesday.id, kind: .night, title: Nights.emptyTuesday.title, detail: "Six people. Vinyl. Rui wants it quieter.",
+                    screens: [.night(Nights.emptyTuesday.id), .story("chapter-4-end")]),
+    ])
 
     /// Chapter 2: other people's houses. A garage, borrowed speakers, requests, a kicked cable.
     static let houseParties = Chapter(number: 2, title: "HOUSE PARTIES",

@@ -95,5 +95,24 @@
         {"who": "", "text": "END OF CHAPTER 3"}
       ] }
     ]
+  },
+  {
+    "id": "rui",
+    "shots": [
+      { "art": "scene-rui", "lines": [
+        {"who": "RUI", "clip": "rui-01", "text": "Tuesdays, nine till one. No money, but exposure. Lots of exposure. Don't scare the regulars."},
+        {"who": "TÓ", "voice": "vo-rui-to", "text": "Exposure. Great. We'll eat exposure."}
+      ] }
+    ]
+  },
+  {
+    "id": "chapter-4-end",
+    "shots": [
+      { "lines": [
+        {"who": "", "text": "01:00. RUI PAYS YOU IN FREE DRINKS."},
+        {"who": "", "text": "A WOMAN AT THE BAR ASKS FOR YOUR NUMBER. SHE RUNS A RADIO SHOW."},
+        {"who": "", "text": "END OF CHAPTER 4"}
+      ] }
+    ]
   }
 ]

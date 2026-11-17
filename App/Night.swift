@@ -28,6 +28,12 @@ struct NightInfo {
     var mishap = Mishap.cable
     /// False on vinyl nights: no SYNC.
     var syncAllowed = true
+    /// The most the room can get going: 3 = going nuts; a pub with six people stops at 2.
+    var maxMood = 3
+    /// When the owner asks to turn it down (share of the night): the on-air fader must come down.
+    var turnDownAt: Double? = nil
+    /// Things the coach just says at a moment of the night (share, moment of `lines`).
+    var remarks: [(at: Double, moment: String)] = []
     /// Who comments, and lines of this night that replace the general ones (by moment).
     var coach = "TÓ"
     var lines: [String: [(voice: String, text: String)]] = [:]
@@ -68,7 +74,26 @@ enum Nights {
                                                  "clash": [("shop-wreck", "Ouch. Horses again.")],
                                                  "nuts": [("shop-nuts", "Look at them. Dancing between the bins."), ("shop-dance-1", "Even Baptista's foot is tapping.")],
                                                  "cable": [("shop-skip", "The needle jumped! Nudge it back in line.")]])
-    static let all = [firstParty, garageParty, saturdayShift]
+    /// Chapter 4: a Tuesday in Rui's pub. Six people, vinyl, long blends, "turn it down".
+    static let emptyTuesday = NightInfo(id: "empty-tuesday", title: "EMPTY TUESDAY", length: 300, room: "pub",
+                                        records: ["flauta", "praia"], chapter: 4, mixesFor3Stars: 2,
+                                        syncAllowed: false,
+                                        maxMood: 2, turnDownAt: 0.45, remarks: [(at: 0.25, moment: "drunk")],
+                                        lines: ["wait": [("pub-wait", "Six people and a barman. Play something.")],
+                                                "start": [("pub-start", "Easy start. Good.")],
+                                                "clean": [("pub-clean-1", "Smooth. The barman nodded."), ("pub-clean-2", "Two people clapped. In here that's a standing ovation.")],
+                                                "rough": [("pub-rough", "Too fast. They noticed.")],
+                                                "dead": [("pub-dead", "Silence in a pub. The barman's looking at you.")],
+                                                "stale": [("pub-stale", "Same record for a while now. Next.")],
+                                                "slip": [("pub-slip", "It's slipping. Nudge it.")],
+                                                "wreck": [("pub-wreck", "Ouch. Even the old men heard that.")],
+                                                "clash": [("pub-wreck", "Ouch. Even the old men heard that.")],
+                                                "nuts": [("pub-nuts", "Six people dancing. It counts.")],
+                                                "loud": [("pub-loud", "Rui says turn it down. His pub. Bring your fader down a bit.")],
+                                                "loudOk": [("pub-loud-ok", "Thank you. Rui's happy. Rui is never happy.")],
+                                                "loudNo": [("pub-loud-no", "He asked twice. Now he's angry. Fader down!")],
+                                                "drunk": [("pub-drunk", "That man wants a song we don't have. Smile and nod.")]])
+    static let all = [firstParty, garageParty, saturdayShift, emptyTuesday]
     static func find(_ id: String) -> NightInfo? { all.first { $0.id == id } }
 }
 
@@ -82,6 +107,9 @@ final class NightRunner: ObservableObject {
     private var requestsMet = 0
     private var mishapDue = false
     private var mishapDone = false
+    private var nextRemark = 0
+    private var turnDownAsked = false
+    private var turnDownBy: Double?
 
     @Published private(set) var energyShown = 0.3
     /// 0 waiting, 1 nodding, 2 dancing, 3 going nuts.
@@ -182,7 +210,7 @@ final class NightRunner: ObservableObject {
 
     /// Called every frame with what the room hears: nothing, one record, or two, and for two,
     /// how well they sit together. `lead` is the louder deck.
-    func update(dt: Double, state: MixReading.State, quality: Double, bassClash: Bool, lead: Int, onAirRecord: String?) {
+    func update(dt: Double, state: MixReading.State, quality: Double, bassClash: Bool, lead: Int, onAirRecord: String?, channel: [Double]) {
         guard stars == nil else { return }
         // Requests and the cable come at their moment of the night, and cannot wait for silence.
         if began {
@@ -202,6 +230,27 @@ final class NightRunner: ObservableObject {
                 requestsMet += 1
                 energy = min(1, energy + 0.12)
                 say("requestDone", urgent: true)
+            }
+            if nextRemark < info.remarks.count && share >= info.remarks[nextRemark].at {
+                say(info.remarks[nextRemark].moment, urgent: true)
+                nextRemark += 1
+            }
+            // The owner wants it quieter: the fader on air has to come down within eight seconds.
+            if let at = info.turnDownAt, !turnDownAsked, share >= at, state != .silence {
+                turnDownAsked = true
+                turnDownBy = now + 8
+                say("loud", urgent: true)
+            }
+            if let by = turnDownBy, lead < channel.count {
+                if channel[lead] < 0.6 {
+                    turnDownBy = nil
+                    energy = min(1, energy + 0.05)
+                    say("loudOk", urgent: true)
+                } else if now > by {
+                    turnDownBy = nil
+                    energy = max(0, energy - 0.12)
+                    say("loudNo", urgent: true)
+                }
             }
             if let at = info.mishapAt, !mishapDone, share >= at, state != .silence {
                 mishapDone = true
@@ -282,7 +331,9 @@ final class NightRunner: ObservableObject {
                 clashRun = 0
             }
         }
-        energy = min(1, max(0, energy + rate * dt))
+        // A small room only gets so wild.
+        let cap = [0.24, 0.48, 0.75, 1.0][min(3, max(0, info.maxMood))]
+        energy = min(cap, max(0, energy + rate * dt))
         energySum += energy * dt
 
         // The mood follows the energy, with a little slack so it does not flicker at an edge.
@@ -310,7 +361,9 @@ final class NightRunner: ObservableObject {
         let crowd = energySum / max(1, elapsed)
         let earned: Int
         let allRequests = requestsMet >= info.requests.count
-        if crowd >= 0.6 && transitions >= info.mixesFor3Stars && deadAir < 3 && wreck < 4 && allRequests {
+        // A small room tops out lower, so it needs less for three stars.
+        let need = info.maxMood >= 3 ? 0.6 : 0.5
+        if crowd >= need && transitions >= info.mixesFor3Stars && deadAir < 3 && wreck < 4 && allRequests {
             earned = 3
         } else if crowd >= 0.42 && transitions >= 1 {
             earned = 2

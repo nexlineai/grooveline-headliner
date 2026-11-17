@@ -66,6 +66,9 @@ shot lesson-sync 6 -screen lesson -lesson sync-off
 shot lesson-ear 6 -screen lesson -lesson by-ear
 shot lesson-hold 6 -screen lesson -lesson hold-it
 shot shop-night 10 -screen night -night saturday-shift -demo 1
+shot chapter4 5 -screen chapter -chapter 4
+shot lesson-long 6 -screen lesson -lesson long-blend
+shot pub-night 10 -screen night -night empty-tuesday -demo 1
 shot lesson-requests 6 -screen lesson -lesson requests
 shot garage 10 -screen night -night garage-party -demo 1
 shot garage-crate 6 -screen night -night garage-party -crate 1

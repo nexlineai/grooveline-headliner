@@ -51,6 +51,9 @@ enum LessonGoal: Equatable {
     case recordLoaded(deck: Int, id: String)
     /// The deck's SYNC is on.
     case syncOn(Int)
+    /// Both records heard together, kicks within `tolerance` of a beat and one bassline, for this
+    /// many bars in all (a slip pauses the count; it does not start it again).
+    case blendHeld(bars: Int, tolerance: Double)
     /// Both records play at the same tempo, within `tolerance` BPM (pitch faders, no sync).
     case tempoMatched(tolerance: Double)
     /// The kicks land together (within `tolerance` of a beat) for this many bars in a row.
@@ -109,7 +112,43 @@ struct Lesson {
 enum Lessons {
     static func find(_ id: String) -> Lesson? { all.first { $0.id == id } }
 
-    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars, requests, syncOff, byEar, holdIt]
+    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars, requests, syncOff, byEar, holdIt, longBlend]
+
+    /// Lesson 9, chapter 4, the pub: a long blend. Bass out of the new record, start it audible
+    /// but quiet, lock it, fader up, sixteen bars of both, the bass swap, out.
+    static let longBlend = Lesson(id: "long-blend", number: 9, title: "LONG BLEND", coach: "TÓ",
+                                  desk: LessonDesk(crossfader: 0.5, channel: [0.85, 0.45], sync: [false, false], room: "pub",
+                                                   syncAllowed: false, records: ["praia", "flauta"], chapter: 4,
+                                                   // Flauta (119) pitched down to Praia's 118.
+                                                   pitch: [0.5, 0.5525]), steps: [
+        LessonStep(voice: "long-01",
+                   text: "A pub on a Tuesday. Nobody's here to dance. They're here to drink, and you're here to make it nicer. That means long blends. Start the left record.",
+                   task: "PRESS PLAY ON THE LEFT DECK", goal: .startDeck(0), target: .play(0)),
+        LessonStep(voice: "long-02",
+                   text: "First, take the bass out of the right one. Low knob, all the way down.",
+                   task: "RIGHT LOW KNOB ALL THE WAY DOWN", goal: .eq(deck: 1, band: 0, 0...0.05), target: .eq(1, 0)),
+        LessonStep(voice: "long-03",
+                   text: "Now start it on a new phrase. Its fader is halfway, so you can hear what you're doing.",
+                   task: "PRESS PLAY ON THE RIGHT DECK, ON A NEW PHRASE", goal: .startOnThePhrase(deck: 1, against: 0), target: .play(1),
+                   missVoice: "phrase-03-miss",
+                   missText: "Close, but that was the middle of a phrase. Press cue on the right deck, and wait for the whoosh.",
+                   missTask: "PRESS CUE ON THE RIGHT DECK, THEN TRY AGAIN", missTarget: .cue(1)),
+        LessonStep(voice: "long-04",
+                   text: "Lock the kicks. Nudge the rim until they're one.",
+                   task: "NUDGE THE RIGHT RECORD UNTIL THE KICKS ARE ONE", goal: .phaseHeld(bars: 2, tolerance: 0.08), target: .record(1)),
+        LessonStep(voice: "long-05",
+                   text: "Good. Now the right fader all the way up.",
+                   task: "RIGHT CHANNEL FADER UP", goal: .channelFader(1, 0.8...1, onThePhrase: false), target: .channel(1)),
+        LessonStep(voice: "long-06",
+                   text: "And now: patience. Sixteen bars of both records together. Kicks locked, one bassline. Let them talk to each other.",
+                   task: "BLEND FOR SIXTEEN BARS", goal: .blendHeld(bars: 16, tolerance: 0.08), target: .record(1)),
+        LessonStep(voice: "long-07",
+                   text: "Now hand over the bass, on the phrase. Left low down, right low back to the middle.",
+                   task: "AT THE NEXT PHRASE: LEFT LOW DOWN, RIGHT LOW TO THE MIDDLE", goal: .bassSwap(from: 0, to: 1), target: .eq(0, 0)),
+        LessonStep(voice: "long-08",
+                   text: "Left fader down. And that, my friend, was three minutes of nobody noticing anything. That's the job.",
+                   task: "LEFT CHANNEL FADER DOWN", goal: .channelFader(0, 0...0.04, onThePhrase: false), target: .channel(0)),
+    ])
 
     /// Lesson 7: the numbers are covered. Which record is ahead, how far, locked: all by ear.
     static let byEar = Lesson(id: "by-ear", number: 7, title: "BY EAR", coach: "LIA",
@@ -402,6 +441,9 @@ struct BoothFacts {
     var records: [String?]
     /// SYNC per deck.
     var sync: [Bool]
+    /// The room hears both records, and they have two basslines.
+    var blend: Bool
+    var bassClash: Bool
 }
 
 /// Walks through a lesson. The booth scene feeds it `BoothFacts` every frame; the overlay shows
@@ -431,6 +473,9 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
     /// What that move was, for the result card ("Out" or "Swap").
     private var phraseMove = "Out"
     private var startBeat: Double?
+    /// For `blendHeld`: beats counted so far, and where the left record was last frame.
+    private var heldBeats = 0.0
+    private var lastBeat: Double?
     private var wasOn = [false, false]
     private var armed = false
     private var fresh = true
@@ -461,6 +506,8 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
         armed = false
         fresh = true
         startBeat = nil
+        heldBeats = 0
+        lastBeat = nil
         let step = lesson.steps[i]
         show(text: step.text, task: step.task, target: step.target)
         say(step.voice)
@@ -522,6 +569,23 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
                 }
             case .eq(let d, let band, let range):
                 if range.contains(facts.eq[d][band]) { met() }
+            case .blendHeld(let bars, let tolerance):
+                let beat = facts.beat[0]
+                let moved = lastBeat.map { max(0, min(0.5, beat - $0)) } ?? 0
+                lastBeat = beat
+                var text: String
+                if !(facts.turning[0] && facts.turning[1]) || !facts.blend {
+                    text = "BOTH RECORDS IN THE ROOM"
+                } else if abs(facts.phase) >= tolerance {
+                    text = "KICKS APART — NUDGE"
+                } else if facts.bassClash {
+                    text = "BASS CLASH — KILL A LOW"
+                } else {
+                    heldBeats += moved
+                    text = "BLEND \(min(bars, Int(heldBeats / 4))) OF \(bars) BARS"
+                }
+                if text != progress { progress = text }
+                if heldBeats >= Double(bars * 4) { met() }
             case .recordLoaded(let d, let id):
                 if facts.records[d] == id { met() }
             case .syncOn(let d):

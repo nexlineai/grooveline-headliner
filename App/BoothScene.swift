@@ -105,6 +105,8 @@ final class BoothScene: SKScene {
     private var syncAllowed = true
     /// Ear training: the tempo readouts, the phase dot and the verdict are hidden.
     private var hideNumbers = false
+    /// What the room heard this frame (for the lesson, which runs after the drawing).
+    private var lastReading: MixReading?
     private var roomVideos: [SKVideoNode?] = [nil, nil, nil, nil]
     private var roomPlayers: [AVQueuePlayer?] = [nil, nil, nil, nil]
     private var roomLoopers: [AVPlayerLooper?] = [nil, nil, nil, nil]
@@ -888,7 +890,9 @@ final class BoothScene: SKScene {
                                  bpm: decks.map { $0.bpm },
                                  phase: MixMath.phaseOffset(decks[0].beat, decks[1].beat),
                                  records: decks.map { $0.info?.id },
-                                 sync: sync))
+                                 sync: sync,
+                                 blend: lastReading?.state == .blend,
+                                 bassClash: lastReading?.bassClash ?? false))
         let wanted: Float = lesson.speaking ? 0.5 : 1
         let now = game.engine.masterVolume
         if abs(wanted - now) > 0.002 {
@@ -1043,6 +1047,7 @@ final class BoothScene: SKScene {
         }
 
         let reading = MixJudge.read(snapshots[0], snapshots[1])
+        lastReading = reading
         verdict?.text = reading.verdict
         let colour: UIColor
         switch reading.state {
@@ -1076,7 +1081,7 @@ final class BoothScene: SKScene {
             // The record on air is the one that is heard; with both heard, the louder one.
             let onAir = snapshots[0].audible ? (snapshots[1].audible ? lead : 0) : 1
             night.update(dt: dt, state: reading.state, quality: reading.quality, bassClash: reading.bassClash, lead: onAir,
-                         onAirRecord: reading.state == .silence ? nil : decks[onAir].info?.id)
+                         onAirRecord: reading.state == .silence ? nil : decks[onAir].info?.id, channel: channel)
             // Things go wrong: somebody kicks the cable and the record on air stops.
             if night.takeMishap() {
                 if nightInfo?.mishap == .needleSkip {

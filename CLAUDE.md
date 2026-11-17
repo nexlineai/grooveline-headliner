@@ -70,6 +70,12 @@ Design, story, decisions and the build log are in the vault:
 - In a night Tó comments as a voice-over (`App/Lessons/night-*.m4a`, music ducks while he talks).
   SwiftUI: a picture wider than the screen must go in `.background`, never as a ZStack child (it
   made the chapter screen wider than the phone and pushed the back button off the edge).
+- Lesson goals worth knowing: `phaseHeld(bars, tolerance)` needs an unbroken lock;
+  `blendHeld(bars, tolerance)` counts bars of a clean blend in total (a slip pauses it) and its
+  chip says why it stopped. Lessons can hide the numbers (`hideBPM`) and preset pitch faders.
+- Nights (`NightInfo`): room, records, chapter, coach + per-night `lines`, `requests`,
+  `mishap` (.cable / .needleSkip), `turnDownAt` (the on-air fader must come down within 8 s),
+  `remarks`, `maxMood` (a small room tops out at 2), `syncAllowed`, `mixesFor3Stars`.
 - Chapters (`Chapter.swift`): PLAY opens the chapter screen (steps with best stars, scenes
   seen, CONTINUE = from the first step not done to the end of the chapter). Progress is saved in
   `UserDefaults` under `progress.v1`, recorded at a result card's CONTINUE (never on the back
