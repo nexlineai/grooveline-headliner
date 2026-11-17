@@ -440,3 +440,22 @@ final class DubplateTests: XCTestCase {
         XCTAssertEqual(DrumPattern.track.on(4), [3, 11])
     }
 }
+
+final class StudioLevelTests: XCTestCase {
+    /// RMS in dB of one bar of the left channel.
+    private func db(_ x: ArraySlice<Float>) -> Double {
+        20 * log10(sqrt(x.reduce(0) { $0 + Double($1) * Double($1) } / Double(x.count)))
+    }
+
+    func testTheDubplateSitsLevelWithTheRecords() {
+        let bar = DrumMachine.barFrames(bpm: 124)
+        let audio = DrumMachine.render(.track, bpm: 124, sections: DrumMachine.arrangement)
+        XCTAssertEqual(db(audio.left[(32 * bar)..<(33 * bar)]), 20 * log10(DrumMachine.targetRMS), accuracy: 1)
+    }
+
+    func testABadMixdownIsAsLoudButHeavierInTheLows() {
+        let bar = DrumMachine.barFrames(bpm: 124)
+        let heavy = DrumMachine.render(.track, bpm: 124, sections: DrumMachine.arrangement, heavyLows: true)
+        XCTAssertEqual(db(heavy.left[(32 * bar)..<(33 * bar)]), 20 * log10(DrumMachine.targetRMS), accuracy: 1)
+    }
+}

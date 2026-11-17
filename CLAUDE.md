@@ -105,6 +105,10 @@ Design, story, decisions and the build log are in the vault:
   name "dubplate"; crate loads of it go through `Studio.loadCut`). Night `mixdownCheck`: 5 s after
   the dubplate is on air its bass "booms"; its low knob must be at 0.35 or below within 8 s.
   Every App file that names a HeadlinerCore type must `import HeadlinerCore` (build 38 failed).
+  Studio audio is levelled: the full mix (all rows) is scaled to `DrumMachine.targetRMS` (-15
+  dBFS RMS, what our records' full sections measure), so the dubplate and the loop sit level with
+  the crate. On `mixdownCheck` nights the dubplate is cut with kick and bass +6 dB (`heavyLows`),
+  so the "boom" is real and turning its low down really fixes it.
 - **Keys (`HeadlinerCore/Harmony.swift`):** Camelot neighbours (same, ±1 with 12/1 wrapping, or
   same number other letter). The decks have NO key lock: the pitch fader and SYNC move the key
   too, so `clash` also counts records pitched more than 0.3 semitone apart (128 -> 130 is 0.27,

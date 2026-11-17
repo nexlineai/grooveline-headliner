@@ -148,6 +148,10 @@ public enum DrumMachine {
         render(pattern, bpm: bpm, sections: [StudioSection(name: "loop", bars: bars, rows: Set(0..<DrumPattern.voices.count))])
     }
 
+    /// How loud the full mix is cut: the RMS of our records' full sections (about -15 dBFS), so a
+    /// record from the studio sits level with the crate and the meters.
+    public static let targetRMS = 0.178
+
     /// The dubplate: a whole record from one pattern, each section playing only some rows.
     public static let arrangement = [
         StudioSection(name: "intro", bars: 16, rows: [0, 2]),
@@ -159,14 +163,17 @@ public enum DrumMachine {
     ]
 
     /// The pattern played section by section (each section is one bar rendered with only its
-    /// rows, repeated).
-    public static func render(_ pattern: DrumPattern, bpm: Double, sections: [StudioSection]) -> (left: [Float], right: [Float]) {
+    /// rows, repeated), at the crate's level. `heavyLows`: kick and bass 6 dB up, a bad mixdown
+    /// that booms on a big system.
+    public static func render(_ pattern: DrumPattern, bpm: Double, sections: [StudioSection],
+                              heavyLows: Bool = false) -> (left: [Float], right: [Float]) {
+        let gain = levelGain(pattern, bpm: bpm, heavyLows: heavyLows)
         var left = [Float](), right = [Float]()
         let total = sections.reduce(0) { $0 + max(0, $1.bars) } * barFrames(bpm: bpm)
         left.reserveCapacity(total)
         right.reserveCapacity(total)
         for section in sections where section.bars > 0 {
-            let bar = renderBar(pattern, bpm: bpm, rows: section.rows)
+            let bar = renderBar(pattern, bpm: bpm, rows: section.rows, gain: gain, heavyLows: heavyLows)
             for _ in 0..<section.bars {
                 left.append(contentsOf: bar.left)
                 right.append(contentsOf: bar.right)
@@ -175,18 +182,36 @@ public enum DrumMachine {
         return (left, right)
     }
 
+    /// The gain that brings the full mix (every row) to `targetRMS`: measured, then corrected
+    /// twice more for the soft clipping. 1 for a silent pattern; never more than 8.
+    static func levelGain(_ pattern: DrumPattern, bpm: Double, heavyLows: Bool) -> Float {
+        var gain: Float = 1
+        let all = Set(0..<DrumPattern.voices.count)
+        for _ in 0..<3 {
+            let bar = renderBar(pattern, bpm: bpm, rows: all, gain: gain, heavyLows: heavyLows)
+            var sum = 0.0
+            for i in 0..<bar.left.count { sum += Double(bar.left[i] * bar.left[i] + bar.right[i] * bar.right[i]) }
+            let rms = sqrt(sum / Double(2 * max(1, bar.left.count)))
+            guard rms > 1e-4 else { return 1 }
+            gain = min(8, gain * Float(targetRMS / rms))
+        }
+        return gain
+    }
+
     /// One bar of the rows asked for.
-    static func renderBar(_ pattern: DrumPattern, bpm: Double, rows: Set<Int>) -> (left: [Float], right: [Float]) {
+    static func renderBar(_ pattern: DrumPattern, bpm: Double, rows: Set<Int>, gain: Float = 1,
+                          heavyLows: Bool = false) -> (left: [Float], right: [Float]) {
         let frames = barFrames(bpm: bpm)
         var barL = [Float](repeating: 0, count: frames), barR = barL
         let levels: [(gain: Float, left: Float, right: Float)] = [(0.9, 1, 1), (0.5, 1, 0.92), (0.3, 0.85, 1), (0.7, 1, 1), (0.35, 0.9, 1)]
         for v in 0..<min(pattern.rows.count, levels.count) where rows.contains(v) {
             let hit = voice(v), level = levels[v]
+            let boost: Float = heavyLows && (v == 0 || v == 3) ? 2 : 1
             for s in 0..<DrumPattern.steps where s < pattern.rows[v].count && pattern.rows[v][s] {
                 let start = stepFrame(s, bpm: bpm)
                 for i in 0..<hit.count {
                     let j = (start + i) % frames
-                    let x = hit[i] * level.gain
+                    let x = hit[i] * level.gain * boost * gain
                     barL[j] += x * level.left
                     barR[j] += x * level.right
                 }

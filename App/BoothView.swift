@@ -86,7 +86,9 @@ struct BoothView: View {
                     if crateOpen {
                         CrateView(tracks: crateRecords, decks: game.engine.decks, tick: crateTick, onLoad: { track, d in
                             if track.id == "dubplate" {
-                                Studio.loadCut(dubplatePattern, on: game.engine.decks[d])
+                                // On the big system (the DUBPLATE night) the cut booms until its low comes down.
+                                let boom = nightID.flatMap { Nights.find($0)?.mixdownCheck } ?? false
+                                Studio.loadCut(dubplatePattern, on: game.engine.decks[d], heavyLows: boom)
                             } else {
                                 game.load(track, on: game.engine.decks[d])
                             }

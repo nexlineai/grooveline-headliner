@@ -16,15 +16,17 @@ enum Studio {
     }
 
     /// The record cut from the pattern (one copy, in your crate).
-    static func cutInfo(seconds: Double = 0) -> TrackInfo {
-        TrackInfo(id: "dubplate", title: "YOUR DUBPLATE", artist: "YOU", label: "ONE COPY", genre: "Your own",
-                  bpm: bpm, key: "A minor", camelot: "8A",
-                  bars: DrumMachine.arrangement.reduce(0) { $0 + $1.bars }, seconds: seconds, chapter: 8)
+    static func cutInfo(seconds: Double? = nil) -> TrackInfo {
+        let bars = DrumMachine.arrangement.reduce(0) { $0 + $1.bars }
+        let length = seconds ?? Double(bars * DrumMachine.barFrames(bpm: bpm)) / DrumMachine.sampleRate
+        return TrackInfo(id: "dubplate", title: "YOUR DUBPLATE", artist: "YOU", label: "ONE COPY", genre: "Your own",
+                         bpm: bpm, key: "A minor", camelot: "8A", bars: bars, seconds: length, chapter: 8)
     }
 
     /// Cuts the pattern into a whole record (intro, groove, full, break, full, outro) on `deck`.
-    static func loadCut(_ pattern: DrumPattern, on deck: Deck) {
-        let audio = DrumMachine.render(pattern, bpm: bpm, sections: DrumMachine.arrangement)
+    /// `heavyLows`: the bad mixdown that booms on a big system (the DUBPLATE night).
+    static func loadCut(_ pattern: DrumPattern, on deck: Deck, heavyLows: Bool = false) {
+        let audio = DrumMachine.render(pattern, bpm: bpm, sections: DrumMachine.arrangement, heavyLows: heavyLows)
         let seconds = Double(audio.left.count) / DrumMachine.sampleRate
         try? deck.load(cutInfo(seconds: seconds), left: audio.left, right: audio.right, sampleRate: DrumMachine.sampleRate)
     }
