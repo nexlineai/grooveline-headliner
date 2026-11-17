@@ -26,7 +26,18 @@ enum Chapters {
     /// played straight away; on for the release.
     static let locked = false
 
-    static let all: [Chapter] = [bedroom]
+    static let all: [Chapter] = [bedroom, shop]
+
+    /// Chapter 3: Lia's shop, where the sync button comes off. (Chapter 2, the house parties,
+    /// is not written yet.)
+    static let shop = Chapter(number: 3, title: "GROOVELINE RECORDS",
+                              line: "A record shop with two old turntables, a rare-groove wall, and Lia, who has heard it all.",
+                              steps: [
+        ChapterStep(id: "white-label", kind: .story, title: "THE WHITE LABEL", detail: "Lia closes in ten minutes. She gives you a record.",
+                    screens: [.story("white-label")]),
+        ChapterStep(id: "sync-off", kind: .lesson, title: "SYNC OFF", detail: "Hear the gallop. Pitch it, nudge it, lock it.",
+                    screens: [.lesson("sync-off")]),
+    ])
 
     static func find(_ number: Int) -> Chapter? { all.first { $0.number == number } }
 
@@ -86,10 +97,26 @@ struct ChapterView: View {
         ZStack(alignment: .topLeading) {
             HStack(alignment: .center, spacing: 22) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("CHAPTER \(chapter.number)")
-                        .font(.system(size: 12, weight: .heavy))
-                        .tracking(5)
-                        .foregroundStyle(GroovelineLogo.teal)
+                    HStack(spacing: 10) {
+                        Text("CHAPTER \(chapter.number)")
+                            .font(.system(size: 12, weight: .heavy))
+                            .tracking(5)
+                            .foregroundStyle(GroovelineLogo.teal)
+                        // Other chapters, while nothing is locked.
+                        if !Chapters.locked {
+                            ForEach(Chapters.all.filter { $0.number != chapter.number }, id: \.number) { other in
+                                Button {
+                                    game.screen = .chapter(other.number)
+                                } label: {
+                                    Text("\(other.number)")
+                                        .font(.system(size: 11, weight: .heavy))
+                                        .foregroundStyle(.white.opacity(0.8))
+                                        .frame(width: 24, height: 24)
+                                        .background(Circle().stroke(.white.opacity(0.35), lineWidth: 1))
+                                }
+                            }
+                        }
+                    }
                     Text(chapter.title)
                         .font(.custom("Orbitron-Black", size: 34))
                         .tracking(2)
@@ -172,6 +199,7 @@ struct ChapterView: View {
         case .lesson: icon = "slider.horizontal.3"
         case .night: icon = "party.popper.fill"
         }
+
         return Button {
             game.run(step.screens, home: .chapter(chapter.number))
         } label: {

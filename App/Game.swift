@@ -81,7 +81,7 @@ final class Game: ObservableObject {
                 progress.stars = ["first-mix": 3, "on-the-phrase": 2]
                 progress.seen = ["cold-open"]
             }
-            screen = .chapter(1)
+            screen = .chapter(max(1, defaults.integer(forKey: "chapter")))
         default: break
         }
         updateMenuMusic()

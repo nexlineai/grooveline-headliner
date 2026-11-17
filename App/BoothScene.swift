@@ -97,7 +97,11 @@ final class BoothScene: SKScene {
     private var roomGlow: SKSpriteNode?
     private var roomShade: SKSpriteNode?
     /// The room in four moods, each a loop of the same picture: waiting, nodding, dancing, going nuts.
-    private static let moodClips = ["room-bedroom-waiting", "room-bedroom-nodding", "room-bedroom-dancing", "room-bedroom-nuts"]
+    private static let moodNames = ["waiting", "nodding", "dancing", "nuts"]
+    /// Which room is above the gear (`room-<room>.jpg`); a lesson can name another.
+    private var room = "bedroom"
+    /// False on vinyl: SYNC is dim and does nothing.
+    private var syncAllowed = true
     private var roomVideos: [SKVideoNode?] = [nil, nil, nil, nil]
     private var roomPlayers: [AVQueuePlayer?] = [nil, nil, nil, nil]
     private var roomLoopers: [AVPlayerLooper?] = [nil, nil, nil, nil]
@@ -149,6 +153,13 @@ final class BoothScene: SKScene {
         pitchFader = [0.5, 0.5]
         eq = [[0.5, 0.5, 0.5], [0.5, 0.5, 0.5]]
         sync = desk.sync
+        room = desk.room
+        syncAllowed = desk.syncAllowed
+        // Lessons are written for the first two records (122 and 124 BPM); put them back if the
+        // crate was used in free play.
+        for d in 0..<2 where d < game.tracks.count && decks[d].info?.id != game.tracks[d].id {
+            game.load(game.tracks[d], on: decks[d])
+        }
         if let mix = desk.cueMix { game.cueMix = mix }
         phones = [false, false]
         for d in 0..<2 {
@@ -215,7 +226,7 @@ final class BoothScene: SKScene {
         // sit in the part the gear leaves free.
         let pictureSize = CGSize(width: W, height: W * 472 / 1456)
         let centre = CGPoint(x: W / 2, y: H + W * 0.026 - pictureSize.height / 2)
-        if let image = Art.image("room-bedroom") {
+        if let image = Art.image("room-\(room)") ?? Art.image("room-bedroom") {
             let still = SKSpriteNode(texture: SKTexture(image: image))
             still.size = pictureSize
             still.position = centre
@@ -256,10 +267,13 @@ final class BoothScene: SKScene {
 
     /// The video node of one mood, made (with its looping player) the first time it is wanted.
     private func roomVideo(_ mood: Int) -> SKVideoNode? {
-        guard mood >= 0, mood < Self.moodClips.count else { return nil }
+        guard mood >= 0, mood < Self.moodNames.count else { return nil }
         if let node = roomVideos[mood] { return node }
         if roomPlayers[mood] == nil {
-            guard let url = Bundle.main.url(forResource: Self.moodClips[mood], withExtension: "mp4") else { return nil }
+            // A room without a loop for this mood borrows the nearest mood it has (the shop only nods).
+            let order = [mood, 1, 2, 0, 3]
+            guard let url = order.lazy.compactMap({ Bundle.main.url(forResource: "room-\(self.room)-\(Self.moodNames[$0])", withExtension: "mp4") }).first
+            else { return nil }
             let player = AVQueuePlayer()
             player.isMuted = true
             player.preventsDisplaySleepDuringVideoPlayback = false
@@ -658,6 +672,11 @@ final class BoothScene: SKScene {
                 tap.impactOccurred()
                 pressCue(d)
             case .sync(let d):
+                guard syncAllowed else {
+                    // Vinyl has no sync button.
+                    UINotificationFeedbackGenerator().notificationOccurred(.error)
+                    break
+                }
                 tap.impactOccurred()
                 sync[d].toggle()
                 if !sync[d] { decks[d].bend = 0 }
@@ -712,7 +731,13 @@ final class BoothScene: SKScene {
             case .wave(let d):
                 dropAt[d] = waveProgress(p, on: d)
             case .pitch(let d):
-                var v = min(1, max(0, grab.startValue + Double((p.y - grab.start.y) / pitchTravel)))
+                // Fine mode: with the finger well to the side of the fader it moves four times slower.
+                // Moved step by step from the last touch, so switching modes mid-drag does not jump.
+                let fine = abs(p.x - pitchNode[d].position.x) > 60
+                let raw = min(1, max(0, grab.startValue + Double((p.y - grab.start.y) / pitchTravel) * (fine ? 0.25 : 1)))
+                grab.startValue = raw
+                grab.start = p
+                var v = raw
                 if abs(v - 0.5) < 0.012 {
                     if pitchFader[d] != 0.5 { detent.selectionChanged() }
                     v = 0.5
@@ -848,7 +873,9 @@ final class BoothScene: SKScene {
                                  eq: eq,
                                  phonesOn: game.phonesMode != 0,
                                  phones: phones,
-                                 cueMix: game.cueMix))
+                                 cueMix: game.cueMix,
+                                 bpm: decks.map { $0.bpm },
+                                 phase: MixMath.phaseOffset(decks[0].beat, decks[1].beat)))
         let wanted: Float = lesson.speaking ? 0.5 : 1
         let now = game.engine.masterVolume
         if abs(wanted - now) > 0.002 {
@@ -882,6 +909,8 @@ final class BoothScene: SKScene {
         case .eq(let d, let band): return .eq(d, band)
         case .phones(let d): return .phones(d)
         case .cueMixKnob: return .cueMix
+        case .pitch(let d): return .pitch(d)
+        case .record(let d): return .platter(d)
         }
     }
 
@@ -986,6 +1015,7 @@ final class BoothScene: SKScene {
             pitchLabel[d].text = String(format: "%+.1f%%", deck.pitch * 100)
             playButton[d].lit = deck.motorOn
             syncButton[d].lit = sync[d]
+            syncButton[d].alpha = syncAllowed ? 1 : 0.25
             if d < phonesButton.count { phonesButton[d].lit = phones[d] }
             // The knob follows the slider in the headphone panel.
             if let knob = cueMixKnob, knob.value != game.cueMix { knob.value = game.cueMix }

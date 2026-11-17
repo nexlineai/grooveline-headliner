@@ -101,6 +101,14 @@ Design, story, decisions and the build log are in the vault:
   `--loop`, for anything that looks wrong in reverse). `tools/art/story-lines.sh` holds the
   prompts of every spoken line. Check the words of each clip with `voxtype transcribe`.
   Work files go in `/data/headliner-work/` (root disk is nearly full), only finished clips in git.
+- **Voice rule (17 Nov):** a character who coaches by voice-over keeps one xAI voice everywhere,
+  and their on-camera lines are made on Grok with `animate.py --voice`: Tó `helios` (never on
+  camera), Lia `ara`, Nuno `zagan`. Characters who only appear on camera (Dani, Mira, Sara, ...)
+  are made with Omni and their voice comes from Omni (same voice description every clip).
+- Lessons can set the room (`LessonDesk.room`, `room-<room>.jpg` + `room-<room>-<mood>.mp4`,
+  falling back to the room's nearest mood) and turn SYNC off (`syncAllowed: false`, vinyl).
+  Pitch fader fine mode: finger more than 60 pt to the side of the fader = four times slower.
+  Lessons reload the first two records (122 / 124 BPM) if the crate swapped them.
 - **Talking clips are made with `tools/art/animate_or.py IN.jpg OUT.mp4 "prompt" --model
   google/gemini-omni-1.2-flash --return`** (OpenRouter, key: keyring `service openrouter account
   claude-art`; Zé's choice 17 Nov: half of Grok's price, he likes look and voice). It is 16:9

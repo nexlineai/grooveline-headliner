@@ -55,11 +55,13 @@ shot() { # name, seconds to wait, launch arguments...
 }
 shot title 6
 shot chapter 5 -screen chapter -demoProgress 1
+shot chapter3 5 -screen chapter -chapter 3
 shot booth 9 -screen booth -demo 1
 shot lesson 6 -screen lesson
 shot lesson2 6 -screen lesson -lesson on-the-phrase
 shot lesson3 6 -screen lesson -lesson bass-swap
 shot lesson4 6 -screen lesson -lesson in-your-ears
+shot lesson-sync 6 -screen lesson -lesson sync-off
 shot night 12 -screen night -demo 1
 shot night-end 30 -screen night -demo 1
 shot crate 6 -screen booth -crate 1

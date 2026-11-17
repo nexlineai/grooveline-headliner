@@ -13,6 +13,8 @@ enum LessonTarget: Equatable {
     case eq(Int, Int)
     /// The PHONES button of a mixer channel, and the cue mix knob between them.
     case phones(Int), cueMixKnob
+    /// A pitch fader, and a whole record (for the rim).
+    case pitch(Int), record(Int)
 }
 
 /// What has to happen before the lesson moves on.
@@ -43,6 +45,10 @@ enum LessonGoal: Equatable {
     case phonesCue(Int)
     /// The cue mix knob is in this part of its travel (0 = only the cued record, 1 = only the room).
     case cueMix(ClosedRange<Double>)
+    /// Both records play at the same tempo, within `tolerance` BPM (pitch faders, no sync).
+    case tempoMatched(tolerance: Double)
+    /// The kicks land together (within 0.07 of a beat) for this many bars in a row.
+    case phaseHeld(bars: Int)
     /// The deck's motor is off.
     case stopDeck(Int)
     /// Nothing to do: the step ends with the coach's line.
@@ -70,6 +76,10 @@ struct LessonDesk {
     var sync = [false, true]
     /// Where the cue mix knob starts, when the lesson cares.
     var cueMix: Double?
+    /// The room above the gear: `room-<room>.jpg` and its mood loops.
+    var room = "bedroom"
+    /// False on vinyl: the SYNC buttons are dim and do nothing.
+    var syncAllowed = true
 }
 
 struct Lesson {
@@ -84,7 +94,44 @@ struct Lesson {
 enum Lessons {
     static func find(_ id: String) -> Lesson? { all.first { $0.id == id } }
 
-    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars]
+    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars, syncOff]
+
+    /// Chapter 3, Lia's shop: no sync button. Hear the gallop, match the tempo with the pitch
+    /// fader, lock the kicks with the rim. Both faders are up: the shop hears everything.
+    static let syncOff = Lesson(id: "sync-off", number: 5, title: "SYNC OFF", coach: "LIA",
+                                desk: LessonDesk(crossfader: 0.5, channel: [0.85, 0.85], sync: [false, false],
+                                                 room: "shop", syncAllowed: false), steps: [
+        LessonStep(voice: "sync-01",
+                   text: "My shop, my decks. And no sync button, kid. Records don't have one. Start the left one.",
+                   task: "PRESS PLAY ON THE LEFT DECK", goal: .startDeck(0), target: .play(0)),
+        LessonStep(voice: "sync-02",
+                   text: "Now the right one. On the one, like your friend taught you. Both faders are up, so the whole shop hears it.",
+                   task: "PRESS PLAY ON THE RIGHT DECK, ON THE ONE", goal: .startOnTheOne(deck: 1, against: 0), target: .play(1),
+                   missVoice: "sync-02-miss",
+                   missText: "That wasn't the one. Cue it, and try again.",
+                   missTask: "PRESS CUE ON THE RIGHT DECK, THEN TRY AGAIN", missTarget: .cue(1)),
+        LessonStep(voice: "sync-03",
+                   text: "Hear that? Horses galloping. Two kicks that won't agree. The right record is faster. A hundred and twenty four, against a hundred and twenty two.",
+                   task: "LISTEN: THE KICKS GALLOP", goal: .listen, target: nil),
+        LessonStep(voice: "sync-04",
+                   text: "Slow it down. Push the right pitch fader up, a little at a time, until the two numbers match. For small moves, keep your finger to the side of the fader.",
+                   task: "RIGHT PITCH FADER UP UNTIL BOTH SAY 122.0", goal: .tempoMatched(tolerance: 0.3), target: .pitch(1)),
+        LessonStep(voice: "sync-05",
+                   text: "Same speed now. But the kicks still don't land together. Touch the dotted rim of the right record. A little push forward, or hold it back, until you hear one kick. Then keep it there.",
+                   task: "NUDGE THE RIGHT RECORD'S RIM UNTIL THE KICKS ARE ONE", goal: .phaseHeld(bars: 4), target: .record(1)),
+        LessonStep(voice: "sync-06",
+                   text: "There. One kick. That's beatmatching. Nobody learns that from a button.",
+                   task: "BEATMATCHED", goal: .listen, target: nil),
+        LessonStep(voice: "sync-07",
+                   text: "Give the shop the new record. Crossfader all the way right.",
+                   task: "CROSSFADER ALL THE WAY RIGHT", goal: .crossfader(0.96...1), target: .crossfader),
+        LessonStep(voice: "sync-08",
+                   text: "And stop the left one.",
+                   task: "STOP THE LEFT DECK", goal: .stopDeck(0), target: .play(0)),
+        LessonStep(voice: "sync-09",
+                   text: "Not bad, kid. Saturday, ten o'clock. Don't be late.",
+                   task: "SYNC OFF", goal: .listen, target: nil),
+    ])
 
     /// Lesson 4: headphones. The next record is heard in one ear before the room gets it, the cue
     /// mix brings the room into that ear, and only then the fader goes up.
@@ -252,6 +299,10 @@ struct BoothFacts {
     var phones: [Bool]
     /// Cue mix knob: 0 = only the cued record, 1 = only the room.
     var cueMix: Double
+    /// Tempo of each record after its pitch fader.
+    var bpm: [Double]
+    /// Where the right record's beat falls against the left one's, in beats (0 = together).
+    var phase: Double
 }
 
 /// Walks through a lesson. The booth scene feeds it `BoothFacts` every frame; the overlay shows
@@ -372,6 +423,25 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
                 }
             case .eq(let d, let band, let range):
                 if range.contains(facts.eq[d][band]) { met() }
+            case .tempoMatched(let tolerance):
+                let gap = abs(facts.bpm[0] - facts.bpm[1])
+                let text = gap <= tolerance ? "MATCHED" : String(format: "%.1f BPM APART", gap)
+                if text != progress { progress = text }
+                if gap <= tolerance && facts.turning[0] && facts.turning[1] { met() }
+            case .phaseHeld(let bars):
+                // Counted in beats of the left record; a slip starts the count again.
+                if facts.turning[0] && facts.turning[1] && abs(facts.phase) < 0.07 {
+                    let from = startBeat ?? facts.beat[0]
+                    startBeat = from
+                    let held = (facts.beat[0] - from) / 4
+                    let text = "LOCKED \(min(bars, Int(held))) OF \(bars) BARS"
+                    if text != progress { progress = text }
+                    if held >= Double(bars) { met() }
+                } else {
+                    startBeat = nil
+                    let text = facts.turning[0] && facts.turning[1] ? String(format: "%+.2f BEAT", facts.phase) : ""
+                    if text != progress { progress = text }
+                }
             case .phonesReady:
                 if facts.phonesOn { met() }
             case .phonesCue(let d):
