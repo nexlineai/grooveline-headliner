@@ -11,7 +11,7 @@ import HeadlinerAudio
 final class BoothScene: SKScene {
     private enum Kind: Equatable {
         case platter(Int), rim(Int), pitch(Int), channel(Int), cross, eq(Int, Int), play(Int), cue(Int), sync(Int)
-        case needle(Int), wave(Int), phones(Int), cueMix
+        case needle(Int), wave(Int), phones(Int), cueMix, filter(Int)
     }
 
     private struct Grab {
@@ -81,6 +81,10 @@ final class BoothScene: SKScene {
     private var channelNode: [FaderNode] = []
     private var crossNode: FaderNode?
     private var knob: [[KnobNode]] = []
+    /// The one-knob filter per channel (0.5 = off), shown from chapter 7 on and in free play.
+    private var filter = [0.5, 0.5]
+    private var filterKnob: [KnobNode] = []
+    private var hasFilter = true
     private var playButton: [ButtonNode] = []
     private var cueButton: [ButtonNode] = []
     private var syncButton: [ButtonNode] = []
@@ -176,6 +180,8 @@ final class BoothScene: SKScene {
         pitchFader = desk.pitch ?? [0.5, 0.5]
         hideNumbers = desk.hideBPM
         eq = [[0.5, 0.5, 0.5], [0.5, 0.5, 0.5]]
+        filter = [0.5, 0.5]
+        hasFilter = desk.chapter >= 7
         sync = desk.sync
         room = desk.room
         syncAllowed = desk.syncAllowed
@@ -195,6 +201,7 @@ final class BoothScene: SKScene {
             deck.cuePoint = cueAt(desk.cueBar, on: deck)
             deck.seek(to: deck.cuePoint)
             for band in 0..<3 { deck.setEQ(band: band, value: 0.5) }
+            deck.setFilter(0.5)
         }
         needsBuild = true
     }
@@ -211,7 +218,7 @@ final class BoothScene: SKScene {
         pointedAt = nil
         releaseAllHands()
         hits = []
-        record = []; arm = []; pitchNode = []; channelNode = []; knob = []
+        record = []; arm = []; pitchNode = []; channelNode = []; knob = []; filterKnob = []
         playButton = []; cueButton = []; syncButton = []; phonesButton = []; meter = []
         bpmLabel = []; pitchLabel = []; beatDots = []
         wavePlayed = []; wavePlayhead = []; waveCue = []; waveDrop = []; timeLabel = []
@@ -596,6 +603,21 @@ final class BoothScene: SKScene {
         addChild(fader)
         crossNode = fader
         hits.insert((Kind.cross, centred(rect.midX, fader.position.y, crossTravel + 36 * u, 40 * u)), at: 0)
+
+        // Filter knobs, under the EQ columns, beside the crossfader's ends (added last, so they win
+        // the little overlap with the crossfader's touch area, outside its travel).
+        if hasFilter {
+            for d in 0..<2 {
+                let kx = d == 0 ? rect.minX + 27 * u : rect.maxX - 27 * u, ky = rect.minY + 27 * u
+                let node = KnobNode(radius: 10 * u, tint: d == 0 ? Palette.teal : Palette.magenta, title: "FILTER")
+                node.position = CGPoint(x: kx, y: ky)
+                node.value = filter[d]
+                node.zPosition = 4
+                addChild(node)
+                filterKnob.append(node)
+                hits.insert((Kind.filter(d), centred(kx, ky, 30 * u, 30 * u)), at: 0)
+            }
+        }
     }
 
     // MARK: - Hands
@@ -650,6 +672,7 @@ final class BoothScene: SKScene {
         case .channel(let d): return channel[d]
         case .cross: return cross
         case .eq(let d, let band): return eq[d][band]
+        case .filter(let d): return filter[d]
         case .cueMix: return game.cueMix
         default: return 0
         }
@@ -723,6 +746,15 @@ final class BoothScene: SKScene {
                     grab.startValue = 0.5
                     detent.selectionChanged()
                 }
+            case .filter(let d):
+                // A double tap switches the filter off (the middle).
+                if touch.tapCount >= 2 {
+                    filter[d] = 0.5
+                    if d < filterKnob.count { filterKnob[d].value = 0.5 }
+                    decks[d].setFilter(0.5)
+                    grab.startValue = 0.5
+                    detent.selectionChanged()
+                }
             case .cueMix:
                 // The cue mix's default is CUE: only the cued record in the headphones.
                 if touch.tapCount >= 2 {
@@ -793,6 +825,12 @@ final class BoothScene: SKScene {
                 eq[d][band] = v
                 knob[d][band].value = v
                 decks[d].setEQ(band: band, value: v)
+            case .filter(let d):
+                var v = min(1, max(0, grab.startValue + Double((p.y - grab.start.y) / knobTravel)))
+                if abs(v - 0.5) < 0.03 { v = 0.5 }
+                filter[d] = v
+                if d < filterKnob.count { filterKnob[d].value = v }
+                decks[d].setFilter(v)
             default:
                 break
             }
@@ -911,7 +949,8 @@ final class BoothScene: SKScene {
                                  blend: lastReading?.state == .blend,
                                  bassClash: lastReading?.bassClash ?? false,
                                  jingles: game.jingleCount,
-                                 time: CACurrentMediaTime()))
+                                 time: CACurrentMediaTime(),
+                                 filter: filter))
         let wanted: Float = lesson.speaking || game.jinglePlaying ? 0.5 : 1
         let now = game.engine.masterVolume
         if abs(wanted - now) > 0.002 {
@@ -945,6 +984,7 @@ final class BoothScene: SKScene {
         case .eq(let d, let band): return .eq(d, band)
         case .phones(let d): return .phones(d)
         case .cueMixKnob: return .cueMix
+        case .filter(let d): return .filter(d)
         case .pitch(let d): return .pitch(d)
         case .record(let d): return .platter(d)
         case .sync(let d): return .sync(d)

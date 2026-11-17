@@ -17,6 +17,8 @@ enum LessonTarget: Equatable {
     case pitch(Int), record(Int)
     /// A SYNC button, the CRATE button and the JINGLE button (top right).
     case sync(Int), crate, jingle
+    /// The filter knob under a channel's EQ.
+    case filter(Int)
 }
 
 /// What has to happen before the lesson moves on.
@@ -64,6 +66,9 @@ enum LessonGoal: Equatable {
     case tempoMatched(tolerance: Double)
     /// The kicks land together (within `tolerance` of a beat) for this many bars in a row.
     case phaseHeld(bars: Int, tolerance: Double = 0.07)
+    /// The deck's filter knob is in this part of its travel (0 = low-pass closed, 0.5 = off,
+    /// 1 = high-pass all the way up).
+    case filter(deck: Int, ClosedRange<Double>)
     /// The deck's motor is off.
     case stopDeck(Int)
     /// Nothing to do: the step ends with the coach's line.
@@ -126,7 +131,50 @@ struct Lesson {
 enum Lessons {
     static func find(_ id: String) -> Lesson? { all.first { $0.id == id } }
 
-    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars, requests, syncOff, byEar, holdIt, longBlend, onAir, warmUp, keys]
+    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars, requests, syncOff, byEar, holdIt, longBlend, onAir, warmUp, keys, filterMix]
+
+    /// Lesson 13, chapter 7, Helena watches the first Friday: the filter. Sink a record with the
+    /// low-pass and bring it back; bring the next one in thin (high-pass), thin the old one out
+    /// and open the new one: the bass changes hands through the filters.
+    static let filterMix = Lesson(id: "filter", number: 13, title: "FILTER", coach: "HELENA",
+                                  desk: LessonDesk(crossfader: 0.5, channel: [0.85, 0], sync: [false, true], room: "cavepeak",
+                                                   records: ["residente", "portao"], chapter: 7, cueBar: 16), steps: [
+        LessonStep(voice: "filter-01",
+                   text: "Your first Friday. I'll stay for the first hour. Start the left one.",
+                   task: "PRESS PLAY ON THE LEFT DECK", goal: .startDeck(0), target: .play(0)),
+        LessonStep(voice: "filter-02",
+                   text: "See the knob at the bottom, under the EQ? The filter. Drag it down, all the way. Hear the record sink, like it's under water? That's a low-pass.",
+                   task: "LEFT FILTER ALL THE WAY DOWN", goal: .filter(deck: 0, 0...0.08), target: .filter(0)),
+        LessonStep(voice: "filter-03",
+                   text: "Now bring it back up to the middle. Slowly. Let the room feel it open.",
+                   task: "LEFT FILTER BACK TO THE MIDDLE", goal: .filter(deck: 0, 0.47...0.53), target: .filter(0)),
+        LessonStep(voice: "filter-04",
+                   text: "The right one now, on the one. Its fader is down, and sync is on.",
+                   task: "PRESS PLAY ON THE RIGHT DECK, ON THE ONE", goal: .startOnTheOne(deck: 1, against: 0), target: .play(1),
+                   missVoice: "filter-04-miss", missText: "Not the one. Cue it, and try again.",
+                   missTask: "PRESS CUE ON THE RIGHT DECK, THEN TRY AGAIN", missTarget: .cue(1)),
+        LessonStep(voice: "filter-05",
+                   text: "Before anyone hears it, drag its filter up, all the way. High-pass. Only the hats get through.",
+                   task: "RIGHT FILTER ALL THE WAY UP", goal: .filter(deck: 1, 0.92...1), target: .filter(1)),
+        LessonStep(voice: "filter-06",
+                   text: "Fader up. Nothing fights: it has no bass yet.",
+                   task: "RIGHT CHANNEL FADER UP", goal: .channelFader(1, 0.8...1, onThePhrase: false), target: .channel(1)),
+        LessonStep(voice: "filter-07",
+                   text: "Now the swap. Drag the left filter up, all the way. It thins out and lets go of the bass.",
+                   task: "LEFT FILTER ALL THE WAY UP", goal: .filter(deck: 0, 0.92...1), target: .filter(0)),
+        LessonStep(voice: "filter-08",
+                   text: "And open the right one. Its filter back down to the middle. The bass is all theirs now.",
+                   task: "RIGHT FILTER BACK TO THE MIDDLE", goal: .filter(deck: 1, 0.47...0.53), target: .filter(1)),
+        LessonStep(voice: "filter-09",
+                   text: "Left fader down, at the next phrase.",
+                   task: "LEFT CHANNEL FADER DOWN, AT THE NEXT PHRASE", goal: .channelFader(0, 0...0.04, onThePhrase: true), target: .channel(0)),
+        LessonStep(voice: "filter-10",
+                   text: "Double tap the left filter to put it back in the middle, for next time.",
+                   task: "DOUBLE TAP THE LEFT FILTER", goal: .filter(deck: 0, 0.47...0.53), target: .filter(0)),
+        LessonStep(voice: "filter-11",
+                   text: "That's a filter mix. Use it like salt. A little, and not on everything.",
+                   task: "FILTER", goal: .listen, target: nil),
+    ])
 
     /// Lesson 12, chapter 7, CAVE on a Friday: keys. Two records at the same tempo in keys that
     /// fight, then one that is a neighbour on the Camelot wheel. All at 128 BPM: the decks have no
@@ -578,6 +626,8 @@ struct BoothFacts {
     /// Station jingles fired so far, and the clock (seconds).
     var jingles: Int
     var time: Double
+    /// Filter knob per deck, 0.5 = off.
+    var filter: [Double]
 }
 
 /// Walks through a lesson. The booth scene feeds it `BoothFacts` every frame; the overlay shows
@@ -890,6 +940,8 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
                 if range.contains(facts.cross) { met() }
             case .stopDeck(let d):
                 if !facts.motorOn[d] { met() }
+            case .filter(let d, let range):
+                if range.contains(facts.filter[d]) { met() }
             case .listen:
                 if !speaking { met() }
             }

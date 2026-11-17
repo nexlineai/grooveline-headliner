@@ -332,3 +332,35 @@ final class HarmonyTests: XCTestCase {
         XCTAssertTrue(Harmony.clash("2A", pitch: 0, "8A", pitch: 0))
     }
 }
+
+final class FilterTests: XCTestCase {
+    /// RMS of a sine after it went through one filter (second half, once the filter has settled).
+    private func rms(through shape: Biquad.Shape, at hz: Double, tone: Double) -> Float {
+        var f = Biquad()
+        f.set(shape, frequency: hz, gainDB: 0, q: 1.0, sampleRate: 48_000)
+        let n = 9_600
+        var l = (0..<n).map { Float(sin(2 * Double.pi * tone * Double($0) / 48_000)) }
+        var r = l
+        l.withUnsafeMutableBufferPointer { lp in
+            r.withUnsafeMutableBufferPointer { rp in f.run(lp.baseAddress!, rp.baseAddress!, count: n) }
+        }
+        let tail = l[(n / 2)...]
+        return sqrt(tail.reduce(0) { $0 + $1 * $1 } / Float(tail.count))
+    }
+
+    func testLowPassKeepsTheBassAndTakesTheTop() {
+        XCTAssertGreaterThan(rms(through: .lowPass, at: 300, tone: 60), 0.6)
+        XCTAssertLessThan(rms(through: .lowPass, at: 300, tone: 5_000), 0.01)
+    }
+
+    func testHighPassTakesTheBass() {
+        XCTAssertGreaterThan(rms(through: .highPass, at: 2_000, tone: 8_000), 0.6)
+        XCTAssertLessThan(rms(through: .highPass, at: 2_000, tone: 60), 0.01)
+    }
+
+    func testKnobPositions() {
+        XCTAssertEqual(Mixer.filterHz(-1), 100, accuracy: 0.01)
+        XCTAssertEqual(Mixer.filterHz(1), 8_000, accuracy: 0.01)
+        XCTAssertEqual(Mixer.filterHz(-0.5), 20_000 * sqrt(100.0 / 20_000), accuracy: 0.01)
+    }
+}

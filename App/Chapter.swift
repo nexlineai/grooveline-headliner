@@ -36,6 +36,8 @@ enum Chapters {
                     screens: [.story("helena")]),
         ChapterStep(id: "keys", kind: .lesson, title: "KEYS", detail: "Same beat, wrong notes. Find a neighbour on the wheel.",
                     screens: [.lesson("keys")]),
+        ChapterStep(id: "filter", kind: .lesson, title: "FILTER", detail: "Helena shows you the knob under the EQ.",
+                    screens: [.lesson("filter")]),
         ChapterStep(id: Nights.fridayCave.id, kind: .night, title: Nights.fridayCave.title, detail: "Peak time, records in key, and the power goes.",
                     screens: [.night(Nights.fridayCave.id)]),
     ])

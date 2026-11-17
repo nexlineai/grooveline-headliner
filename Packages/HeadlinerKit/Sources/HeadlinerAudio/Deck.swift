@@ -149,4 +149,9 @@ public final class Deck {
         default: break
         }
     }
+
+    /// Filter knob, value 0...1: 0.5 off, below it a low-pass closing, above it a high-pass opening.
+    public func setFilter(_ value: Double) {
+        strip.pointee.filter = Float(max(-1, min(1, (value - 0.5) * 2)))
+    }
 }

@@ -12,10 +12,11 @@ public struct Biquad {
 
     public init() {}
 
-    public enum Shape { case lowShelf, peak, highShelf }
+    public enum Shape { case lowShelf, peak, highShelf, lowPass, highPass }
 
-    /// Sets the filter (Robert Bristow-Johnson's formulas). `q` is used by `.peak` only; the
-    /// shelves have the steepest slope that does not overshoot.
+    /// Sets the filter (Robert Bristow-Johnson's formulas). `q` is used by `.peak` and the
+    /// passes; the shelves have the steepest slope that does not overshoot. The passes ignore
+    /// `gainDB`.
     public mutating func set(_ shape: Shape, frequency: Double, gainDB: Double, q: Double = 0.86, sampleRate: Double) {
         let a = pow(10, gainDB / 40)
         let w = 2 * Double.pi * min(frequency, sampleRate * 0.45) / sampleRate
@@ -42,6 +43,13 @@ public struct Biquad {
             d0 = (a + 1) - (a - 1) * cs + beta
             d1 = 2 * ((a - 1) - (a + 1) * cs)
             d2 = (a + 1) - (a - 1) * cs - beta
+        case .lowPass, .highPass:
+            let alpha = sn / (2 * q)
+            let low = shape == .lowPass
+            n0 = low ? (1 - cs) / 2 : (1 + cs) / 2
+            n1 = low ? 1 - cs : -(1 + cs)
+            n2 = n0
+            d0 = 1 + alpha; d1 = -2 * cs; d2 = 1 - alpha
         }
         b0 = Float(n0 / d0); b1 = Float(n1 / d0); b2 = Float(n2 / d0)
         a1 = Float(d1 / d0); a2 = Float(d2 / d0)
@@ -87,11 +95,14 @@ public struct ChannelStrip {
     public var fader: Float = 1
     /// 1 when this deck is switched to the headphones (before the fader), else 0.
     public var cue: Float = 0
+    /// The one-knob filter: -1 = low-pass all the way down, 0 = off, 1 = high-pass all the way up.
+    public var filter: Float = 0
 
     // The audio thread's own.
     var lowNow: Float = 0, midNow: Float = 0, highNow: Float = 0
     var faderNow: Float = 0, cueNow: Float = 0
-    var low = Biquad(), mid = Biquad(), high = Biquad()
+    var filterNow: Float = 0
+    var low = Biquad(), mid = Biquad(), high = Biquad(), sweep = Biquad()
 
     public init() {}
 }
@@ -118,6 +129,16 @@ public enum Mixer {
     static func glide(_ now: Float, to wanted: Float) -> Float {
         let next = now + (wanted - now) * 0.25
         return abs(wanted - next) < 0.02 ? wanted : next
+    }
+
+    /// Around the middle of the filter knob nothing is filtered.
+    public static let filterDeadZone: Float = 0.03
+
+    /// The filter's corner for a knob position: the low-pass closes from 20 kHz to 100 Hz, the
+    /// high-pass opens from 20 Hz to 8 kHz, both evenly in octaves along the knob.
+    public static func filterHz(_ position: Float) -> Double {
+        let x = Double(max(-1, min(1, position)))
+        return x < 0 ? 20_000 * pow(100.0 / 20_000, -x) : 20 * pow(8_000.0 / 20, x)
     }
 
     /// Mixes `deckCount` decks into one stereo output, or into two when `phonesLeft` and
@@ -170,6 +191,22 @@ public enum Mixer {
             if strip.pointee.lowNow != 0 { strip.pointee.low.run(tl, tr, count: count) }
             if strip.pointee.midNow != 0 { strip.pointee.mid.run(tl, tr, count: count) }
             if strip.pointee.highNow != 0 { strip.pointee.high.run(tl, tr, count: count) }
+
+            // Filter: glides like the EQ, re-tuned only while the knob moves; off in the middle.
+            if strip.pointee.filterNow != strip.pointee.filter {
+                let wanted = max(-1, min(1, strip.pointee.filter))
+                var f = strip.pointee.filterNow + (wanted - strip.pointee.filterNow) * 0.3
+                if abs(wanted - f) < 0.002 { f = wanted }
+                let crossed = (f < 0) != (strip.pointee.filterNow < 0)
+                strip.pointee.filterNow = f
+                if abs(f) < filterDeadZone || crossed {
+                    strip.pointee.sweep.clear()
+                }
+                if abs(f) >= filterDeadZone {
+                    strip.pointee.sweep.set(f < 0 ? .lowPass : .highPass, frequency: filterHz(f), gainDB: 0, q: 1.0, sampleRate: rate)
+                }
+            }
+            if abs(strip.pointee.filterNow) >= filterDeadZone { strip.pointee.sweep.run(tl, tr, count: count) }
 
             var fader = strip.pointee.faderNow, cue = strip.pointee.cueNow
             let faderWanted = strip.pointee.fader, cueWanted = strip.pointee.cue
