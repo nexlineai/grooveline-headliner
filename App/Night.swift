@@ -238,7 +238,26 @@ enum Nights {
                                                "joli": [("ber-joli", "Joli's dancing. Joli never dances.")]],
                                        bag: ["berlim", "cave", "luz-vermelha", "seguranca", "canal", "oito-milhas", "residente", "porta"],
                                        clockStart: 3 * 60, deadFader: 0)
-    static let all = [firstParty, garageParty, saturdayShift, emptyTuesday, thursdayShow, caveWarmUp, fridayCave, afterhours, dubplateNight, berlinNight]
+    /// Chapter 9: a sunset terrace in Ibiza with Joli's records (the airline lost yours). Keys are
+    /// judged; the chains that fit are Praia - Sal - Regresso and Tambor - Fita Gasta - Flauta.
+    static let ibizaNight = NightInfo(id: "ibiza-night", title: "IBIZA SUNSET", length: 360, room: "ibiza",
+                                      records: ["sal", "praia"], chapter: 9, mixesFor3Stars: 2,
+                                      remarks: [(at: 0.15, moment: "bag")],
+                                      lines: ["wait": [("ibz-wait", "Ibiza, sunset. A hundred and fifty people and the sea. Play something.")],
+                                              "start": [("cave-start", "Here we go. Easy does it.")],
+                                              "clean": [("ibz-clean-1", "Smooth. The sun's going down right on time."), ("fri-clean-2", "Nobody even blinked. Perfect.")],
+                                              "rough": [("ibz-rough", "Bumpy. The terrace heard that.")],
+                                              "dead": [("ibz-dead", "Silence! At sunset! Play!")],
+                                              "stale": [("fri-stale", "This one's done. Next.")],
+                                              "slip": [("fri-slip", "It's drifting. Nudge it.")],
+                                              "wreck": [("fri-wreck", "Ouch. Two kicks fighting.")],
+                                              "clash": [("fri-clash", "Two basslines. Kill a low.")],
+                                              "nuts": [("ibz-nuts", "The whole terrace is jumping!")],
+                                              "keys": [("ibz-keys", "Sour! Those two don't fit. Cut on the phrase.")],
+                                              "bag": [("ibz-bag", "Joli's records. Read the sleeves: the keys are on them.")]],
+                                      bag: ["sal", "praia", "regresso", "tambor", "fita-gasta", "flauta", "terraco", "varanda"],
+                                      clockStart: 20 * 60, judgeKeys: true)
+    static let all = [firstParty, garageParty, saturdayShift, emptyTuesday, thursdayShow, caveWarmUp, fridayCave, afterhours, dubplateNight, berlinNight, ibizaNight]
     static func find(_ id: String) -> NightInfo? { all.first { $0.id == id } }
 }
 

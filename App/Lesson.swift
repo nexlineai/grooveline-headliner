@@ -80,6 +80,9 @@ enum LessonGoal: Equatable {
     case studioPage(Int)
     /// A dubplate is cut (CUT on the grid).
     case dubplateCut
+    /// The crossfader goes all the way right; the result card says whether it was on a phrase
+    /// change of the left record (a cut between records that do not fit).
+    case crossfaderCut
     /// The deck's motor is off.
     case stopDeck(Int)
     /// Nothing to do: the step ends with the coach's line.
@@ -150,7 +153,33 @@ struct Lesson {
 enum Lessons {
     static func find(_ id: String) -> Lesson? { all.first { $0.id == id } }
 
-    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars, requests, syncOff, byEar, holdIt, longBlend, onAir, warmUp, keys, filterMix, tempo, drums, synth, dubplate, borrowedBooth]
+    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars, requests, syncOff, byEar, holdIt, longBlend, onAir, warmUp, keys, filterMix, tempo, drums, synth, dubplate, borrowedBooth, genreSwitch]
+
+    /// Lesson 19, chapter 9, an Ibiza terrace: two records that do not fit (126 / 120, keys apart)
+    /// are not blended. Thin the old one with the filter, start the new one on its drums-only
+    /// intro on the phrase, and cut across on the next phrase.
+    static let genreSwitch = Lesson(id: "genre-switch", number: 19, title: "GENRE SWITCH", coach: "TÓ",
+                                    desk: LessonDesk(crossfader: 0, channel: [0.85, 0.85], sync: [false, false], room: "ibiza",
+                                                     records: ["canal", "sal"], chapter: 9), steps: [
+        LessonStep(voice: "switch-01",
+                   text: "Ibiza, sunset. Canal is Amsterdam, 126. The terrace wants Sal: Balearic, 120, another key. You can't blend those. Start the left one.",
+                   task: "PRESS PLAY ON THE LEFT DECK", goal: .startDeck(0), target: .play(0)),
+        LessonStep(voice: "switch-02",
+                   text: "When two records don't fit, you don't blend them. You hand over. First, thin the left one out: its filter up, about halfway.",
+                   task: "LEFT FILTER UP, ABOUT HALFWAY", goal: .filter(deck: 0, 0.68...0.9), target: .filter(0)),
+        LessonStep(voice: "switch-03",
+                   text: "Now start Sal on a new phrase. The crossfader is left, so nobody hears it yet.",
+                   task: "PRESS PLAY ON THE RIGHT DECK, ON A NEW PHRASE", goal: .startOnThePhrase(deck: 1, against: 0), target: .play(1),
+                   missVoice: "phrase-03-miss",
+                   missText: "Close, but that was the middle of a phrase. Press cue on the right deck, and wait for the whoosh.",
+                   missTask: "PRESS CUE ON THE RIGHT DECK, THEN TRY AGAIN", missTarget: .cue(1)),
+        LessonStep(voice: "switch-04",
+                   text: "Now the cut. On the next phrase, crossfader all the way right, in one move.",
+                   task: "AT THE NEXT PHRASE: CROSSFADER ALL THE WAY RIGHT", goal: .crossfaderCut, target: .crossfader),
+        LessonStep(voice: "switch-05",
+                   text: "Sal's intro takes over, and the terrace never heard the key change. When records don't fit, cut on the phrase.",
+                   task: "GENRE SWITCH", goal: .listen, target: nil),
+    ])
 
     /// Lesson 18, chapter 9, Joli's booth in Berlin: the left channel fader is dead (stuck at
     /// full), so the mix is done with the crossfader and the EQ.
@@ -1112,6 +1141,15 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
                 if range.contains(facts.filter[d]) { met() }
             case .studioPage(let p):
                 if facts.page == p { met() }
+            case .crossfaderCut:
+                showBar(facts.beat[0])
+                if facts.cross >= 0.96 {
+                    var into = facts.beat[0].truncatingRemainder(dividingBy: Lessons.phrase)
+                    if into < 0 { into += Lessons.phrase }
+                    outOnThePhrase = min(into, Lessons.phrase - into) <= 4
+                    phraseMove = "Cut"
+                    met()
+                }
             case .dubplateCut:
                 let seen = cutsSeen ?? facts.cuts
                 cutsSeen = seen

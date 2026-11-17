@@ -200,5 +200,14 @@
         {"who": "TÓ", "voice": "vo-joli-to", "text": "Tired. The left fader is dead, and one of the turntables has had a long night."}
       ] }
     ]
+  },
+  {
+    "id": "lost-bag",
+    "shots": [
+      { "lines": [
+        {"who": "", "text": "IBIZA AIRPORT. YOUR RECORD BAG WENT TO MÁLAGA."},
+        {"who": "", "text": "JOLI LENDS YOU HERS. YOU KNOW NONE OF THESE RECORDS."}
+      ] }
+    ]
   }
 ]

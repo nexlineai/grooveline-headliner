@@ -97,6 +97,9 @@ shot chapter9 5 -screen chapter -chapter 9
 shot lesson-booth 6 -screen lesson -lesson borrowed-booth
 shot berlin-night 10 -screen night -night berlin-night -demo 1
 shot story-joli 5 -screen story -scene joli
+shot lesson-switch 6 -screen lesson -lesson genre-switch -lessonStep 3
+shot ibiza-night 10 -screen night -night ibiza-night -demo 1
+shot ibiza-crate 6 -screen night -night ibiza-night -crate 1
 shot lesson-requests 6 -screen lesson -lesson requests
 shot garage 10 -screen night -night garage-party -demo 1
 shot garage-crate 6 -screen night -night garage-party -crate 1
