@@ -237,22 +237,22 @@ struct ChapterView: View {
         ZStack(alignment: .topLeading) {
             HStack(alignment: .center, spacing: 22) {
                 VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 6) {
-                        Text("CHAPTER \(chapter.number)")
-                            .font(.system(size: 12, weight: .heavy))
-                            .tracking(5)
-                            .foregroundStyle(GroovelineLogo.teal)
-                            .fixedSize()
-                        // Other chapters, while nothing is locked.
-                        if !Chapters.locked {
+                    Text("CHAPTER \(chapter.number)")
+                        .font(.system(size: 12, weight: .heavy))
+                        .tracking(5)
+                        .foregroundStyle(GroovelineLogo.teal)
+                        .fixedSize()
+                    // Other chapters, while nothing is locked: their own line, so twelve still fit.
+                    if !Chapters.locked {
+                        HStack(spacing: 4) {
                             ForEach(Chapters.all.filter { $0.number != chapter.number }, id: \.number) { other in
                                 Button {
                                     game.screen = .chapter(other.number)
                                 } label: {
                                     Text("\(other.number)")
-                                        .font(.system(size: 11, weight: .heavy))
+                                        .font(.system(size: 10, weight: .heavy))
                                         .foregroundStyle(.white.opacity(0.8))
-                                        .frame(width: 22, height: 22)
+                                        .frame(width: 21, height: 21)
                                         .background(Circle().stroke(.white.opacity(0.35), lineWidth: 1))
                                 }
                             }
