@@ -67,6 +67,8 @@ shot phones 6 -screen booth -phones 1 -phonesMode 1 -demo 1
 shot story-nuno 5 -screen story -scene cold-open
 # Four seconds in, Lia is in the middle of her first line (a clip with her voice in it).
 shot story-lia 4 -screen story -scene white-label
+shot story-dani 3 -screen story -scene dani
+shot story-mira 3 -screen story -scene mira-lights
 
 # What the app logged (audio engine, track loading), for reading next to the pictures.
 xcrun simctl spawn "$udid" log show --last 3m --style compact --info --debug \

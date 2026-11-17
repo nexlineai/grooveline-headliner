@@ -29,5 +29,33 @@
         {"who": "LIA", "text": "Play it when you know why.", "clip": "white-label-05"}
       ] }
     ]
+  },
+  {
+    "id": "dani",
+    "shots": [
+      { "art": "scene-dani", "lines": [
+        {"who": "DANI", "clip": "dani-01", "text": "This is it? A plastic controller with a sync button? Fine. Make them dance, superstar."},
+        {"who": "TÓ", "voice": "vo-dani-to", "text": "Ignore him. He's been like that since we were eight. Lesson one, I'll talk you through it."}
+      ] }
+    ]
+  },
+  {
+    "id": "mira-lights",
+    "shots": [
+      { "art": "scene-mira", "lines": [
+        {"who": "MIRA", "clip": "mira-01", "text": "Two desk lamps, one bedsheet, and a red sock. Behold: the light show!"},
+        {"who": "TÓ", "voice": "vo-mira-to", "text": "Doors are open. Well, the door. Six people. Your night. Go."}
+      ] }
+    ]
+  },
+  {
+    "id": "chapter-1-end",
+    "shots": [
+      { "lines": [
+        {"who": "", "text": "02:14. MUM BANGS ON THE WALL."},
+        {"who": "", "text": "NEXT SATURDAY: SOMEBODY'S GARAGE."},
+        {"who": "", "text": "END OF CHAPTER 1"}
+      ] }
+    ]
   }
 ]

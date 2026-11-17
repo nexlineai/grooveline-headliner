@@ -41,7 +41,9 @@ def main():
     with tempfile.TemporaryDirectory() as tmp:
         first, last, log = (os.path.join(tmp, n) for n in ("first.png", "last.png", "psnr.log"))
         run("ffmpeg", "-v", "error", "-y", "-i", src, "-frames:v", "1", "-update", "1", first)
-        run("ffmpeg", "-v", "error", "-y", "-sseof", "-0.08", "-i", src, "-frames:v", "1", "-update", "1", last)
+        # The last picture: read the final half second and keep overwriting, so the file ends up
+        # holding the very last frame (a fixed -0.08 s found nothing when the sound outlasts the picture).
+        run("ffmpeg", "-v", "error", "-y", "-sseof", "-0.5", "-i", src, "-an", "-update", "1", last)
         run("ffmpeg", "-v", "error", "-y", "-i", src, "-i", last, "-filter_complex", f"[0:v][1:v]psnr=stats_file={log}", "-f", "null", "-")
         psnr = [float(re.search(r"psnr_avg:(\S+)", l).group(1).replace("inf", "99")) for l in open(log)]
         total = len(psnr) / fps

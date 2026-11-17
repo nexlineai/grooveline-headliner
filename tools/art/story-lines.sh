@@ -37,3 +37,10 @@ want white-label-03 && line white-label-03 scene-shop-lia ara 5 "$LIA_WHO \"Sync
 want white-label-04 && line white-label-04 scene-shop-lia ara 6 "$LIA_WHO \"Here. White label. No name, no artist, nothing.\" She pushes the white sleeve a little towards the viewer. $LIA_REST" &
 want white-label-05 && line white-label-05 scene-shop-lia ara 4 "$LIA_WHO \"Play it when you know why.\" She says it quietly and seriously. $LIA_REST" &
 wait
+
+# Chapter 1 (17 Nov 2026) was made with Gemini Omni through OpenRouter (tools/art/animate_or.py,
+# --model google/gemini-omni-1.2-flash --seconds 7 --return, 16:9 pictures from imagine.py).
+# The voice comes from the model, so every clip of a character uses the same description:
+#   DANI: "a seventeen-year-old boy's voice, cocky and teasing, lazy drawl"
+#   MIRA: "a seventeen-year-old girl's voice, bright, proud and theatrical"
+# Tó never speaks on camera: his lines are tools/voice/say.sh with the voice helios.

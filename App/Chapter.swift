@@ -35,6 +35,8 @@ enum Chapters {
                                  steps: [
         ChapterStep(id: "cold-open", kind: .story, title: "MERIDIAN", detail: "Sixty thousand people. Nine years from now.",
                     screens: [.story("cold-open"), .story("nine-years")]),
+        ChapterStep(id: "dani", kind: .story, title: "DANI", detail: "Your oldest friend has opinions.",
+                    screens: [.story("dani")]),
         ChapterStep(id: "first-mix", kind: .lesson, title: "FIRST MIX", detail: "Play, count the bars, start on the one, crossfade.",
                     screens: [.lesson("first-mix")]),
         ChapterStep(id: "on-the-phrase", kind: .lesson, title: "ON THE PHRASE", detail: "Eight bars make a phrase. Mix where it changes.",
@@ -44,7 +46,7 @@ enum Chapters {
         ChapterStep(id: "in-your-ears", kind: .lesson, title: "IN YOUR EARS", detail: "Hear the next record before the room does.",
                     screens: [.lesson("in-your-ears")]),
         ChapterStep(id: Nights.firstParty.id, kind: .night, title: Nights.firstParty.title, detail: "Six friends, four and a half minutes, no help.",
-                    screens: [.night(Nights.firstParty.id)]),
+                    screens: [.story("mira-lights"), .night(Nights.firstParty.id), .story("chapter-1-end")]),
     ])
 }
 
@@ -117,7 +119,7 @@ struct ChapterView: View {
                     .padding(.top, 8)
                 }
                 .frame(maxWidth: 300, alignment: .leading)
-                VStack(spacing: 6) {
+                VStack(spacing: 4) {
                     ForEach(Array(chapter.steps.enumerated()), id: \.element.id) { index, step in
                         row(step, index: index)
                     }
@@ -206,7 +208,7 @@ struct ChapterView: View {
                 }
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 7)
+            .padding(.vertical, 5)
             .background(RoundedRectangle(cornerRadius: 12).fill(Color.black.opacity(isNext ? 0.7 : 0.5)))
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(isNext ? GroovelineLogo.teal.opacity(0.7) : Color.white.opacity(0.1), lineWidth: 1))
             .opacity(open ? 1 : 0.45)
