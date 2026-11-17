@@ -149,7 +149,7 @@ final class BoothScene: SKScene {
             // A night starts like a gig: the first record ready, the second one's fader down.
             setTheDesk(LessonDesk(crossfader: 0.5, channel: [0.85, 0], sync: info.syncAllowed ? [false, true] : [false, false],
                                   room: info.room, syncAllowed: info.syncAllowed, records: info.records, crate: true, chapter: info.chapter,
-                                  deadFader: info.deadFader))
+                                  deadFader: info.deadFader, echo: info.echo))
         }
         applyMix()
     }
@@ -195,6 +195,7 @@ final class BoothScene: SKScene {
         hasFilter = desk.chapter >= 7
         deadFader = desk.deadFader
         wander = nil
+        game.engine.echoSeconds = desk.echo
         sync = desk.sync
         room = desk.room
         syncAllowed = desk.syncAllowed

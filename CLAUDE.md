@@ -113,6 +113,10 @@ Design, story, decisions and the build log are in the vault:
   stuck where the desk sets it (drawn dim, ignores the finger). Mishap `.pitchWander`: the on-air
   deck's belt slips, its pitch drifts (about ±0.5 %, slow) around its fader for the rest of the
   night unless SYNC holds it.
+- **Festival echo (chapter 10):** `MixerShared.echoDelay` + ring buffers from `DeckEngine`:
+  the ROOM output also gets a copy `echoSeconds` late at -6 dB (the far speakers); the headphones
+  never do (the monitors). `LessonDesk.echo` / `NightInfo.echo`; `closeBooth` turns it off.
+  `NightInfo.climbTo`: the tempo on air must end at or above it for three stars.
 - **Keys (`HeadlinerCore/Harmony.swift`):** Camelot neighbours (same, ±1 with 12/1 wrapping, or
   same number other letter). The decks have NO key lock: the pitch fader and SYNC move the key
   too, so `clash` also counts records pitched more than 0.3 semitone apart (128 -> 130 is 0.27,

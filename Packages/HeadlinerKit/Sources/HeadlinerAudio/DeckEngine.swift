@@ -42,6 +42,11 @@ public final class DeckEngine {
     public init() {
         mixer = UnsafeMutablePointer<MixerShared>.allocate(capacity: 1)
         mixer.initialize(to: MixerShared())
+        for side in 0..<2 {
+            let ring = UnsafeMutablePointer<Float>.allocate(capacity: Mixer.echoCapacity)
+            ring.initialize(repeating: 0, count: Mixer.echoCapacity)
+            if side == 0 { mixer.pointee.echoL = ring } else { mixer.pointee.echoR = ring }
+        }
         deckList = UnsafeMutablePointer<UnsafeMutablePointer<DeckShared>>.allocate(capacity: 2)
         stripList = UnsafeMutablePointer<UnsafeMutablePointer<ChannelStrip>>.allocate(capacity: 2)
         for (i, deck) in decks.enumerated() {
@@ -55,8 +60,14 @@ public final class DeckEngine {
     deinit {
         if let observer { NotificationCenter.default.removeObserver(observer) }
         engine.stop()
+        mixer.pointee.echoL?.deallocate(); mixer.pointee.echoR?.deallocate()
         mixer.deinitialize(count: 1); mixer.deallocate()
         deckList.deallocate(); stripList.deallocate(); scratch.deallocate()
+    }
+
+    /// The far speakers of a festival stage: the room hears the music this late as well (0 = off).
+    public var echoSeconds: Double = 0 {
+        didSet { mixer.pointee.echoDelay = Int(max(0, echoSeconds) * mixer.pointee.sampleRate) }
     }
 
     /// Everything the mixer puts out, 0...1. Turned down a little while a coach talks over the music.
@@ -119,6 +130,7 @@ public final class DeckEngine {
             let rate = hardware.sampleRate > 0 ? hardware.sampleRate : 48_000
             sampleRate = rate
             mixer.pointee.sampleRate = rate
+            mixer.pointee.echoDelay = Int(max(0, echoSeconds) * rate)
             for deck in decks { deck.outputRate = rate }
 
             if wantCard && hardware.channelCount >= 4 {

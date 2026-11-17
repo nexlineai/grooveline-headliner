@@ -58,6 +58,10 @@ struct NightInfo {
     /// The night that is stopped (the burnout): at this share Tó says "home", and a few seconds
     /// later it is over with one star, whatever happened.
     var stopsAt: Double? = nil
+    /// A festival field: the room also hears the far speakers this many seconds late.
+    var echo: Double = 0
+    /// A set that has to climb: the tempo on air must end at or above this for three stars.
+    var climbTo: Double? = nil
 }
 
 /// What goes wrong in a night: the cable is kicked (the record stops), the needle jumps a groove,
@@ -281,7 +285,28 @@ enum Nights {
                                            "home": [("burn-home", "That's it. We're stopping. I'm taking you home.")]],
                                    bag: ["oito-milhas", "berlim", "cansaco", "canal", "residente", "coro"],
                                    clockStart: 4 * 60 + 30, stopsAt: 0.5)
-    static let all = [firstParty, garageParty, saturdayShift, emptyTuesday, thursdayShow, caveWarmUp, fridayCave, afterhours, dubplateNight, berlinNight, ibizaNight, burnout]
+    /// Chapter 10: the sunset slot on a festival main stage. The far speakers come back late
+    /// (an echo in the room, not in the headphones), the set has to climb from 118 to 126 by the
+    /// end, and the generator fails once.
+    static let sunsetSlot = NightInfo(id: "sunset-slot", title: "SUNSET SLOT", length: 360, room: "festival",
+                                      records: ["por-do-sol", "chuva"], chapter: 10, mixesFor3Stars: 3,
+                                      mishapAt: 0.55, mishap: .powerCut,
+                                      remarks: [(at: 0.1, moment: "climb")],
+                                      lines: ["wait": [("fest-wait", "Thousands of people and the sun going down. Play something.")],
+                                              "start": [("cave-start", "Here we go. Easy does it.")],
+                                              "clean": [("fest-clean-1", "Smooth. The whole field felt that."), ("fri-clean-2", "Nobody even blinked. Perfect.")],
+                                              "rough": [("fest-rough", "Bumpy. Ten thousand people heard that.")],
+                                              "dead": [("fest-dead", "Silence! On a main stage! Play!")],
+                                              "stale": [("fri-stale", "This one's done. Next.")],
+                                              "slip": [("fest-slip", "It's drifting. Listen to the monitors, not the echo.")],
+                                              "wreck": [("fri-wreck", "Ouch. Two kicks fighting.")],
+                                              "clash": [("fri-clash", "Two basslines. Kill a low.")],
+                                              "nuts": [("fest-nuts", "Look at them! Hands in the air, all the way to the back!")],
+                                              "cable": [("fest-generator", "The generator! Hold on... it's back! Go, go!")],
+                                              "climb": [("fest-climb", "Sunset slot. Start slow, end at a hundred and twenty six. Take them up.")]],
+                                      bag: ["por-do-sol", "chuva", "floresta", "tenda", "encore", "palco-principal", "onda-media", "fila"],
+                                      clockStart: 19 * 60, echo: 0.12, climbTo: 126)
+    static let all = [firstParty, garageParty, saturdayShift, emptyTuesday, thursdayShow, caveWarmUp, fridayCave, afterhours, dubplateNight, berlinNight, ibizaNight, burnout, sunsetSlot]
     static func find(_ id: String) -> NightInfo? { all.first { $0.id == id } }
 }
 
@@ -626,8 +651,8 @@ final class NightRunner: ObservableObject {
             } else {
                 bpmAnchor = (now, onAirBPM)
             }
-            lastBPM = onAirBPM
         }
+        if state != .silence { lastBPM = onAirBPM }
         // A small room only gets so wild.
         let cap = [0.24, 0.48, 0.75, 1.0][min(3, max(0, info.maxMood))]
         energy = min(cap, max(0, energy + rate * dt))
@@ -676,7 +701,8 @@ final class NightRunner: ObservableObject {
         // A small room tops out lower, so it needs less for three stars.
         let need = info.maxMood >= 3 ? 0.6 : 0.5
         let broughtDown = info.endBPM.map { lastBPM <= $0 + 0.5 } ?? true
-        if crowd >= need && transitions >= info.mixesFor3Stars && deadAir < 3 && wreck < 4 && allRequests && !hotPlayed && broughtDown {
+        let climbed = info.climbTo.map { lastBPM >= $0 - 0.5 } ?? true
+        if crowd >= need && transitions >= info.mixesFor3Stars && deadAir < 3 && wreck < 4 && allRequests && !hotPlayed && broughtDown && climbed {
             earned = 3
         } else if crowd >= 0.42 && transitions >= 1 {
             earned = 2
@@ -689,7 +715,7 @@ final class NightRunner: ObservableObject {
         if !info.requests.isEmpty { summary += "   ·   requests \(requestsMet) / \(info.requests.count)" }
         if !info.hot.isEmpty { summary += hotPlayed ? "   ·   too hot, too early" : "   ·   kept it warm" }
         if info.judgeKeys { summary += sourTime < 1 ? "   ·   in key" : "   ·   sour \(Int(sourTime.rounded())) s" }
-        if info.endBPM != nil { summary += "   ·   ended at \(Int(lastBPM.rounded())) BPM" }
+        if info.endBPM != nil || info.climbTo != nil { summary += "   ·   ended at \(Int(lastBPM.rounded())) BPM" }
         comment = ""
         stars = earned
     }

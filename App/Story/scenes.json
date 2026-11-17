@@ -229,5 +229,14 @@
         {"who": "", "text": "END OF CHAPTER 9"}
       ] }
     ]
+  },
+  {
+    "id": "carla",
+    "shots": [
+      { "art": "scene-carla", "lines": [
+        {"who": "CARLA", "clip": "carla-01", "text": "I'm Carla. I manage people who get booked. Three festivals this summer: a tent, a forest, and a sunset slot. Don't be late."},
+        {"who": "TÓ", "voice": "vo-carla-to", "text": "A manager. We have a manager. Mum is going to love this."}
+      ] }
+    ]
   }
 ]

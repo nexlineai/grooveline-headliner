@@ -143,6 +143,7 @@ final class Game: ObservableObject {
     func closeBooth(leaving: Bool = false) {
         for deck in engine.decks { deck.motorOn = false }
         engine.masterVolume = 1
+        engine.echoSeconds = 0
         if leaving { leave() } else { next() }
     }
 

@@ -459,3 +459,39 @@ final class StudioLevelTests: XCTestCase {
         XCTAssertEqual(db(heavy.left[(32 * bar)..<(33 * bar)]), 20 * log10(DrumMachine.targetRMS), accuracy: 1)
     }
 }
+
+final class EchoTests: XCTestCase {
+    func testTheFarSpeakersArriveLateAndQuieter() {
+        let mixer = UnsafeMutablePointer<MixerShared>.allocate(capacity: 1)
+        mixer.initialize(to: MixerShared())
+        let bl = UnsafeMutablePointer<Float>.allocate(capacity: Mixer.echoCapacity)
+        let br = UnsafeMutablePointer<Float>.allocate(capacity: Mixer.echoCapacity)
+        bl.initialize(repeating: 0, count: Mixer.echoCapacity)
+        br.initialize(repeating: 0, count: Mixer.echoCapacity)
+        defer { bl.deallocate(); br.deallocate(); mixer.deallocate() }
+        mixer.pointee.echoL = bl
+        mixer.pointee.echoR = br
+        mixer.pointee.echoDelay = 100
+        mixer.pointee.echoGain = 0.5
+        var l = [Float](repeating: 0, count: 300), r = l
+        l[0] = 1
+        r[0] = 1
+        l.withUnsafeMutableBufferPointer { lp in
+            r.withUnsafeMutableBufferPointer { rp in Mixer.applyEcho(mixer, left: lp.baseAddress!, right: rp.baseAddress!, count: 300) }
+        }
+        XCTAssertEqual(l[0], 1)
+        XCTAssertEqual(l[50], 0)
+        XCTAssertEqual(l[100], 0.5, accuracy: 1e-6)
+        XCTAssertEqual(r[100], 0.5, accuracy: 1e-6)
+    }
+
+    func testNoEchoWhenOff() {
+        let mixer = UnsafeMutablePointer<MixerShared>.allocate(capacity: 1)
+        mixer.initialize(to: MixerShared())
+        defer { mixer.deallocate() }
+        var l = [Float](repeating: 0, count: 10)
+        l[0] = 1
+        l.withUnsafeMutableBufferPointer { Mixer.applyEcho(mixer, left: $0.baseAddress!, right: nil, count: 10) }
+        XCTAssertEqual(l, [1, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    }
+}

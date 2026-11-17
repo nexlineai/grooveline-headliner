@@ -139,6 +139,9 @@ struct LessonDesk {
     var cutter = false
     /// A channel fader that is broken in this booth (stuck where the desk sets it).
     var deadFader: Int?
+    /// A festival field: the room also hears the far speakers this many seconds late (not the
+    /// headphones, like a DJ's monitors). 0 = no echo.
+    var echo: Double = 0
 }
 
 struct Lesson {
@@ -153,7 +156,37 @@ struct Lesson {
 enum Lessons {
     static func find(_ id: String) -> Lesson? { all.first { $0.id == id } }
 
-    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars, requests, syncOff, byEar, holdIt, longBlend, onAir, warmUp, keys, filterMix, tempo, drums, synth, dubplate, borrowedBooth, genreSwitch]
+    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars, requests, syncOff, byEar, holdIt, longBlend, onAir, warmUp, keys, filterMix, tempo, drums, synth, dubplate, borrowedBooth, genreSwitch, delay]
+
+    /// Lesson 20, chapter 10, a festival stage: the far speakers come back late. Beatmatch to the
+    /// first hit (the monitors), never to the echo.
+    static let delay = Lesson(id: "delay", number: 20, title: "THE DELAY", coach: "HELENA",
+                              desk: LessonDesk(crossfader: 0.5, channel: [0.85, 0.45], sync: [false, false], room: "festival",
+                                               syncAllowed: false, records: ["floresta", "tenda"], chapter: 10, echo: 0.14), steps: [
+        LessonStep(voice: "delay-01",
+                   text: "A festival stage. The speakers out in the field are far away, so what comes back is late. Start the left one.",
+                   task: "PRESS PLAY ON THE LEFT DECK", goal: .startDeck(0), target: .play(0)),
+        LessonStep(voice: "delay-02",
+                   text: "Hear the echo? That's the field, a seventh of a second behind. Never mix to the echo. Mix to the first hit, the one from your monitors. Start the right one on the one.",
+                   task: "PRESS PLAY ON THE RIGHT DECK, ON THE ONE", goal: .startOnTheOne(deck: 1, against: 0), target: .play(1),
+                   missVoice: "filter-04-miss", missText: "Not the one. Cue it, and try again.",
+                   missTask: "PRESS CUE ON THE RIGHT DECK, THEN TRY AGAIN", missTarget: .cue(1)),
+        LessonStep(voice: "delay-03",
+                   text: "Its fader is up halfway so you can hear it. It's faster: bring the right pitch fader up until both say 122.",
+                   task: "RIGHT PITCH FADER UP UNTIL BOTH SAY 122.0", goal: .tempoMatched(tolerance: 0.3), target: .pitch(1)),
+        LessonStep(voice: "delay-04",
+                   text: "Lock the kicks. Listen to the first kick, not the echo.",
+                   task: "NUDGE THE RIGHT RECORD UNTIL THE KICKS ARE ONE", goal: .phaseHeld(bars: 4), target: .record(1)),
+        LessonStep(voice: "delay-05",
+                   text: "Right fader all the way up.",
+                   task: "RIGHT CHANNEL FADER UP", goal: .channelFader(1, 0.8...1, onThePhrase: false), target: .channel(1)),
+        LessonStep(voice: "delay-06",
+                   text: "And the left one out, on the phrase.",
+                   task: "LEFT CHANNEL FADER DOWN, AT THE NEXT PHRASE", goal: .channelFader(0, 0...0.04, onThePhrase: true), target: .channel(0)),
+        LessonStep(voice: "delay-07",
+                   text: "Out there, ten thousand people heard that late, and perfect. That's a big stage.",
+                   task: "THE DELAY", goal: .listen, target: nil),
+    ])
 
     /// Lesson 19, chapter 9, an Ibiza terrace: two records that do not fit (126 / 120, keys apart)
     /// are not blended. Thin the old one with the filter, start the new one on its drums-only

@@ -117,6 +117,14 @@ public struct MixerShared {
     public var master: Float = 1
     var masterNow: Float = 1
     public var sampleRate: Double = 48_000
+    /// The far speakers of a big system: the room also hears the music `echoDelay` frames late
+    /// (a quieter copy); the headphones do not, like a DJ's monitors. 0 = off. The ring buffers
+    /// (`Mixer.echoCapacity` frames each) belong to the engine; nil = no echo.
+    public var echoDelay: Int = 0
+    public var echoGain: Float = 0.5
+    public var echoL: UnsafeMutablePointer<Float>?
+    public var echoR: UnsafeMutablePointer<Float>?
+    var echoWrite = 0
 
     public init() {}
 }
@@ -129,6 +137,32 @@ public enum Mixer {
     static func glide(_ now: Float, to wanted: Float) -> Float {
         let next = now + (wanted - now) * 0.25
         return abs(wanted - next) < 0.02 ? wanted : next
+    }
+
+    /// Frames in each echo ring buffer (a third of a second at 48 kHz).
+    public static let echoCapacity = 16_384
+
+    /// Adds the late copy from the far speakers to the room channels (`right` nil: the room is
+    /// one channel).
+    public static func applyEcho(_ mixer: UnsafeMutablePointer<MixerShared>, left: UnsafeMutablePointer<Float>,
+                                 right: UnsafeMutablePointer<Float>?, count: Int) {
+        let delay = min(mixer.pointee.echoDelay, echoCapacity - 1)
+        guard delay > 0, let bl = mixer.pointee.echoL, let br = mixer.pointee.echoR else { return }
+        let gain = mixer.pointee.echoGain
+        var w = mixer.pointee.echoWrite
+        for i in 0..<count {
+            let r = (w - delay + echoCapacity) % echoCapacity
+            let l = left[i]
+            left[i] = l + bl[r] * gain
+            bl[w] = l
+            if let right {
+                let x = right[i]
+                right[i] = x + br[r] * gain
+                br[w] = x
+            }
+            w = (w + 1) % echoCapacity
+        }
+        mixer.pointee.echoWrite = w
     }
 
     /// Around the middle of the filter knob nothing is filtered.
@@ -262,6 +296,15 @@ public enum Mixer {
             }
             if abs(master - masterWanted) < 1e-4 { master = masterWanted }
             mixer.pointee.masterNow = master
+        }
+
+        // The far speakers: only the room is late, never the headphones.
+        if phonesLeft != nil {
+            applyEcho(mixer, left: outL, right: outR, count: count)
+        } else if split {
+            applyEcho(mixer, left: outL, right: nil, count: count)
+        } else {
+            applyEcho(mixer, left: outL, right: outR, count: count)
         }
     }
 }
