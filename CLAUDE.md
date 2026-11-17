@@ -114,7 +114,9 @@ Design, story, decisions and the build log are in the vault:
   average energy, the number of mixes, dead air and train wrecks. `BoothScene.showRoom` cross-
   fades between four loops of the same room picture (`room-bedroom-{waiting,nodding,dancing,nuts}`);
   outside a night the room dances while music is heard and holds still when it stops.
-- Crate (`CrateView.swift`, free play only): lists `tracks.json`, loads a record on the left or
+- Crate (`CrateView.swift`): in free play only the records of chapters played so far
+  (`Chapters.recordsOpen`: chapter 1 always, chapter N once its night has a star, or one of its
+  lessons when it has no night yet; Zé, 17 Nov); in lessons/nights the chapter's or the bag's. Lists `tracks.json`, loads a record on the left or
   right deck (not onto a turning deck, one copy per record). `BoothScene.recordChanged(on:)` redraws.
 - The Grooveline name is always the site's mark: `GroovelineLogo` (bars + Orbitron Bold, teal
   `#00d4c8`). Fonts in `App/Fonts/` (Orbitron, OFL).

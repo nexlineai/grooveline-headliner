@@ -148,9 +148,13 @@ struct BoothView: View {
         return true
     }
 
-    /// Free play: every record. A lesson or night: the records of its chapter and the ones before,
-    /// or only the records in the bag when it names them.
+    /// Free play: the records of the chapters played so far (`Chapters.recordsOpen`). A lesson or
+    /// night: the records of its chapter and the ones before, or only the bag when it names them.
     private var crateRecords: [TrackInfo] {
+        if lessonID == nil && nightID == nil {
+            let open = Chapters.recordsOpen(game.progress)
+            return game.tracks.filter { open.contains($0.chapter ?? 1) }
+        }
         var chapter = Int.max
         var bag: [String]?
         if let id = lessonID, let lesson = Lessons.find(id) { chapter = lesson.desk.chapter; bag = lesson.desk.bag }

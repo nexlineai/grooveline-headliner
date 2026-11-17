@@ -125,6 +125,19 @@ enum Chapters {
 
     static func find(_ number: Int) -> Chapter? { all.first { $0.number == number } }
 
+    /// Chapters whose records are in the free-play crate: the first from the start, the others
+    /// once their night has been played (one star is enough); a chapter without a night yet,
+    /// once one of its lessons has been done. Records belong to the chapter that brought them.
+    static func recordsOpen(_ progress: CareerProgress) -> Set<Int> {
+        var open: Set<Int> = [1]
+        for chapter in all {
+            let nights = chapter.steps.filter { $0.kind == .night }
+            let counted = nights.isEmpty ? chapter.steps.filter { $0.kind == .lesson } : nights
+            if counted.contains(where: { (progress.stars[$0.id] ?? 0) > 0 }) { open.insert(chapter.number) }
+        }
+        return open
+    }
+
     static let bedroom = Chapter(number: 1, title: "THE BEDROOM",
                                  line: "Your room, a cheap controller with the sync button on, and the friends who will put up with anything.",
                                  steps: [
