@@ -417,3 +417,26 @@ final class StudioSynthTests: XCTestCase {
         XCTAssertGreaterThan(audio.left[at..<(at + 4_410)].map { abs($0) }.max() ?? 0, 0.05)
     }
 }
+
+final class DubplateTests: XCTestCase {
+    func testTheArrangementIsEightyBars() {
+        XCTAssertEqual(DrumMachine.arrangement.reduce(0) { $0 + $1.bars }, 80)
+        let audio = DrumMachine.render(.track, bpm: 124, sections: DrumMachine.arrangement)
+        XCTAssertEqual(audio.left.count, 80 * DrumMachine.barFrames(bpm: 124))
+    }
+
+    func testTheIntroHasNoClap() {
+        var p = DrumPattern()
+        p.rows[1][4] = true // clap only
+        let audio = DrumMachine.render(p, bpm: 124, sections: DrumMachine.arrangement)
+        let bar = DrumMachine.barFrames(bpm: 124)
+        XCTAssertEqual(audio.left[0..<(16 * bar)].map { abs($0) }.max() ?? 1, 0)                 // intro: kick and hat only
+        XCTAssertGreaterThan(audio.left[(16 * bar)..<(17 * bar)].map { abs($0) }.max() ?? 0, 0.05) // groove: the clap is in
+    }
+
+    func testTheLoopStillWorks() {
+        XCTAssertEqual(DrumMachine.render(.house, bpm: 120, bars: 2).left.count, 2 * 88_200)
+        XCTAssertEqual(DrumPattern.track.on(3), [2, 6, 10, 14])
+        XCTAssertEqual(DrumPattern.track.on(4), [3, 11])
+    }
+}

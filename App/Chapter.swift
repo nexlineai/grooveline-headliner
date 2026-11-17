@@ -1,4 +1,5 @@
 import SwiftUI
+import HeadlinerCore
 
 // The career is told in chapters. A chapter is a list of steps (story scenes, lessons, nights);
 // the player's best stars and the scenes already seen are saved on the phone, so the game goes
@@ -37,6 +38,10 @@ enum Chapters {
                     screens: [.lesson("drums")]),
         ChapterStep(id: "synth", kind: .lesson, title: "BASS AND CHORDS", detail: "The bass goes where the kick isn't.",
                     screens: [.lesson("synth")]),
+        ChapterStep(id: "dubplate", kind: .lesson, title: "DUBPLATE", detail: "Your loop becomes a record. One copy.",
+                    screens: [.lesson("dubplate")]),
+        ChapterStep(id: Nights.dubplateNight.id, kind: .night, title: Nights.dubplateNight.title, detail: "Your record, at CAVE, on a big system.",
+                    screens: [.night(Nights.dubplateNight.id), .story("chapter-8-end")]),
     ])
 
     /// Chapter 7: Fridays at CAVE. Helena gives you peak time; club players, keys, a power cut.
@@ -165,6 +170,9 @@ struct CareerProgress: Codable, Equatable {
     var stars: [String: Int] = [:]
     /// Story steps seen to the end.
     var seen: Set<String> = []
+    /// The pattern of the record cut in the studio (chapter 8). Optional, so saves from before it
+    /// existed still load (a new non-optional field would make every old save fail to decode).
+    var track: DrumPattern?
 
     private static let key = "progress.v1"
 

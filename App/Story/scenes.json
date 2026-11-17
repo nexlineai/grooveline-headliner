@@ -181,5 +181,15 @@
         {"who": "", "text": "END OF CHAPTER 7"}
       ] }
     ]
+  },
+  {
+    "id": "chapter-8-end",
+    "shots": [
+      { "lines": [
+        {"who": "", "text": "MONDAY. THE LABEL WRITES BACK: \"NOT FOR US.\""},
+        {"who": "", "text": "FRIDAY. HELENA PLAYS YOUR DUBPLATE AT HER SET ANYWAY."},
+        {"who": "", "text": "END OF CHAPTER 8"}
+      ] }
+    ]
   }
 ]

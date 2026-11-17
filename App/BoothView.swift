@@ -33,7 +33,12 @@ struct BoothView: View {
                     }
                 }
                 if studio && runner?.stars == nil {
-                    StudioGrid(pattern: $game.pattern, page: $game.studioPage, deck: game.engine.decks[0])
+                    StudioGrid(pattern: $game.pattern, page: $game.studioPage, deck: game.engine.decks[0], cutter: cutter) {
+                        // CUT: the loop becomes a whole record on the left deck, kept with the progress.
+                        Studio.loadCut(game.pattern, on: game.engine.decks[0])
+                        game.cut(game.pattern)
+                        scene?.recordChanged(on: 0)
+                    }
                         .frame(maxWidth: .infinity)
                         .frame(height: max(60, roomHeight - 4), alignment: .bottom)
                 }
@@ -80,7 +85,11 @@ struct BoothView: View {
                 if crateShown {
                     if crateOpen {
                         CrateView(tracks: crateRecords, decks: game.engine.decks, tick: crateTick, onLoad: { track, d in
-                            game.load(track, on: game.engine.decks[d])
+                            if track.id == "dubplate" {
+                                Studio.loadCut(dubplatePattern, on: game.engine.decks[d])
+                            } else {
+                                game.load(track, on: game.engine.decks[d])
+                            }
                             scene?.recordChanged(on: d)
                             crateTick += 1
                         }, onClose: {
@@ -94,7 +103,12 @@ struct BoothView: View {
                 // A studio lesson starts from its own pattern, or an empty one (the screenshot run
                 // can bring a groove), on the page asked for.
                 if studio, let id = lessonID, let lesson = Lessons.find(id) {
-                    if !UserDefaults.standard.bool(forKey: "demoPattern") { game.pattern = lesson.desk.pattern ?? DrumPattern() }
+                    if lesson.desk.cutter {
+                        // The dubplate lesson cuts what you made (or the groove from the lessons).
+                        game.pattern = game.progress.track ?? (game.pattern != DrumPattern() ? game.pattern : (lesson.desk.pattern ?? DrumPattern()))
+                    } else if !UserDefaults.standard.bool(forKey: "demoPattern") {
+                        game.pattern = lesson.desk.pattern ?? DrumPattern()
+                    }
                     game.studioPage = UserDefaults.standard.integer(forKey: "studioPage")
                 }
                 let made = BoothScene(game: game)
@@ -129,6 +143,15 @@ struct BoothView: View {
         }
     }
 
+    /// The dubplate lesson has a CUT button on the grid.
+    private var cutter: Bool {
+        if let id = lessonID { return Lessons.find(id)?.desk.cutter ?? false }
+        return false
+    }
+
+    /// The pattern of your dubplate: the one you cut, or (not cut yet) the groove from the lessons.
+    private var dubplatePattern: DrumPattern { game.progress.track ?? .track }
+
     /// The studio (chapter 8): the drum machine's grid over the room.
     private var studio: Bool {
         if let id = lessonID { return Lessons.find(id)?.desk.studio ?? false }
@@ -153,13 +176,13 @@ struct BoothView: View {
     private var crateRecords: [TrackInfo] {
         if lessonID == nil && nightID == nil {
             let open = Chapters.recordsOpen(game.progress)
-            return game.tracks.filter { open.contains($0.chapter ?? 1) }
+            return game.tracks.filter { open.contains($0.chapter ?? 1) } + (game.progress.track != nil ? [Studio.cutInfo()] : [])
         }
         var chapter = Int.max
         var bag: [String]?
         if let id = lessonID, let lesson = Lessons.find(id) { chapter = lesson.desk.chapter; bag = lesson.desk.bag }
         if let id = nightID, let info = Nights.find(id) { chapter = info.chapter; bag = info.bag }
-        if let bag { return game.tracks.filter { bag.contains($0.id) } }
+        if let bag { return game.tracks.filter { bag.contains($0.id) } + (bag.contains("dubplate") ? [Studio.cutInfo()] : []) }
         return game.tracks.filter { ($0.chapter ?? 1) <= chapter }
     }
 

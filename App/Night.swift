@@ -50,6 +50,9 @@ struct NightInfo {
     /// An afterhours: the tempo on air must end at or below this, and must not drop more than
     /// 2 BPM within 2 seconds (the room feels the brakes).
     var endBPM: Double? = nil
+    /// Your dubplate on a big system: a few seconds after it goes on air its bass booms, and its
+    /// low knob has to come down within eight seconds.
+    var mixdownCheck = false
 }
 
 /// What goes wrong in a night: the cable is kicked (the record stops), the needle jumps a groove,
@@ -192,7 +195,28 @@ enum Nights {
                                               "slow": [("after-slow", "It's six in the morning. Bring them down. Slowly.")]],
                                       bag: ["coro", "oito-oito", "manha", "fumo", "residente", "portao"],
                                       clockStart: 5 * 60, endBPM: 122)
-    static let all = [firstParty, garageParty, saturdayShift, emptyTuesday, thursdayShow, caveWarmUp, fridayCave, afterhours]
+    /// Chapter 8: your dubplate at CAVE, one in the morning. The room asks for it; on the big
+    /// system its bass booms until its low comes down.
+    static let dubplateNight = NightInfo(id: "dubplate-night", title: "DUBPLATE", length: 360, room: "cavepeak",
+                                         records: ["onda-media", "estatica"], chapter: 8, mixesFor3Stars: 2,
+                                         requests: [NightRequest(at: 0.2, record: "dubplate", voice: "dub-req", text: "Now. Play your record. It's in the crate.")],
+                                         lines: ["wait": [("dub-wait", "Saturday at CAVE. Your record's in the bag. Play something.")],
+                                                 "start": [("fri-start", "Here we go. Peak time.")],
+                                                 "clean": [("fri-clean-1", "Smooth. The whole cellar felt that."), ("fri-clean-2", "Nobody even blinked. Perfect.")],
+                                                 "rough": [("fri-rough", "Bumpy. Nine hundred people heard that.")],
+                                                 "dead": [("fri-dead", "Silence! At peak time! Play!")],
+                                                 "stale": [("fri-stale", "This one's done. Next.")],
+                                                 "slip": [("fri-slip", "It's drifting. Nudge it.")],
+                                                 "wreck": [("fri-wreck", "Ouch. Two kicks fighting.")],
+                                                 "clash": [("fri-clash", "Two basslines. Kill a low.")],
+                                                 "nuts": [("fri-nuts", "Look at them! The whole cellar's jumping!")],
+                                                 "requestDone": [("dub-req-done", "That's your record! They're dancing to your record!")],
+                                                 "boom": [("dub-boom", "Your bass is huge on this system. Bring its low down a bit.")],
+                                                 "boomOk": [("dub-boom-ok", "Better. Now it sounds like a club record.")],
+                                                 "boomNo": [("dub-boom-no", "It's booming. The sound guy is waving at you.")]],
+                                         bag: ["onda-media", "estatica", "dubplate", "sinal", "antena", "sem-lista"],
+                                         clockStart: 60, mixdownCheck: true)
+    static let all = [firstParty, garageParty, saturdayShift, emptyTuesday, thursdayShow, caveWarmUp, fridayCave, afterhours, dubplateNight]
     static func find(_ id: String) -> NightInfo? { all.first { $0.id == id } }
 }
 
@@ -224,6 +248,10 @@ final class NightRunner: ObservableObject {
     /// Afterhours: the tempo on air two seconds ago, and the last tempo heard.
     private var bpmAnchor: (time: Double, bpm: Double)?
     private var lastBPM = 0.0
+    /// Your dubplate: when it went on air, whether the boom was called, and by when to fix it.
+    private var plateOnAirAt: Double?
+    private var boomAsked = false
+    private var boomBy: Double?
 
     /// Listeners on the stream, from the energy (radio nights).
     var listeners: Int { Int((40 + energyShown * 1260).rounded()) }
@@ -335,7 +363,8 @@ final class NightRunner: ObservableObject {
     /// how well they sit together. `lead` is the louder deck. `stuck`: the room hears a record
     /// stuck in one groove.
     func update(dt: Double, state: MixReading.State, quality: Double, bassClash: Bool, lead: Int, onAirRecord: String?, channel: [Double],
-                jingles: Int, beat: Double, stuck: Bool = false, keyClash: Bool = false, onAirBPM: Double = 0) {
+                jingles: Int, beat: Double, stuck: Bool = false, keyClash: Bool = false, onAirBPM: Double = 0,
+                lowOnAir: Double = 0.5) {
         guard stars == nil else { return }
         // Requests and the cable come at their moment of the night, and cannot wait for silence.
         if began {
@@ -363,6 +392,26 @@ final class NightRunner: ObservableObject {
                 requestsMet += 1
                 energy = min(1, energy + 0.12)
                 say("requestDone", urgent: true)
+            }
+            // Your dubplate on a big system: the bass booms; its low knob must come down.
+            if info.mixdownCheck {
+                if onAirRecord == "dubplate" && plateOnAirAt == nil { plateOnAirAt = now }
+                if let at = plateOnAirAt, !boomAsked, now - at > 5, onAirRecord == "dubplate" {
+                    boomAsked = true
+                    boomBy = now + 8
+                    say("boom", urgent: true)
+                }
+                if let by = boomBy {
+                    if onAirRecord == "dubplate" && lowOnAir <= 0.35 {
+                        boomBy = nil
+                        energy = min(1, energy + 0.05)
+                        say("boomOk", urgent: true)
+                    } else if now > by {
+                        boomBy = nil
+                        energy = max(0, energy - 0.12)
+                        say("boomNo", urgent: true)
+                    }
+                }
             }
             if nextRemark < info.remarks.count && share >= info.remarks[nextRemark].at {
                 say(info.remarks[nextRemark].moment, urgent: true)

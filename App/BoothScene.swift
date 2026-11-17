@@ -166,7 +166,7 @@ final class BoothScene: SKScene {
 
     /// The studio's pattern was edited: the left deck plays the new version from where it is.
     func patternChanged() {
-        guard lesson?.lesson.desk.studio == true else { return }
+        guard lesson?.lesson.desk.studio == true, decks[0].info?.id != "dubplate" else { return }
         Studio.load(game.pattern, on: decks[0], keepPlace: true)
     }
 
@@ -960,7 +960,8 @@ final class BoothScene: SKScene {
                                  time: CACurrentMediaTime(),
                                  filter: filterSetting,
                                  pattern: game.pattern.rows,
-                                 page: game.studioPage))
+                                 page: game.studioPage,
+                                 cuts: game.cuts))
         let wanted: Float = lesson.speaking || game.jinglePlaying ? 0.5 : 1
         let now = game.engine.masterVolume
         if abs(wanted - now) > 0.002 {
@@ -1169,7 +1170,7 @@ final class BoothScene: SKScene {
                          onAirRecord: reading.state == .silence ? nil : decks[onAir].info?.id, channel: channel,
                          jingles: game.jingleCount, beat: decks[onAir].beat,
                          stuck: stuck.map { snapshots[$0.deck].audible } ?? false, keyClash: keyClash,
-                         onAirBPM: decks[onAir].bpm)
+                         onAirBPM: decks[onAir].bpm, lowOnAir: eq[onAir][0])
             // Things go wrong: somebody kicks the cable and the record on air stops.
             if night.takeMishap() {
                 switch nightInfo?.mishap ?? .cable {

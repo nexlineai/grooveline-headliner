@@ -32,6 +32,22 @@ public struct DrumPattern: Codable, Equatable, Sendable {
         (0..<16).map { $0 == 4 || $0 == 12 },
         (0..<16).map { $0 % 4 == 2 },
     ])
+
+    /// The house groove with the bass between the kicks and chord stabs before the clap.
+    public static let track = DrumPattern(rows: Array(house.rows.prefix(3)) + [
+        (0..<16).map { $0 % 4 == 2 },
+        (0..<16).map { $0 == 3 || $0 == 11 },
+    ])
+}
+
+/// A part of a record cut from the pattern: how many bars, and which rows play in it.
+public struct StudioSection: Sendable, Equatable {
+    public var name: String
+    public var bars: Int
+    public var rows: Set<Int>
+    public init(name: String, bars: Int, rows: Set<Int>) {
+        self.name = name; self.bars = bars; self.rows = rows
+    }
 }
 
 public enum DrumMachine {
@@ -129,10 +145,42 @@ public enum DrumMachine {
     /// past the end of the bar continues at its start) and repeated, so an edit costs almost
     /// nothing and the record loops without a seam.
     public static func render(_ pattern: DrumPattern, bpm: Double, bars: Int) -> (left: [Float], right: [Float]) {
+        render(pattern, bpm: bpm, sections: [StudioSection(name: "loop", bars: bars, rows: Set(0..<DrumPattern.voices.count))])
+    }
+
+    /// The dubplate: a whole record from one pattern, each section playing only some rows.
+    public static let arrangement = [
+        StudioSection(name: "intro", bars: 16, rows: [0, 2]),
+        StudioSection(name: "groove", bars: 16, rows: [0, 1, 2, 3]),
+        StudioSection(name: "full", bars: 16, rows: [0, 1, 2, 3, 4]),
+        StudioSection(name: "break", bars: 8, rows: [2, 4]),
+        StudioSection(name: "full", bars: 16, rows: [0, 1, 2, 3, 4]),
+        StudioSection(name: "outro", bars: 8, rows: [0, 2]),
+    ]
+
+    /// The pattern played section by section (each section is one bar rendered with only its
+    /// rows, repeated).
+    public static func render(_ pattern: DrumPattern, bpm: Double, sections: [StudioSection]) -> (left: [Float], right: [Float]) {
+        var left = [Float](), right = [Float]()
+        let total = sections.reduce(0) { $0 + max(0, $1.bars) } * barFrames(bpm: bpm)
+        left.reserveCapacity(total)
+        right.reserveCapacity(total)
+        for section in sections where section.bars > 0 {
+            let bar = renderBar(pattern, bpm: bpm, rows: section.rows)
+            for _ in 0..<section.bars {
+                left.append(contentsOf: bar.left)
+                right.append(contentsOf: bar.right)
+            }
+        }
+        return (left, right)
+    }
+
+    /// One bar of the rows asked for.
+    static func renderBar(_ pattern: DrumPattern, bpm: Double, rows: Set<Int>) -> (left: [Float], right: [Float]) {
         let frames = barFrames(bpm: bpm)
         var barL = [Float](repeating: 0, count: frames), barR = barL
         let levels: [(gain: Float, left: Float, right: Float)] = [(0.9, 1, 1), (0.5, 1, 0.92), (0.3, 0.85, 1), (0.7, 1, 1), (0.35, 0.9, 1)]
-        for v in 0..<min(pattern.rows.count, levels.count) {
+        for v in 0..<min(pattern.rows.count, levels.count) where rows.contains(v) {
             let hit = voice(v), level = levels[v]
             for s in 0..<DrumPattern.steps where s < pattern.rows[v].count && pattern.rows[v][s] {
                 let start = stepFrame(s, bpm: bpm)
@@ -148,14 +196,7 @@ public enum DrumMachine {
             barL[i] = Float(tanh(Double(barL[i])))
             barR[i] = Float(tanh(Double(barR[i])))
         }
-        var left = [Float](), right = [Float]()
-        left.reserveCapacity(frames * bars)
-        right.reserveCapacity(frames * bars)
-        for _ in 0..<max(1, bars) {
-            left.append(contentsOf: barL)
-            right.append(contentsOf: barR)
-        }
-        return (left, right)
+        return (barL, barR)
     }
 }
 

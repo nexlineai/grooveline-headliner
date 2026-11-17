@@ -78,6 +78,8 @@ enum LessonGoal: Equatable {
     case pattern(row: Int, steps: [Int])
     /// The step grid shows this page (0 drums, 1 synth).
     case studioPage(Int)
+    /// A dubplate is cut (CUT on the grid).
+    case dubplateCut
     /// The deck's motor is off.
     case stopDeck(Int)
     /// Nothing to do: the step ends with the coach's line.
@@ -130,6 +132,8 @@ struct LessonDesk {
     var studio = false
     /// The pattern a studio lesson starts from (nil: empty).
     var pattern: DrumPattern?
+    /// The grid has a CUT button (the loop becomes a whole record).
+    var cutter = false
 }
 
 struct Lesson {
@@ -144,7 +148,29 @@ struct Lesson {
 enum Lessons {
     static func find(_ id: String) -> Lesson? { all.first { $0.id == id } }
 
-    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars, requests, syncOff, byEar, holdIt, longBlend, onAir, warmUp, keys, filterMix, tempo, drums, synth]
+    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars, requests, syncOff, byEar, holdIt, longBlend, onAir, warmUp, keys, filterMix, tempo, drums, synth, dubplate]
+
+    /// Lesson 17, chapter 8: CUT turns the loop into a whole record (intro, groove, full, break,
+    /// full, outro), kept with the progress and put in the crate.
+    static let dubplate = Lesson(id: "dubplate", number: 17, title: "DUBPLATE", coach: "LIA",
+                                 desk: LessonDesk(crossfader: 0.5, channel: [0.85, 0], sync: [false, false], room: "bedroom",
+                                                  chapter: 8, studio: true, pattern: .track, cutter: true), steps: [
+        LessonStep(voice: "plate-01",
+                   text: "This is your loop. One bar, over and over. A record needs more than that: an intro, a build, a break. Press play.",
+                   task: "PRESS PLAY ON THE LEFT DECK", goal: .startDeck(0), target: .play(0)),
+        LessonStep(voice: "plate-02",
+                   text: "On the left of the grid there's a CUT button. It cuts your loop onto a dubplate: a whole record. Tap it.",
+                   task: "TAP CUT (LEFT OF THE GRID)", goal: .dubplateCut, target: nil),
+        LessonStep(voice: "plate-03",
+                   text: "Cut. Play it from the top.",
+                   task: "PRESS PLAY ON THE LEFT DECK", goal: .startDeck(0), target: .play(0)),
+        LessonStep(voice: "plate-04",
+                   text: "Listen. Only kick and hats in the intro. Then the clap and the bass. Then everything, a break with the chords, and back. That's an arrangement.",
+                   task: "LISTEN: YOUR RECORD", goal: .listen, target: nil),
+        LessonStep(voice: "plate-05",
+                   text: "It's in your crate now. One copy, nobody else has it. Saturday, we play it at CAVE.",
+                   task: "DUBPLATE", goal: .listen, target: nil),
+    ])
 
     /// Lesson 16, chapter 8: bass and chords on the SYNTH page, over the house drums. The bass
     /// goes where the kick is not; one on the kick shows why; chord stabs just before the clap.
@@ -724,6 +750,8 @@ struct BoothFacts {
     /// The studio's pattern, per row the steps that are on; the grid's page.
     var pattern: [[Bool]]
     var page: Int
+    /// Dubplates cut so far.
+    var cuts: Int
 }
 
 /// Walks through a lesson. The booth scene feeds it `BoothFacts` every frame; the overlay shows
@@ -769,6 +797,8 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private var rideAnchor: (beat: Double, bpm: Double)?
     private var rideMisses = 0
     private var rode = false
+    /// For `dubplateCut`: cuts counted when the step began.
+    private var cutsSeen: Int?
     private var wasOn = [false, false]
     private var armed = false
     private var fresh = true
@@ -809,6 +839,7 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
         postRearm = false
         recordsSeen = nil
         rideAnchor = nil
+        cutsSeen = nil
         let step = lesson.steps[i]
         show(text: step.text, task: step.task, target: step.target)
         say(step.voice)
@@ -1045,6 +1076,10 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
                 if range.contains(facts.filter[d]) { met() }
             case .studioPage(let p):
                 if facts.page == p { met() }
+            case .dubplateCut:
+                let seen = cutsSeen ?? facts.cuts
+                cutsSeen = seen
+                if facts.cuts > seen { met() }
             case .pattern(let row, let steps):
                 if facts.pattern.indices.contains(row) {
                     let on = facts.pattern[row].indices.filter { facts.pattern[row][$0] }

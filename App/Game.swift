@@ -43,6 +43,15 @@ final class Game: ObservableObject {
     @Published var pattern = DrumPattern()
     /// Which page of the step grid shows: 0 drums, 1 synth.
     @Published var studioPage = 0
+    /// Dubplates cut so far in this session (a lesson counts new ones).
+    @Published private(set) var cuts = 0
+
+    /// The studio cut a dubplate: its pattern is kept with the progress.
+    func cut(_ pattern: DrumPattern) {
+        progress.track = pattern
+        progress.save()
+        cuts += 1
+    }
     /// Headphones: 0 off (the room on both sides), 1 split (room left, headphones right),
     /// 2 a four-output sound card (room on 1-2, headphones on 3-4).
     @Published var phonesMode: Int {
