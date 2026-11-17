@@ -95,8 +95,8 @@ Design, story, decisions and the build log are in the vault:
   `tracks.json`); `--all` re-renders every one, including the approved ones, so name the ids.
   Each record can choose its own sounds (`kit`: kicks deep/punch, metal hats, shaker, snare,
   rim, congas, cowbell, piano, organ, Rhodes, pluck, acid/sub/reese/organ bass, vox chops), its
-  own drum patterns (`drums`), sections and mix. Chapter 2's six (`chapter: 2` in tracks.json)
-  use them; keep new records sounding different from the ones before (Zé, 17 Nov). Appending
+  own drum patterns (`drums`), sections and mix. Chapter 2's six and chapter 3's six (strings,
+  brass, clav, disco bass, square/reed lead, tambourine; major keys) use them; keep new records sounding different from the ones before (Zé, 17 Nov). Appending
   only: lessons use tracks[0] and tracks[1] (122 / 124 BPM).
   Every track starts on a kick at sample 0; the app finds it at load and starts the grid there.
 - `tools/art/imagine.py OUT.jpg "prompt" [--aspect 16:9]`: illustrations in the house style.
