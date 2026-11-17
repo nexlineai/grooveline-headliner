@@ -436,7 +436,9 @@ struct NightOverlay: View {
                 result(stars)
             } else {
                 VStack(spacing: 0) {
-                    meter
+                    // Top left, after the back button: the top right holds up to three buttons.
+                    HStack { meter; Spacer(minLength: 0) }
+                        .padding(.leading, 48)
                     Spacer(minLength: 4)
                     if !runner.comment.isEmpty { words }
                 }
@@ -466,7 +468,7 @@ struct NightOverlay: View {
                 .font(.system(size: 10, weight: .heavy))
                 .tracking(2)
                 .foregroundStyle(tint)
-                .frame(width: 86, alignment: .leading)
+                .fixedSize()
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 7)
