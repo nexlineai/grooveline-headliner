@@ -191,5 +191,14 @@
         {"who": "", "text": "END OF CHAPTER 8"}
       ] }
     ]
+  },
+  {
+    "id": "joli",
+    "shots": [
+      { "art": "scene-joli", "lines": [
+        {"who": "JOLI", "clip": "joli-01", "text": "So you're the kid from Lisbon. Helena says you can play anything, on anything. My booth is tired. Show me."},
+        {"who": "TÓ", "voice": "vo-joli-to", "text": "Tired. The left fader is dead, and one of the turntables has had a long night."}
+      ] }
+    ]
   }
 ]

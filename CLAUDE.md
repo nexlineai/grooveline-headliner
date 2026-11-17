@@ -109,6 +109,10 @@ Design, story, decisions and the build log are in the vault:
   dBFS RMS, what our records' full sections measure), so the dubplate and the loop sit level with
   the crate. On `mixdownCheck` nights the dubplate is cut with kick and bass +6 dB (`heavyLows`),
   so the "boom" is real and turning its low down really fixes it.
+- **Strange booths (chapter 9):** `LessonDesk.deadFader` / `NightInfo.deadFader` = a channel fader
+  stuck where the desk sets it (drawn dim, ignores the finger). Mishap `.pitchWander`: the on-air
+  deck's belt slips, its pitch drifts (about ±0.5 %, slow) around its fader for the rest of the
+  night unless SYNC holds it.
 - **Keys (`HeadlinerCore/Harmony.swift`):** Camelot neighbours (same, ±1 with 12/1 wrapping, or
   same number other letter). The decks have NO key lock: the pitch fader and SYNC move the key
   too, so `clash` also counts records pitched more than 0.3 semitone apart (128 -> 130 is 0.27,

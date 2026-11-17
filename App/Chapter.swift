@@ -27,7 +27,19 @@ enum Chapters {
     /// played straight away; on for the release.
     static let locked = false
 
-    static let all: [Chapter] = [bedroom, houseParties, shop, pubs, radio, door, resident, studio]
+    static let all: [Chapter] = [bedroom, houseParties, shop, pubs, radio, door, resident, studio, road]
+
+    /// Chapter 9: on the road. Other people's booths, other cities; Berlin first.
+    static let road = Chapter(number: 9, title: "ON THE ROAD",
+                              line: "Berlin, Amsterdam, Ibiza, Detroit: strange booths, other people's records, and too many airports.",
+                              steps: [
+        ChapterStep(id: "joli", kind: .story, title: "JOLI", detail: "My booth is tired. Show me.",
+                    screens: [.story("joli")]),
+        ChapterStep(id: "borrowed-booth", kind: .lesson, title: "BORROWED BOOTH", detail: "The left fader is dead. Mix with the crossfader.",
+                    screens: [.lesson("borrowed-booth")]),
+        ChapterStep(id: Nights.berlinNight.id, kind: .night, title: Nights.berlinNight.title, detail: "Vinyl, a dead fader, a belt that slips.",
+                    screens: [.night(Nights.berlinNight.id)]),
+    ])
 
     /// Chapter 8: the studio. A drum machine first; bass and chords, the arrangement and your own
     /// record in the crate follow.

@@ -134,6 +134,8 @@ struct LessonDesk {
     var pattern: DrumPattern?
     /// The grid has a CUT button (the loop becomes a whole record).
     var cutter = false
+    /// A channel fader that is broken in this booth (stuck where the desk sets it).
+    var deadFader: Int?
 }
 
 struct Lesson {
@@ -148,7 +150,41 @@ struct Lesson {
 enum Lessons {
     static func find(_ id: String) -> Lesson? { all.first { $0.id == id } }
 
-    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars, requests, syncOff, byEar, holdIt, longBlend, onAir, warmUp, keys, filterMix, tempo, drums, synth, dubplate]
+    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars, requests, syncOff, byEar, holdIt, longBlend, onAir, warmUp, keys, filterMix, tempo, drums, synth, dubplate, borrowedBooth]
+
+    /// Lesson 18, chapter 9, Joli's booth in Berlin: the left channel fader is dead (stuck at
+    /// full), so the mix is done with the crossfader and the EQ.
+    static let borrowedBooth = Lesson(id: "borrowed-booth", number: 18, title: "BORROWED BOOTH", coach: "TÓ",
+                                      desk: LessonDesk(crossfader: 0, channel: [0.85, 0.85], sync: [false, false], room: "berlin",
+                                                       syncAllowed: false, records: ["berlim", "cave"], chapter: 9, deadFader: 0), steps: [
+        LessonStep(voice: "booth-01",
+                   text: "Berlin. Joli's booth. The left channel fader is dead, stuck at full. So tonight you mix with the crossfader. Start the left one.",
+                   task: "PRESS PLAY ON THE LEFT DECK", goal: .startDeck(0), target: .play(0)),
+        LessonStep(voice: "booth-02",
+                   text: "The crossfader is all the way left, so nobody hears the right deck. Start it on the one.",
+                   task: "PRESS PLAY ON THE RIGHT DECK, ON THE ONE", goal: .startOnTheOne(deck: 1, against: 0), target: .play(1),
+                   missVoice: "first-mix-03-miss",
+                   missText: "Nope. That was not the one. Press cue on the right deck, wait for the first lamp, and go again.",
+                   missTask: "PRESS CUE ON THE RIGHT DECK, THEN TRY AGAIN", missTarget: .cue(1)),
+        LessonStep(voice: "booth-03",
+                   text: "It's slower. Bring the right pitch fader down until both say 130.",
+                   task: "RIGHT PITCH FADER DOWN UNTIL BOTH SAY 130.0", goal: .tempoMatched(tolerance: 0.3), target: .pitch(1)),
+        LessonStep(voice: "booth-04",
+                   text: "Lock the kicks with the rim.",
+                   task: "NUDGE THE RIGHT RECORD UNTIL THE KICKS ARE ONE", goal: .phaseHeld(bars: 4), target: .record(1)),
+        LessonStep(voice: "booth-05",
+                   text: "Now the crossfader to the middle. Slowly.",
+                   task: "CROSSFADER TO THE MIDDLE", goal: .crossfader(0.42...0.58), target: .crossfader),
+        LessonStep(voice: "booth-06",
+                   text: "Two basslines. Take the left low down, on the phrase.",
+                   task: "AT THE NEXT PHRASE: LEFT LOW DOWN", goal: .bassSwap(from: 0, to: 1), target: .eq(0, 0)),
+        LessonStep(voice: "booth-07",
+                   text: "Crossfader all the way right.",
+                   task: "CROSSFADER ALL THE WAY RIGHT", goal: .crossfader(0.96...1), target: .crossfader),
+        LessonStep(voice: "booth-08",
+                   text: "Every booth is broken somewhere. The good ones mix anyway.",
+                   task: "BORROWED BOOTH", goal: .listen, target: nil),
+    ])
 
     /// Lesson 17, chapter 8: CUT turns the loop into a whole record (intro, groove, full, break,
     /// full, outro), kept with the progress and put in the crate.

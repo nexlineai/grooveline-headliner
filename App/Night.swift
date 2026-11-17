@@ -53,12 +53,14 @@ struct NightInfo {
     /// Your dubplate on a big system: a few seconds after it goes on air its bass booms, and its
     /// low knob has to come down within eight seconds.
     var mixdownCheck = false
+    /// A channel fader that is broken in this booth (stuck where the night starts it).
+    var deadFader: Int? = nil
 }
 
 /// What goes wrong in a night: the cable is kicked (the record stops), the needle jumps a groove,
 /// the stream drops, a scratched record sticks in one groove until the needle is moved on, or the
 /// power goes (both decks stop; a few seconds of silence are nobody's fault).
-enum Mishap { case cable, needleSkip, streamDrop, stuckGroove, powerCut }
+enum Mishap { case cable, needleSkip, streamDrop, stuckGroove, powerCut, pitchWander }
 
 /// Who the night is for: a room of people, or listeners on the stream.
 enum Audience { case room, listeners }
@@ -216,7 +218,27 @@ enum Nights {
                                                  "boomNo": [("dub-boom-no", "It's booming. The sound guy is waving at you.")]],
                                          bag: ["onda-media", "estatica", "your-dubplate", "sinal", "antena", "sem-lista"],
                                          clockStart: 60, mixdownCheck: true)
-    static let all = [firstParty, garageParty, saturdayShift, emptyTuesday, thursdayShow, caveWarmUp, fridayCave, afterhours, dubplateNight]
+    /// Chapter 9: Joli's club in Berlin, three in the morning. Vinyl, the left fader is dead, and
+    /// a turntable's belt starts slipping: its pitch wanders for the rest of the night.
+    static let berlinNight = NightInfo(id: "berlin-night", title: "BERLIN", length: 360, room: "berlin",
+                                       records: ["berlim", "cave"], chapter: 9, mixesFor3Stars: 2,
+                                       mishapAt: 0.35, mishap: .pitchWander, syncAllowed: false,
+                                       remarks: [(at: 0.6, moment: "joli")],
+                                       lines: ["wait": [("ber-wait", "Berlin, three in the morning. Two hundred people in the dark. Play something.")],
+                                               "start": [("cave-start", "Here we go. Easy does it.")],
+                                               "clean": [("ber-clean-1", "Smooth. Berlin approves."), ("ber-clean-2", "Nobody heard the join. Joli's nodding.")],
+                                               "rough": [("ber-rough", "Bumpy. They heard that.")],
+                                               "dead": [("ber-dead", "Silence! In Berlin! Play!")],
+                                               "stale": [("fri-stale", "This one's done. Next.")],
+                                               "slip": [("ber-slip", "It's drifting again. Ride the pitch.")],
+                                               "wreck": [("fri-wreck", "Ouch. Two kicks fighting.")],
+                                               "clash": [("fri-clash", "Two basslines. Kill a low.")],
+                                               "nuts": [("ber-nuts", "Berlin's going off!")],
+                                               "cable": [("ber-wander", "This turntable's belt is slipping. It'll wander all night. Ride the pitch.")],
+                                               "joli": [("ber-joli", "Joli's dancing. Joli never dances.")]],
+                                       bag: ["berlim", "cave", "luz-vermelha", "seguranca", "canal", "oito-milhas", "residente", "porta"],
+                                       clockStart: 3 * 60, deadFader: 0)
+    static let all = [firstParty, garageParty, saturdayShift, emptyTuesday, thursdayShow, caveWarmUp, fridayCave, afterhours, dubplateNight, berlinNight]
     static func find(_ id: String) -> NightInfo? { all.first { $0.id == id } }
 }
 

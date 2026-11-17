@@ -37,6 +37,10 @@ final class BoothScene: SKScene {
     var nightInfo: NightInfo?
     /// A record stuck in one groove (a night's mishap): the deck, and where the groove starts (s).
     private var stuck: (deck: Int, from: Double)?
+    /// A turntable whose belt slips (a night's mishap): its pitch wanders from then on.
+    private var wander: (deck: Int, since: Double)?
+    /// A channel fader that is broken in this booth (stuck where it is).
+    private var deadFader: Int?
     private var pointer: SKShapeNode?
     private var pointedAt: LessonTarget?
     private var lessonReady = false
@@ -144,7 +148,8 @@ final class BoothScene: SKScene {
         } else if let info = nightInfo {
             // A night starts like a gig: the first record ready, the second one's fader down.
             setTheDesk(LessonDesk(crossfader: 0.5, channel: [0.85, 0], sync: info.syncAllowed ? [false, true] : [false, false],
-                                  room: info.room, syncAllowed: info.syncAllowed, records: info.records, crate: true, chapter: info.chapter))
+                                  room: info.room, syncAllowed: info.syncAllowed, records: info.records, crate: true, chapter: info.chapter,
+                                  deadFader: info.deadFader))
         }
         applyMix()
     }
@@ -188,6 +193,8 @@ final class BoothScene: SKScene {
         eq = [[0.5, 0.5, 0.5], [0.5, 0.5, 0.5]]
         filterSetting = [0.5, 0.5]
         hasFilter = desk.chapter >= 7
+        deadFader = desk.deadFader
+        wander = nil
         sync = desk.sync
         room = desk.room
         syncAllowed = desk.syncAllowed
@@ -574,6 +581,7 @@ final class BoothScene: SKScene {
             fader.zPosition = 4
             addChild(fader)
             channelNode.append(fader)
+            if d == deadFader { fader.alpha = 0.4 } // broken in this booth
             hits.insert((Kind.channel(d), centred(fx, fader.position.y, 40 * u, channelTravel + 28 * u)), at: 0)
 
             // Headphone cue, under the channel fader.
@@ -817,6 +825,7 @@ final class BoothScene: SKScene {
                 if sync[d] { sync[d] = false; decks[d].bend = 0 } // touching the pitch takes over from sync
                 decks[d].pitch = (0.5 - v) * 2 * Self.pitchRange
             case .channel(let d):
+                if d == deadFader { break } // a broken fader: stuck where it is
                 channel[d] = min(1, max(0, grab.startValue + Double((p.y - grab.start.y) / channelTravel)))
                 channelNode[d].value = channel[d]
                 applyMix()
@@ -1160,6 +1169,12 @@ final class BoothScene: SKScene {
                     deck.seek(to: s.from)
                 }
             }
+            // A slipping belt: the deck's speed drifts slowly around where its pitch fader says.
+            if let w = wander, !sync[w.deck] {
+                let t = CACurrentMediaTime() - w.since
+                let drift = 0.0035 * sin(t * 2 * .pi / 23) + 0.002 * sin(t * 2 * .pi / 7.3)
+                decks[w.deck].pitch = (0.5 - pitchFader[w.deck]) * 2 * Self.pitchRange + drift
+            }
             // Two records heard together in keys that fight (or pitched apart: no key lock).
             var keyClash = false
             if nightInfo?.judgeKeys == true, reading.state == .blend,
@@ -1183,6 +1198,8 @@ final class BoothScene: SKScene {
                 case .powerCut:
                     // Everything stops; the power is back a moment later and the room waits.
                     for deck in decks { deck.motorOn = false }
+                case .pitchWander:
+                    wander = (onAir, CACurrentMediaTime())
                 default:
                     decks[onAir].motorOn = false
                 }
