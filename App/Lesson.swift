@@ -1,6 +1,7 @@
 import AVFoundation
 import SwiftUI
 import UIKit
+import HeadlinerCore
 
 // A lesson is a short list of steps played in the booth. In every step the coach says a line
 // (a voice over the room, the eyes stay on the decks), the screen names one thing to do and
