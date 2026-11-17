@@ -39,6 +39,10 @@ enum Chapters {
                     screens: [.lesson("b2b")]),
         ChapterStep(id: Nights.boatParty.id, kind: .night, title: Nights.boatParty.title, detail: "Sunset on the river. You answer her, she answers you.",
                     screens: [.story("boat-party"), .night(Nights.boatParty.id)]),
+        ChapterStep(id: "vex-poster", kind: .story, title: "VEX", detail: "His name on top. Yours underneath.",
+                    screens: [.story("vex-poster")]),
+        ChapterStep(id: Nights.vexB2B.id, kind: .night, title: Nights.vexB2B.title, detail: "His set, his timing. Keep the room. Keep your cool.",
+                    screens: [.night(Nights.vexB2B.id), .story("chapter-11-end")]),
     ])
 
     /// Chapter 10: festivals. Carla, a big stage whose far speakers come back late, the sunset slot.

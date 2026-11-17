@@ -275,5 +275,24 @@
         {"who": "", "text": "ONE BOOTH, TWO DECKS. THE LEFT ONE IS HELENA'S."}
       ] }
     ]
+  },
+  {
+    "id": "vex-poster",
+    "shots": [
+      { "art": "scene-vex-b2b", "lines": [
+        {"who": "VEX", "clip": "vex-b2b-01", "text": "Back to back, superstar. My laptop, your little records. Try to keep up."},
+        {"who": "TÓ", "voice": "vo-vex-b2b-to", "text": "His name on top of the poster, yours underneath. Smaller. Just play your records."}
+      ] }
+    ]
+  },
+  {
+    "id": "chapter-11-end",
+    "shots": [
+      { "lines": [
+        {"who": "", "text": "06:30. HIS LAPTOP IS STILL ON THE MIXER. BLACK."},
+        {"who": "", "text": "DANI, AT THE BAR, NO SUNGLASSES: \"TEACH ME. THE RECORDS, I MEAN.\""},
+        {"who": "", "text": "END OF CHAPTER 11"}
+      ] }
+    ]
   }
 ]

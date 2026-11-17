@@ -44,6 +44,10 @@ final class BoothScene: SKScene {
         case rising(from: Double)
         /// Up: her low comes back in over two beats from this beat of hers; take yours out.
         case bassing(from: Double)
+        /// VEX: he pulls your fader down over one beat from this beat of his, from this level.
+        case stealing(from: Double, level: Double)
+        /// VEX: your fader is his until then; pushing it back up is a fight (counted once).
+        case holding(until: Double, fought: Bool)
     }
 
     /// Radians per second of a record at 33⅓ rpm.
@@ -77,6 +81,10 @@ final class BoothScene: SKScene {
     private var partnerAnswers = 0
     /// When she may next move her needle to put a small slip right (her fader is down then).
     private var partnerTrimAt = 0.0
+    /// How the other DJ plays; VEX's grabs at your fader, and the times you fought him for it.
+    private var partnerStyle = PartnerStyle.helena
+    private var partnerSteals = 0
+    private var partnerFights = 0
     private var pointer: SKShapeNode?
     private var pointedAt: LessonTarget?
     private var lessonReady = false
@@ -188,7 +196,8 @@ final class BoothScene: SKScene {
             // A night starts like a gig: the first record ready, the second one's fader down.
             setTheDesk(LessonDesk(crossfader: 0.5, channel: [0.85, 0], sync: info.syncAllowed ? [false, true] : [false, false],
                                   room: info.room, syncAllowed: info.syncAllowed, records: info.records, crate: true, chapter: info.chapter,
-                                  deadFader: info.deadFader, echo: info.echo, partner: info.partner, partnerBag: info.partnerBag))
+                                  deadFader: info.deadFader, echo: info.echo, partner: info.partner, partnerBag: info.partnerBag,
+                                  partnerStyle: info.partnerStyle))
         }
         applyMix()
     }
@@ -263,6 +272,9 @@ final class BoothScene: SKScene {
         partnerMove = .on(armed: true)
         stepOns = 0
         partnerBag = desk.partnerBag
+        partnerStyle = desk.partnerStyle
+        partnerSteals = 0
+        partnerFights = 0
         partnerAnswers = 0
         partnerPlayed = []
         if let h = desk.partner, decks[h].isLoaded {
@@ -1174,7 +1186,9 @@ final class BoothScene: SKScene {
             if !armed {
                 if channel[you] <= 0.04 { partnerMove = .on(armed: true) }
             } else if her.rate > 0.5 && decks[you].rate > 0.5 && channel[you] >= 0.8 {
-                partnerMove = .waiting(phrase: (beat / Lessons.phrase).rounded(.down))
+                // Helena waits for her phrase and swaps the bass; VEX just pulls his fader.
+                partnerMove = partnerStyle == .vex ? .fading(from: beat, level: channel[h])
+                                                   : .waiting(phrase: (beat / Lessons.phrase).rounded(.down))
             }
         case .waiting(let phrase):
             if (beat / Lessons.phrase).rounded(.down) > phrase { partnerMove = .cutting(from: beat) }
@@ -1184,7 +1198,7 @@ final class BoothScene: SKScene {
         case .swapped(let since):
             if eq[you][0] >= 0.45 || beat - since >= 8 { partnerMove = .fading(from: beat, level: channel[h]) }
         case .fading(let from, let level):
-            let t = min(1, max(0, (beat - from) / 16))
+            let t = min(1, max(0, (beat - from) / (partnerStyle == .vex ? 4 : 16)))
             setPartnerFader(level * (1 - t), on: h)
             if t >= 1 {
                 her.motorOn = false
@@ -1195,11 +1209,11 @@ final class BoothScene: SKScene {
             // Your record has to be on air by itself for a while before she answers it.
             if !(decks[you].rate > 0.5 && channel[you] >= 0.5) {
                 partnerMove = .out(since: time)
-            } else if time - since >= 35, let track = partnerPick() {
+            } else if time - since >= (partnerStyle == .vex ? 20 : 35), let track = partnerPick() {
                 game.load(track, on: her)
                 partnerPlayed.insert(track.id)
                 recordChanged(on: h)
-                setPartnerLow(0, on: h)
+                setPartnerLow(partnerStyle == .vex ? 0.5 : 0, on: h)
                 setPartnerFader(0, on: h)
                 sync[h] = false
                 partnerMatchTempo(h)
@@ -1207,7 +1221,9 @@ final class BoothScene: SKScene {
                 // platter takes to come up to speed.
                 var into = yours.truncatingRemainder(dividingBy: Lessons.phrase)
                 if into < 0 { into += Lessons.phrase }
-                her.seek(to: her.grid.seconds(atBeat: Lessons.phrase + into + 0.05 * her.bpm / 60))
+                // (VEX lands on your beat but half a phrase off: his set, his timing.)
+                let off = partnerStyle == .vex ? 16.0 : 0
+                her.seek(to: her.grid.seconds(atBeat: Lessons.phrase + into + off + 0.05 * her.bpm / 60))
                 her.motorOn = true
                 partnerTrimAt = time + 0.3
                 partnerAnswers += 1
@@ -1222,16 +1238,43 @@ final class BoothScene: SKScene {
                 her.seek(to: her.grid.seconds(atBeat: beat + slip))
                 partnerTrimAt = time + 0.3
             }
-            if (yours / Lessons.phrase).rounded(.down) > phrase { partnerMove = .rising(from: yours) }
+            // Helena comes in at your next phrase; VEX as soon as his record is up to speed.
+            let go: Bool
+            if partnerStyle == .vex {
+                go = her.rate > 0.9 && time >= partnerTrimAt
+            } else {
+                go = (yours / Lessons.phrase).rounded(.down) > phrase
+            }
+            if go { partnerMove = .rising(from: yours) }
         case .rising(let from):
             partnerMatchTempo(h)
-            let t = min(1, max(0, (yours - from) / Lessons.phrase))
+            // Helena over a phrase; VEX slams it up in a bar, bass and all, then grabs your fader.
+            let t = min(1, max(0, (yours - from) / (partnerStyle == .vex ? 4 : Lessons.phrase)))
             setPartnerFader(0.85 * t, on: h)
-            if t >= 1 { partnerMove = .bassing(from: beat) }
+            if t >= 1 {
+                if partnerStyle == .vex {
+                    partnerSteals += 1
+                    partnerMove = .stealing(from: beat, level: channel[you])
+                } else {
+                    partnerMove = .bassing(from: beat)
+                }
+            }
         case .bassing(let from):
             partnerMatchTempo(h)
             setPartnerLow(0.5 * min(1, max(0, (beat - from) / 2)), on: h)
             if beat - from >= 2 { partnerMove = .on(armed: false) }
+        case .stealing(let from, let level):
+            partnerMatchTempo(h)
+            setPartnerFader(level * (1 - min(1, max(0, beat - from))), on: you)
+            if beat - from >= 1 { partnerMove = .holding(until: time + 8, fought: false) }
+        case .holding(let until, let fought):
+            if !fought && channel[you] > 0.5 {
+                partnerFights += 1
+                partnerMove = .holding(until: until, fought: true)
+            } else if time >= until {
+                // After a fight your record is still up: he only hands over once it has been down.
+                partnerMove = .on(armed: !fought)
+            }
         }
     }
 
@@ -1250,6 +1293,10 @@ final class BoothScene: SKScene {
     /// to your tempo (no key lock: her pitch fader moves its key too); failing that, any that fits.
     private func partnerPick() -> TrackInfo? {
         guard let h = partnerDeck else { return nil }
+        if partnerStyle == .vex {
+            // His set was planned weeks ago: the next record on his list, whatever you play.
+            return partnerBag.first { !partnerPlayed.contains($0) }.flatMap { id in game.tracks.first { $0.id == id } }
+        }
         let yours = decks[1 - h].info
         let tempo = decks[1 - h].bpm
         let open = partnerBag.filter { !partnerPlayed.contains($0) && $0 != yours?.id }
@@ -1394,7 +1441,7 @@ final class BoothScene: SKScene {
                          jingles: game.jingleCount, beat: decks[onAir].beat,
                          stuck: stuck.map { snapshots[$0.deck].audible } ?? false, keyClash: keyClash,
                          onAirBPM: decks[onAir].bpm, lowOnAir: eq[onAir][0],
-                         stepOns: stepOns, partnerAnswers: partnerAnswers)
+                         stepOns: stepOns, partnerAnswers: partnerAnswers, partnerSteals: partnerSteals, partnerFights: partnerFights)
             // Things go wrong: somebody kicks the cable and the record on air stops.
             if night.takeMishap() {
                 switch nightInfo?.mishap ?? .cable {
@@ -1409,6 +1456,14 @@ final class BoothScene: SKScene {
                     for deck in decks { deck.motorOn = false }
                 case .pitchWander:
                     wander = (onAir, CACurrentMediaTime())
+                case .rainRush:
+                    break // the rain only fills the tent (the night lifts the energy); the music plays on
+                case .partnerCrash:
+                    // His laptop dies: his deck stops and he leaves the booth; both decks are yours now.
+                    if let h = partnerDeck {
+                        decks[h].motorOn = false
+                        partnerDeck = nil
+                    }
                 default:
                     decks[onAir].motorOn = false
                 }

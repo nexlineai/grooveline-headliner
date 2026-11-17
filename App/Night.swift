@@ -68,12 +68,18 @@ struct NightInfo {
     /// and her records for answering yours. A hand on her deck costs energy and the third star.
     var partner: Int? = nil
     var partnerBag: [String] = []
+    var partnerStyle = PartnerStyle.helena
 }
 
 /// What goes wrong in a night: the cable is kicked (the record stops), the needle jumps a groove,
 /// the stream drops, a scratched record sticks in one groove until the needle is moved on, or the
 /// power goes (both decks stop; a few seconds of silence are nobody's fault).
-enum Mishap { case cable, needleSkip, streamDrop, stuckGroove, powerCut, pitchWander, rainRush }
+enum Mishap { case cable, needleSkip, streamDrop, stuckGroove, powerCut, pitchWander, rainRush, partnerCrash }
+
+/// How the DJ on the other deck plays (back to back). Helena: on the phrase, in key, never
+/// touches your deck. VEX: his planned set in its own order, in whenever he likes, and he pulls
+/// your fader down when he is in.
+enum PartnerStyle { case helena, vex }
 
 /// Who the night is for: a room of people, or listeners on the stream.
 enum Audience { case room, listeners, field }
@@ -386,7 +392,33 @@ enum Nights {
                                      bag: ["tambor", "garage-door", "terraco", "chuva", "primeira-demo", "dubplate", "saturday-job", "tabla"],
                                      clockStart: 19 * 60 + 30, judgeKeys: true,
                                      partner: 0, partnerBag: ["barco", "fita-gasta", "telhado", "neon-pluck", "manha", "regresso"])
-    static let all = [firstParty, garageParty, saturdayShift, emptyTuesday, thursdayShow, caveWarmUp, fridayCave, afterhours, dubplateNight, berlinNight, ibizaNight, burnout, sunsetSlot, threePM, tentRain, forestStage, boatParty]
+    /// Chapter 11's last night: VEX B2B at CAVE. Dani has the left deck and his planned set: his
+    /// records in their own order (out of your key), in whenever he likes, half a phrase off, and
+    /// he pulls your fader down when he is in. Pushing it back up is a fight the room sees (no
+    /// third star). At 60 % his laptop dies, he walks off, and both decks are yours.
+    static let vexB2B = NightInfo(id: "vex-b2b", title: "VEX B2B", length: 360, room: "cavepeak",
+                                  records: ["palco-principal", "tabla"], chapter: 11, mixesFor3Stars: 3,
+                                  mishapAt: 0.6, mishap: .partnerCrash,
+                                  lines: ["start": [("vex-start", "Your name's on the poster, under his. Whatever he does, keep the room.")],
+                                          "answer": [("vex-answer", "Here he comes.")],
+                                          "stolen": [("vex-stolen", "He pulled your fader down! Don't fight him. Not in front of them.")],
+                                          "fight": [("vex-fight", "Two DJs fighting over a fader. The whole room saw that.")],
+                                          "hands": [("vex-hands", "Leave his deck alone. Don't sink to his level.")],
+                                          "cable": [("vex-crash", "His laptop just died! He's walking off. It's all yours. Play!")],
+                                          "clean": [("vex-clean", "That's how it's done. Show him."), ("fri-clean-2", "Nobody even blinked. Perfect.")],
+                                          "rough": [("fri-rough", "Bumpy. Nine hundred people heard that.")],
+                                          "dead": [("fri-dead", "Silence! At peak time! Play!")],
+                                          "stale": [("fri-stale", "This one's done. Next.")],
+                                          "slip": [("fri-slip", "It's drifting. Nudge it.")],
+                                          "wreck": [("fri-wreck", "Ouch. Two kicks fighting.")],
+                                          "clash": [("fri-clash", "Two basslines. Kill a low.")],
+                                          "keys": [("vex-keys", "Sour! His set doesn't care about your key. Keep it short, cut on the phrase.")],
+                                          "nuts": [("vex-nuts", "Listen to them! They're chanting your name, not his!")]],
+                                  bag: ["tabla", "low-tide", "sala-de-mistura", "acordeao", "onda-media", "mexe", "vibrafone", "cravo"],
+                                  clockStart: 2 * 60, judgeKeys: true,
+                                  partner: 0, partnerBag: ["palco-principal", "coro", "residente", "oito-milhas", "encore", "portao"],
+                                  partnerStyle: .vex)
+    static let all = [firstParty, garageParty, saturdayShift, emptyTuesday, thursdayShow, caveWarmUp, fridayCave, afterhours, dubplateNight, berlinNight, ibizaNight, burnout, sunsetSlot, threePM, tentRain, forestStage, boatParty, vexB2B]
     static func find(_ id: String) -> NightInfo? { all.first { $0.id == id } }
 }
 
@@ -427,6 +459,8 @@ final class NightRunner: ObservableObject {
     /// Back to back: hands put on her deck, and her answers, seen so far.
     private var stepOnsSeen = 0
     private var answersSeen = 0
+    private var stealsSeen = 0
+    private var fightsSeen = 0
 
     /// Listeners on the stream, from the energy (radio nights).
     var listeners: Int { Int((40 + energyShown * 1260).rounded()) }
@@ -541,18 +575,33 @@ final class NightRunner: ObservableObject {
     /// stuck in one groove.
     func update(dt: Double, state: MixReading.State, quality: Double, bassClash: Bool, lead: Int, onAirRecord: String?, channel: [Double],
                 jingles: Int, beat: Double, stuck: Bool = false, keyClash: Bool = false, onAirBPM: Double = 0,
-                lowOnAir: Double = 0.5, stepOns: Int = 0, partnerAnswers: Int = 0) {
+                lowOnAir: Double = 0.5, stepOns: Int = 0, partnerAnswers: Int = 0, partnerSteals: Int = 0,
+                partnerFights: Int = 0) {
         guard stars == nil else { return }
         // Back to back: a hand on her deck (refused) costs a little, and she says so at once.
         if stepOns > stepOnsSeen {
             stepOnsSeen = stepOns
             energy = max(0, energy - 0.05)
-            speak((Lessons.handsOff.voice, Lessons.handsOff.text), by: "HELENA")
+            if info.partnerStyle == .vex {
+                say("hands", urgent: true)
+            } else {
+                speak((Lessons.handsOff.voice, Lessons.handsOff.text), by: "HELENA")
+            }
         }
         // She starts an answer to your record: Tó tells you what comes next.
         if partnerAnswers > answersSeen {
             answersSeen = partnerAnswers
             say("answer", urgent: true)
+        }
+        // VEX grabs your fader; pushing it back up in front of the room is a fight.
+        if partnerSteals > stealsSeen {
+            stealsSeen = partnerSteals
+            say("stolen", urgent: true)
+        }
+        if partnerFights > fightsSeen {
+            fightsSeen = partnerFights
+            energy = max(0, energy - 0.08)
+            say("fight", urgent: true)
         }
         // Requests and the cable come at their moment of the night, and cannot wait for silence.
         if began {
@@ -800,7 +849,7 @@ final class NightRunner: ObservableObject {
         let broughtDown = info.endBPM.map { lastBPM <= $0 + 0.5 } ?? true
         let climbed = info.climbTo.map { lastBPM >= $0 - 0.5 } ?? true
         let encored = info.encoreWith.isEmpty || (lastOnAirRecord.map { info.encoreWith.contains($0) } ?? false)
-        let handsOff = info.partner == nil || stepOnsSeen == 0
+        let handsOff = info.partner == nil || (stepOnsSeen == 0 && fightsSeen == 0)
         if crowd >= need && transitions >= info.mixesFor3Stars && deadAir < 3 && wreck < 4 && allRequests && !hotPlayed && broughtDown && climbed && encored && handsOff {
             earned = 3
         } else if crowd >= 0.42 && transitions >= 1 {
@@ -816,7 +865,11 @@ final class NightRunner: ObservableObject {
         if info.judgeKeys { summary += sourTime < 1 ? "   ·   in key" : "   ·   sour \(Int(sourTime.rounded())) s" }
         if info.endBPM != nil || info.climbTo != nil { summary += "   ·   ended at \(Int(lastBPM.rounded())) BPM" }
         if !info.encoreWith.isEmpty { summary += encored ? "   ·   encore!" : "   ·   no encore" }
-        if info.partner != nil { summary += stepOnsSeen == 0 ? "   ·   hands off her deck" : "   ·   on her deck \(stepOnsSeen)×" }
+        if info.partnerStyle == .vex {
+            summary += fightsSeen == 0 ? "   ·   kept your cool" : "   ·   fought him \(fightsSeen)×"
+        } else if info.partner != nil {
+            summary += stepOnsSeen == 0 ? "   ·   hands off her deck" : "   ·   on her deck \(stepOnsSeen)×"
+        }
         comment = ""
         stars = earned
     }

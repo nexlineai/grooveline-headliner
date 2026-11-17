@@ -148,6 +148,7 @@ struct LessonDesk {
     var partner: Int?
     /// Her records for answering yours (a back-to-back night); empty: she never answers.
     var partnerBag: [String] = []
+    var partnerStyle = PartnerStyle.helena
 }
 
 struct Lesson {

@@ -132,6 +132,13 @@ Design, story, decisions and the build log are in the vault:
   fader up over your next phrase (low out), then her low in; she hands over again only after
   your fader has been down (`PartnerMove.on(armed:)`). Step-ons in a night: -0.05 energy,
   Helena's line (`speak(by:)`), no third star; Tó's moment "answer" when she starts one.
+  `PartnerStyle.vex` (night VEX B2B): his bag in its own order (no key check), answers after
+  20 s, half a phrase off, fader up in one bar with his bass in, then pulls YOUR fader down
+  (moment "stolen"); pushing it back up within 8 s = a fight (-0.08, moment "fight", no third
+  star); he hands over at once when your fader comes up. Mishap `.partnerCrash` (his laptop
+  dies): his deck stops and `partnerDeck = nil` (both decks are yours).
+  Mishap switch in `BoothScene`: anything not listed falls to `default` = the record on air
+  STOPS. `.rainRush` was missing there until build 50 (THE TENT went silent at 35 %).
 - **Room lift:** `BoothScene.roomLift` raises a room's picture by a part of its height when its
   people stand low (the booth shows only ~8-67 % of the picture's height); clamped so the bottom
   edge never comes above the gear.
