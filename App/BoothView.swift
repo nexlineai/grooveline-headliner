@@ -6,6 +6,9 @@ import SpriteKit
 struct BoothView: View {
     @EnvironmentObject var game: Game
     let lessonID: String?
+    /// A night for a room, judged by the crowd.
+    let isNight: Bool
+    @State private var nightRunner: NightRunner?
     @State private var scene: BoothScene?
     @State private var runner: LessonRunner?
     @State private var crateOpen = false
@@ -19,10 +22,15 @@ struct BoothView: View {
                     SpriteView(scene: scene, preferredFramesPerSecond: 120)
                         .ignoresSafeArea()
                 }
+                // The gear takes the lower 58 % of the whole screen; the room is what is left above.
+                let roomHeight = (geo.size.height + geo.safeAreaInsets.top + geo.safeAreaInsets.bottom) * 0.42 - geo.safeAreaInsets.top
                 if let runner {
-                    // The gear takes the lower 58 % of the whole screen; the room is what is left above.
-                    let screenHeight = geo.size.height + geo.safeAreaInsets.top + geo.safeAreaInsets.bottom
-                    LessonOverlay(runner: runner, roomHeight: screenHeight * 0.42 - geo.safeAreaInsets.top) {
+                    LessonOverlay(runner: runner, roomHeight: roomHeight) {
+                        game.closeBooth()
+                    }
+                }
+                if let nightRunner {
+                    NightOverlay(runner: nightRunner, roomHeight: roomHeight) {
                         game.closeBooth()
                     }
                 }
@@ -71,6 +79,12 @@ struct BoothView: View {
                     let coach = LessonRunner(lesson: lesson)
                     made.lesson = coach
                     runner = coach
+                }
+                if isNight {
+                    // Four and a half minutes: room for three records and two mixes.
+                    let party = NightRunner(title: "FIRST PARTY", length: UserDefaults.standard.bool(forKey: "demo") ? 20 : 270)
+                    made.night = party
+                    nightRunner = party
                 }
                 scene = made
             }

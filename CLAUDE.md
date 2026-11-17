@@ -63,6 +63,12 @@ Design, story, decisions and the build log are in the vault:
   is fed `BoothFacts` by `BoothScene.teach` every frame; `LessonOverlay` shows task and words over
   the room. The coach is a voice-over (Zé's choice), never on camera; music ducks while he talks.
   Voice files in `App/Lessons/` made with `tools/voice/say.sh` (Tó = `helios`).
+- Nights (`Night.swift`, `Screen.night`, title PARTY): no coach; `NightRunner` turns what the
+  room hears (`MixJudge` reading: silence / one record / blend quality, bass clash, which deck is
+  on air) into crowd energy, a mood 0-3 and short comments from the friends; stars from the
+  average energy, the number of mixes, dead air and train wrecks. `BoothScene.showRoom` cross-
+  fades between four loops of the same room picture (`room-bedroom-{waiting,nodding,dancing,nuts}`);
+  outside a night the room dances while music is heard and holds still when it stops.
 - Crate (`CrateView.swift`, free play only): lists `tracks.json`, loads a record on the left or
   right deck (not onto a turning deck, one copy per record). `BoothScene.recordChanged(on:)` redraws.
 - The Grooveline name is always the site's mark: `GroovelineLogo` (bars + Orbitron Bold, teal

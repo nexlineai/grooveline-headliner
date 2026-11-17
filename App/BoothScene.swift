@@ -31,6 +31,8 @@ final class BoothScene: SKScene {
     var insets = EdgeInsets() { didSet { if insets != oldValue { needsBuild = true } } }
     /// The lesson being taught here, if any. It reads the decks every frame and says what to point at.
     var lesson: LessonRunner?
+    /// The night being played here, if any: the crowd's energy follows the mixing.
+    var night: NightRunner?
     private var pointer: SKShapeNode?
     private var pointedAt: LessonTarget?
     private var lessonReady = false
@@ -94,10 +96,15 @@ final class BoothScene: SKScene {
     private var phaseDot: SKShapeNode?
     private var roomGlow: SKSpriteNode?
     private var roomShade: SKSpriteNode?
-    private var roomVideo: SKVideoNode?
-    private var roomPlayer: AVQueuePlayer?
-    private var roomLooper: AVPlayerLooper?
-    private var roomMoving = false
+    /// The room in four moods, each a loop of the same picture: waiting, nodding, dancing, going nuts.
+    private static let moodClips = ["room-bedroom-waiting", "room-bedroom-nodding", "room-bedroom-dancing", "room-bedroom-nuts"]
+    private var roomVideos: [SKVideoNode?] = [nil, nil, nil, nil]
+    private var roomPlayers: [AVQueuePlayer?] = [nil, nil, nil, nil]
+    private var roomLoopers: [AVPlayerLooper?] = [nil, nil, nil, nil]
+    /// The mood on show, or -1 while only the still picture has been seen.
+    private var roomMood = -1
+    private var roomPictureSize = CGSize.zero
+    private var roomCentre = CGPoint.zero
     private var status: SKLabelNode?
 
     private var lastTime: TimeInterval = 0
@@ -116,7 +123,12 @@ final class BoothScene: SKScene {
 
     override func didMove(to view: SKView) {
         view.isMultipleTouchEnabled = true
-        if lesson != nil { setTheDeskForALesson() }
+        if let lesson {
+            setTheDesk(lesson.lesson.desk)
+        } else if night != nil {
+            // A night starts like a gig: the first record ready, the second one's fader down.
+            setTheDesk(LessonDesk(crossfader: 0.5, channel: [0.85, 0], sync: [false, true]))
+        }
         applyMix()
     }
 
@@ -131,8 +143,7 @@ final class BoothScene: SKScene {
 
     /// A lesson starts from a known desk: both records at their first beat and stopped, pitch
     /// and EQ in the middle, and the crossfader, channel faders and SYNC as the lesson wants them.
-    private func setTheDeskForALesson() {
-        let desk = lesson?.lesson.desk ?? LessonDesk()
+    private func setTheDesk(_ desk: LessonDesk) {
         cross = desk.crossfader
         channel = desk.channel
         pitchFader = [0.5, 0.5]
@@ -211,15 +222,11 @@ final class BoothScene: SKScene {
             still.zPosition = -12
             addChild(still)
         }
-        if let player = roomPlayer ?? makeRoomPlayer() {
-            let video = SKVideoNode(avPlayer: player)
-            video.size = pictureSize
-            video.position = centre
-            video.zPosition = -11
-            video.isHidden = !roomMoving // nothing to show until the clip has played once
-            addChild(video)
-            roomVideo = video
-        }
+        // The moving room is added when a mood is first wanted (see `showRoom`).
+        roomPictureSize = pictureSize
+        roomCentre = centre
+        roomVideos = [nil, nil, nil, nil]
+        if roomMood >= 0, let node = roomVideo(roomMood) { node.alpha = 1 }
 
         let rect = CGRect(x: 0, y: gearTop, width: W, height: H - gearTop)
         let shade = SKSpriteNode(color: .black, size: rect.size)
@@ -246,14 +253,45 @@ final class BoothScene: SKScene {
         addChild(lip)
     }
 
-    private func makeRoomPlayer() -> AVQueuePlayer? {
-        guard let url = Bundle.main.url(forResource: "room-bedroom-dancing", withExtension: "mp4") else { return nil }
-        let player = AVQueuePlayer()
-        player.isMuted = true
-        player.preventsDisplaySleepDuringVideoPlayback = false
-        roomLooper = AVPlayerLooper(player: player, templateItem: AVPlayerItem(url: url))
-        roomPlayer = player
-        return player
+    /// The video node of one mood, made (with its looping player) the first time it is wanted.
+    private func roomVideo(_ mood: Int) -> SKVideoNode? {
+        guard mood >= 0, mood < Self.moodClips.count else { return nil }
+        if let node = roomVideos[mood] { return node }
+        if roomPlayers[mood] == nil {
+            guard let url = Bundle.main.url(forResource: Self.moodClips[mood], withExtension: "mp4") else { return nil }
+            let player = AVQueuePlayer()
+            player.isMuted = true
+            player.preventsDisplaySleepDuringVideoPlayback = false
+            roomLoopers[mood] = AVPlayerLooper(player: player, templateItem: AVPlayerItem(url: url))
+            roomPlayers[mood] = player
+        }
+        guard let player = roomPlayers[mood] else { return nil }
+        let video = SKVideoNode(avPlayer: player)
+        video.size = roomPictureSize
+        video.position = roomCentre
+        video.zPosition = -11
+        video.alpha = 0
+        addChild(video)
+        roomVideos[mood] = video
+        return video
+    }
+
+    /// Shows the room in `mood` (fading over from the mood before), or with -1 holds it still
+    /// where it is.
+    private func showRoom(_ mood: Int, _ dt: Double) {
+        var wanted = mood
+        if wanted >= 0 && roomVideo(wanted) == nil { wanted = roomVideo(2) == nil ? -1 : 2 } // no clip: dancing will do
+        if wanted >= 0 {
+            roomMood = wanted
+            if let player = roomPlayers[wanted], player.rate == 0 { player.play() }
+        }
+        for m in 0..<roomVideos.count {
+            guard let node = roomVideos[m] else { continue }
+            let target: CGFloat = m == roomMood ? 1 : 0
+            node.alpha += (target - node.alpha) * CGFloat(min(1, dt * 4))
+            let gone = m != roomMood && node.alpha < 0.02
+            if (gone || wanted < 0), let player = roomPlayers[m], player.rate != 0 { player.pause() }
+        }
     }
 
     private func buildDeck(_ d: Int, in rect: CGRect, unit u: CGFloat) {
@@ -987,15 +1025,15 @@ final class BoothScene: SKScene {
             let phase = decks[lead].grid.phase(at: decks[lead].seconds)
             glow.alpha = heard ? CGFloat(0.12 * exp(-phase * 5)) : 0
         }
-        // The friends dance while there is music and stop where they are when it goes quiet.
-        if heard != roomMoving {
-            roomMoving = heard
-            if heard {
-                roomVideo?.isHidden = false
-                roomPlayer?.play()
-            } else {
-                roomPlayer?.pause()
-            }
+        if let night {
+            // A night: the crowd answers the mixing, and the room shows its mood.
+            // The record on air is the one that is heard; with both heard, the louder one.
+            let onAir = snapshots[0].audible ? (snapshots[1].audible ? lead : 0) : 1
+            night.update(dt: dt, state: reading.state, quality: reading.quality, bassClash: reading.bassClash, lead: onAir)
+            showRoom(night.mood, dt)
+        } else {
+            // Otherwise the friends dance while there is music and stop where they are when it goes quiet.
+            showRoom(heard ? 2 : -1, dt)
         }
 
         if let status {

@@ -9,7 +9,7 @@ let gameLog = Logger(subsystem: "org.grooveline.headliner", category: "game")
 
 /// App-wide state: which screen is up, what comes after it, the deck engine, the crate and the story.
 final class Game: ObservableObject {
-    enum Screen: Equatable { case title, story(String), booth, lesson(String) }
+    enum Screen: Equatable { case title, story(String), booth, lesson(String), night }
 
     @Published var screen: Screen = .title
     let engine = DeckEngine()
@@ -63,6 +63,7 @@ final class Game: ObservableObject {
         switch defaults.string(forKey: "screen") ?? "" {
         case "booth": openBooth()
         case "lesson": openBooth(lesson: defaults.string(forKey: "lesson") ?? "first-mix")
+        case "night": openBooth(night: true)
         case "story": screen = .story(defaults.string(forKey: "scene") ?? "cold-open")
         default: break
         }
@@ -73,7 +74,7 @@ final class Game: ObservableObject {
     }
 
     /// Opens the booth: free play, or a lesson when one is named.
-    func openBooth(lesson: String? = nil) {
+    func openBooth(lesson: String? = nil, night: Bool = false) {
         engine.start()
         if let error = engine.lastError {
             gameLog.error("audio engine did not start: \(error, privacy: .public)")
@@ -83,7 +84,7 @@ final class Game: ObservableObject {
         for (deck, track) in zip(engine.decks, tracks) where !deck.isLoaded {
             load(track, on: deck)
         }
-        screen = lesson.map { Screen.lesson($0) } ?? Screen.booth
+        screen = night ? Screen.night : (lesson.map { Screen.lesson($0) } ?? Screen.booth)
     }
 
     func closeBooth() {
@@ -109,6 +110,7 @@ final class Game: ObservableObject {
         switch queue.removeFirst() {
         case .booth: openBooth()
         case .lesson(let id): openBooth(lesson: id)
+        case .night: openBooth(night: true)
         case let other: screen = other
         }
     }
