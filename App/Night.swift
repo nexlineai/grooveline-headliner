@@ -64,6 +64,10 @@ struct NightInfo {
     var climbTo: Double? = nil
     /// The encore: three stars need one of these records on air when the night ends.
     var encoreWith: [String] = []
+    /// Back to back: the deck the partner plays herself (her record is on air from the start),
+    /// and her records for answering yours. A hand on her deck costs energy and the third star.
+    var partner: Int? = nil
+    var partnerBag: [String] = []
 }
 
 /// What goes wrong in a night: the cable is kicked (the record stops), the needle jumps a groove,
@@ -360,7 +364,29 @@ enum Nights {
                                                "encore": [("forest-encore", "Listen to them! They want an encore. Finish on your biggest record.")]],
                                        bag: ["floresta", "por-do-sol", "tenda", "chuva", "encore", "palco-principal", "coro", "residente"],
                                        clockStart: 23 * 60, echo: 0.1, encoreWith: ["encore", "palco-principal"])
-    static let all = [firstParty, garageParty, saturdayShift, emptyTuesday, thursdayShow, caveWarmUp, fridayCave, afterhours, dubplateNight, berlinNight, ibizaNight, burnout, sunsetSlot, threePM, tentRain, forestStage]
+    /// Chapter 11: back to back with Helena on a party boat on the river at sunset. The left deck
+    /// is hers and she plays it herself: answer her record (keys count), bring yours in, and when
+    /// she answers yours, take yours out. A hand on her deck costs energy and the third star.
+    /// Both bags sit around 2B at ~122 BPM so every record has an answer in the other bag
+    /// (yours: Tambor 3B, Garage Door 2A, Terraço 1B, Chuva 3A, Primeira Demo 5B, Dubplate 12B;
+    /// traps Saturday Job 8A, Tabla 7A at 126).
+    static let boatParty = NightInfo(id: "boat-party", title: "BOAT PARTY", length: 360, room: "boat",
+                                     records: ["barco", "tambor"], chapter: 11, mixesFor3Stars: 3,
+                                     lines: ["start": [("boat-start", "Helena's on. Listen to her record, then answer it.")],
+                                             "answer": [("boat-answer", "Helena's answering you. When her bass comes in, take yours out.")],
+                                             "clean": [("boat-clean", "Smooth. Even the captain is dancing."), ("fri-clean-2", "Nobody even blinked. Perfect.")],
+                                             "rough": [("boat-rough", "Bumpy. The whole boat felt that.")],
+                                             "dead": [("boat-dead", "Silence on the river! Play something!")],
+                                             "stale": [("fri-stale", "This one's done. Next.")],
+                                             "slip": [("fri-slip", "It's drifting. Nudge it.")],
+                                             "wreck": [("fri-wreck", "Ouch. Two kicks fighting.")],
+                                             "clash": [("fri-clash", "Two basslines. Kill a low.")],
+                                             "keys": [("fri-keys", "Sour! Those keys fight. Get out of it, or change it.")],
+                                             "nuts": [("boat-nuts", "The whole boat is jumping! Hold on to something!")]],
+                                     bag: ["tambor", "garage-door", "terraco", "chuva", "primeira-demo", "dubplate", "saturday-job", "tabla"],
+                                     clockStart: 19 * 60 + 30, judgeKeys: true,
+                                     partner: 0, partnerBag: ["barco", "fita-gasta", "telhado", "neon-pluck", "manha", "regresso"])
+    static let all = [firstParty, garageParty, saturdayShift, emptyTuesday, thursdayShow, caveWarmUp, fridayCave, afterhours, dubplateNight, berlinNight, ibizaNight, burnout, sunsetSlot, threePM, tentRain, forestStage, boatParty]
     static func find(_ id: String) -> NightInfo? { all.first { $0.id == id } }
 }
 
@@ -398,6 +424,9 @@ final class NightRunner: ObservableObject {
     private var plateOnAirAt: Double?
     private var boomAsked = false
     private var boomBy: Double?
+    /// Back to back: hands put on her deck, and her answers, seen so far.
+    private var stepOnsSeen = 0
+    private var answersSeen = 0
 
     /// Listeners on the stream, from the energy (radio nights).
     var listeners: Int { Int((40 + energyShown * 1260).rounded()) }
@@ -492,8 +521,8 @@ final class NightRunner: ObservableObject {
         speak(options[n % options.count])
     }
 
-    private func speak(_ line: (voice: String, text: String)) {
-        commentBy = info.coach
+    private func speak(_ line: (voice: String, text: String), by who: String? = nil) {
+        commentBy = who ?? info.coach
         comment = line.text
         var seconds = 3.0
         if let url = Bundle.main.url(forResource: line.voice, withExtension: "m4a"),
@@ -512,8 +541,19 @@ final class NightRunner: ObservableObject {
     /// stuck in one groove.
     func update(dt: Double, state: MixReading.State, quality: Double, bassClash: Bool, lead: Int, onAirRecord: String?, channel: [Double],
                 jingles: Int, beat: Double, stuck: Bool = false, keyClash: Bool = false, onAirBPM: Double = 0,
-                lowOnAir: Double = 0.5) {
+                lowOnAir: Double = 0.5, stepOns: Int = 0, partnerAnswers: Int = 0) {
         guard stars == nil else { return }
+        // Back to back: a hand on her deck (refused) costs a little, and she says so at once.
+        if stepOns > stepOnsSeen {
+            stepOnsSeen = stepOns
+            energy = max(0, energy - 0.05)
+            speak((Lessons.handsOff.voice, Lessons.handsOff.text), by: "HELENA")
+        }
+        // She starts an answer to your record: Tó tells you what comes next.
+        if partnerAnswers > answersSeen {
+            answersSeen = partnerAnswers
+            say("answer", urgent: true)
+        }
         // Requests and the cable come at their moment of the night, and cannot wait for silence.
         if began {
             let share = elapsed / length
@@ -760,7 +800,8 @@ final class NightRunner: ObservableObject {
         let broughtDown = info.endBPM.map { lastBPM <= $0 + 0.5 } ?? true
         let climbed = info.climbTo.map { lastBPM >= $0 - 0.5 } ?? true
         let encored = info.encoreWith.isEmpty || (lastOnAirRecord.map { info.encoreWith.contains($0) } ?? false)
-        if crowd >= need && transitions >= info.mixesFor3Stars && deadAir < 3 && wreck < 4 && allRequests && !hotPlayed && broughtDown && climbed && encored {
+        let handsOff = info.partner == nil || stepOnsSeen == 0
+        if crowd >= need && transitions >= info.mixesFor3Stars && deadAir < 3 && wreck < 4 && allRequests && !hotPlayed && broughtDown && climbed && encored && handsOff {
             earned = 3
         } else if crowd >= 0.42 && transitions >= 1 {
             earned = 2
@@ -775,6 +816,7 @@ final class NightRunner: ObservableObject {
         if info.judgeKeys { summary += sourTime < 1 ? "   ·   in key" : "   ·   sour \(Int(sourTime.rounded())) s" }
         if info.endBPM != nil || info.climbTo != nil { summary += "   ·   ended at \(Int(lastBPM.rounded())) BPM" }
         if !info.encoreWith.isEmpty { summary += encored ? "   ·   encore!" : "   ·   no encore" }
+        if info.partner != nil { summary += stepOnsSeen == 0 ? "   ·   hands off her deck" : "   ·   on her deck \(stepOnsSeen)×" }
         comment = ""
         stars = earned
     }

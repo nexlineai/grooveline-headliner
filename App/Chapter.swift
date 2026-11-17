@@ -37,6 +37,8 @@ enum Chapters {
                     screens: [.story("helena-b2b")]),
         ChapterStep(id: "b2b", kind: .lesson, title: "BACK TO BACK", detail: "Answer her record. Never touch her deck.",
                     screens: [.lesson("b2b")]),
+        ChapterStep(id: Nights.boatParty.id, kind: .night, title: Nights.boatParty.title, detail: "Sunset on the river. You answer her, she answers you.",
+                    screens: [.story("boat-party"), .night(Nights.boatParty.id)]),
     ])
 
     /// Chapter 10: festivals. Carla, a big stage whose far speakers come back late, the sunset slot.

@@ -266,5 +266,14 @@
         {"who": "TÓ", "voice": "vo-helena-b2b-to", "text": "Helena Voss. In the same booth as me. Don't touch her deck. Got it."}
       ] }
     ]
+  },
+  {
+    "id": "boat-party",
+    "shots": [
+      { "lines": [
+        {"who": "", "text": "19:30. AN OLD BOAT ON THE TEJO, THE BRIDGE IN THE SUNSET."},
+        {"who": "", "text": "ONE BOOTH, TWO DECKS. THE LEFT ONE IS HELENA'S."}
+      ] }
+    ]
   }
 ]

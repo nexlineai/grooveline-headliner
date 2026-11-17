@@ -146,6 +146,8 @@ struct LessonDesk {
     /// start). Her deck is hers, and so is the crossfader while her record is on: a hand on
     /// them is refused and counted ("stepping on her").
     var partner: Int?
+    /// Her records for answering yours (a back-to-back night); empty: she never answers.
+    var partnerBag: [String] = []
 }
 
 struct Lesson {

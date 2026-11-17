@@ -125,6 +125,13 @@ Design, story, decisions and the build log are in the vault:
   `refuseLoad(on:)`. Each refusal is `BoothFacts.stepOns` -> Helena's "Hands off" line + a miss +
   a verdict line. Her deck never auto-restarts while your fader is up. Lesson goals that wait
   for her use her fader (`channelFader(0, 0...0.04)`), not `.listen`.
+  Nights: `NightInfo.partner` + `partnerBag` (her answers). 35 s after your record is on air
+  alone she loads one that fits (`partnerPick`: Harmony + within 2.1 BPM), sets her PITCH to your
+  tempo in the same frame (never her SYNC: your deck's SYNC follows hers, so hers must not
+  jump), seeks to your beat-in-phrase + 0.05 s spin-up, trims the phase while her fader is down,
+  fader up over your next phrase (low out), then her low in; she hands over again only after
+  your fader has been down (`PartnerMove.on(armed:)`). Step-ons in a night: -0.05 energy,
+  Helena's line (`speak(by:)`), no third star; Tó's moment "answer" when she starts one.
 - **Room lift:** `BoothScene.roomLift` raises a room's picture by a part of its height when its
   people stand low (the booth shows only ~8-67 % of the picture's height); clamped so the bottom
   edge never comes above the gear.
