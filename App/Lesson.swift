@@ -142,6 +142,10 @@ struct LessonDesk {
     /// A festival field: the room also hears the far speakers this many seconds late (not the
     /// headphones, like a DJ's monitors). 0 = no echo.
     var echo: Double = 0
+    /// Back to back: the other DJ plays this deck by herself (her record is on air from the
+    /// start). Her deck is hers, and so is the crossfader while her record is on: a hand on
+    /// them is refused and counted ("stepping on her").
+    var partner: Int?
 }
 
 struct Lesson {
@@ -156,7 +160,47 @@ struct Lesson {
 enum Lessons {
     static func find(_ id: String) -> Lesson? { all.first { $0.id == id } }
 
-    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars, requests, syncOff, byEar, holdIt, longBlend, onAir, warmUp, keys, filterMix, tempo, drums, synth, dubplate, borrowedBooth, genreSwitch, delay]
+    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars, requests, syncOff, byEar, holdIt, longBlend, onAir, warmUp, keys, filterMix, tempo, drums, synth, dubplate, borrowedBooth, genreSwitch, delay, backToBack]
+
+    /// What the partner says when a hand lands on her deck (a back-to-back lesson).
+    static let handsOff = (voice: "b2b-hands", text: "Hands off. That's my deck.")
+
+    /// Lesson 21, chapter 11, CAVE on a legend night: back to back with Helena. Her record is on
+    /// the left deck and she plays it herself; the player answers it on the right deck with a
+    /// record in a fitting key, on her phrase, brings it up with the low down, swaps the bass
+    /// when she takes hers out, and keeps their hands off while she fades her record out.
+    static let backToBack = Lesson(id: "b2b", number: 21, title: "BACK TO BACK", coach: "HELENA",
+                                   desk: LessonDesk(crossfader: 0.5, channel: [0.85, 0], sync: [false, true], room: "cavepeak",
+                                                    records: ["acordeao", "telhado"], crate: true, chapter: 11,
+                                                    bag: ["telhado", "low-tide", "onda-media", "tenda"], cueBar: 8, partner: 0), steps: [
+        LessonStep(voice: "b2b-01",
+                   text: "Back to back. The left deck is mine, the right one is yours. Rule one: you never touch the other DJ's deck. Not the record, not the fader.",
+                   task: "LISTEN TO HELENA'S RECORD", goal: .listen, target: nil),
+        LessonStep(voice: "b2b-02",
+                   text: "I'm playing Acordeão. Nine A. Answer it. In your bag there's one record that sits next to mine on the wheel. Put it on your deck.",
+                   task: "CRATE: A RECORD NEXT TO 9A, ON THE RIGHT DECK", goal: .pickRecord(deck: 1, good: ["onda-media"]), target: .crate,
+                   missVoice: "b2b-02-miss", missText: "That one fights my key. Try another."),
+        LessonStep(voice: "b2b-03",
+                   text: "Start it on my phrase. Your fader is down, so nobody hears it yet.",
+                   task: "PRESS PLAY ON THE RIGHT DECK, ON HER PHRASE", goal: .startOnThePhrase(deck: 1, against: 0), target: .play(1),
+                   missVoice: "b2b-03-miss", missText: "Not on my phrase. Cue it, and wait for the next one.",
+                   missTask: "PRESS CUE ON THE RIGHT DECK, THEN TRY AGAIN", missTarget: .cue(1)),
+        LessonStep(voice: "b2b-04",
+                   text: "Your low all the way down first. One bassline at a time.",
+                   task: "RIGHT LOW ALL THE WAY DOWN", goal: .eq(deck: 1, band: 0, 0...0.1), target: .eq(1, 0)),
+        LessonStep(voice: "b2b-05",
+                   text: "Now bring your fader up. All the way.",
+                   task: "RIGHT CHANNEL FADER UP", goal: .channelFader(1, 0.8...1, onThePhrase: false), target: .channel(1)),
+        LessonStep(voice: "b2b-06",
+                   text: "On my next phrase, I take my bass out. You put yours back in. Same moment.",
+                   task: "WHEN HER LOW GOES OUT: YOUR LOW TO THE MIDDLE", goal: .bassSwap(from: 0, to: 1), target: .eq(1, 0)),
+        LessonStep(voice: "b2b-07",
+                   text: "And now I take my record out. My deck, my fader. Hands off.",
+                   task: "HANDS OFF: SHE TAKES HER RECORD OUT", goal: .channelFader(0, 0...0.04, onThePhrase: false), target: nil),
+        LessonStep(voice: "b2b-08",
+                   text: "You answered me, and you never touched my deck. That's back to back.",
+                   task: "BACK TO BACK", goal: .listen, target: nil),
+    ])
 
     /// Lesson 20, chapter 10, a festival stage: the far speakers come back late. Beatmatch to the
     /// first hit (the monitors), never to the echo.
@@ -850,6 +894,8 @@ struct BoothFacts {
     var page: Int
     /// Dubplates cut so far.
     var cuts: Int
+    /// Back to back: hands put on the partner's deck so far (refused).
+    var stepOns = 0
 }
 
 /// Walks through a lesson. The booth scene feeds it `BoothFacts` every frame; the overlay shows
@@ -897,6 +943,9 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private var rode = false
     /// For `dubplateCut`: cuts counted when the step began.
     private var cutsSeen: Int?
+    /// Back to back: hands on the partner's deck seen so far (each one is a miss).
+    private var stepOnsSeen = 0
+    private var stepMisses = 0
     private var wasOn = [false, false]
     private var armed = false
     private var fresh = true
@@ -976,6 +1025,15 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
     func update(_ facts: BoothFacts) {
         guard started, stars == nil, lesson.steps.indices.contains(index) else { return }
         let step = lesson.steps[index]
+        if facts.stepOns > stepOnsSeen {
+            // A hand on her deck (the booth refused it): she says so, and it costs a star.
+            stepOnsSeen = facts.stepOns
+            stepMisses += 1
+            buzz.notificationOccurred(.warning)
+            show(text: Lessons.handsOff.text, task: step.task, target: goalMet ? nil : step.target)
+            if goalMet { taskDone = true }
+            say(Lessons.handsOff.voice)
+        }
         if !goalMet {
             switch step.goal {
             case .startDeck(let d):
@@ -1240,7 +1298,7 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
         // Stars for what took skill: how close the start was and on which try, and, where the
         // lesson asks for it, taking the old record out at a phrase change.
         var earned: Int
-        let misses = self.misses + pickMisses + rideMisses
+        let misses = self.misses + pickMisses + rideMisses + stepMisses
         if misses == 0 && oneError <= 0.15 {
             earned = 3
         } else if misses <= 1 && oneError <= 0.3 {
@@ -1269,6 +1327,9 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
         }
         if let out = outOnThePhrase {
             parts.append(out ? "\(phraseMove): on the phrase" : "\(phraseMove): in the middle of a phrase")
+        }
+        if lesson.desk.partner != nil {
+            parts.append(stepMisses == 0 ? "Hands: never on her deck" : "Hands: on her deck \(stepMisses)×")
         }
         return parts.joined(separator: "   ·   ")
     }

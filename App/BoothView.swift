@@ -85,6 +85,8 @@ struct BoothView: View {
                 if crateShown {
                     if crateOpen {
                         CrateView(tracks: crateRecords, decks: game.engine.decks, tick: crateTick, onLoad: { track, d in
+                            // Back to back: her deck is hers.
+                            if scene?.refuseLoad(on: d) == true { return }
                             if track.id == "your-dubplate" {
                                 // On the big system (the DUBPLATE night) the cut booms until its low comes down.
                                 let boom = nightID.flatMap { Nights.find($0)?.mixdownCheck } ?? false

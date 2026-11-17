@@ -117,6 +117,17 @@ Design, story, decisions and the build log are in the vault:
   the ROOM output also gets a copy `echoSeconds` late at -6 dB (the far speakers); the headphones
   never do (the monitors). `LessonDesk.echo` / `NightInfo.echo`; `closeBooth` turns it off.
   `NightInfo.climbTo`: the tempo on air must end at or above it for three stars.
+- **Back to back (chapter 11):** `LessonDesk.partner` = the deck the other DJ plays herself
+  (`BoothScene.drivePartner`, state `PartnerMove`: her record on air from the start; once yours is
+  up, ≥ 0.8, she cuts her low at her next phrase over 2 beats, waits for your low (or 2 bars),
+  fades her fader over 4 bars and stops). Her deck's controls, and the crossfader while she is on,
+  refuse touches (`partnerHolds`, PHONES and the cue mix stay free); the crate's `onLoad` asks
+  `refuseLoad(on:)`. Each refusal is `BoothFacts.stepOns` -> Helena's "Hands off" line + a miss +
+  a verdict line. Her deck never auto-restarts while your fader is up. Lesson goals that wait
+  for her use her fader (`channelFader(0, 0...0.04)`), not `.listen`.
+- **Room lift:** `BoothScene.roomLift` raises a room's picture by a part of its height when its
+  people stand low (the booth shows only ~8-67 % of the picture's height); clamped so the bottom
+  edge never comes above the gear.
 - **Keys (`HeadlinerCore/Harmony.swift`):** Camelot neighbours (same, ±1 with 12/1 wrapping, or
   same number other letter). The decks have NO key lock: the pitch fader and SYNC move the key
   too, so `clash` also counts records pitched more than 0.3 semitone apart (128 -> 130 is 0.27,

@@ -27,7 +27,17 @@ enum Chapters {
     /// played straight away; on for the release.
     static let locked = false
 
-    static let all: [Chapter] = [bedroom, houseParties, shop, pubs, radio, door, resident, studio, road, festivals]
+    static let all: [Chapter] = [bedroom, houseParties, shop, pubs, radio, door, resident, studio, road, festivals, backToBack]
+
+    /// Chapter 11: back to back. Helena first: one booth, two DJs, her deck is hers.
+    static let backToBack = Chapter(number: 11, title: "BACK TO BACK",
+                                    line: "Legend nights, a boat on the river, and someone else's hands on the same mixer.",
+                                    steps: [
+        ChapterStep(id: "helena-b2b", kind: .story, title: "HELENA", detail: "One booth, two DJs.",
+                    screens: [.story("helena-b2b")]),
+        ChapterStep(id: "b2b", kind: .lesson, title: "BACK TO BACK", detail: "Answer her record. Never touch her deck.",
+                    screens: [.lesson("b2b")]),
+    ])
 
     /// Chapter 10: festivals. Carla, a big stage whose far speakers come back late, the sunset slot.
     static let festivals = Chapter(number: 10, title: "FESTIVALS",

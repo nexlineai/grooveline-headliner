@@ -21,6 +21,23 @@ final class BoothScene: SKScene {
         var angle: CGFloat = 0
     }
 
+    /// What the DJ on the other deck is doing (back to back, chapter 11). Ramps are counted in
+    /// beats of her own record.
+    private enum PartnerMove: Equatable {
+        /// Her record is on air; she waits for yours to come up.
+        case alone
+        /// Your record is up: at the end of this phrase of hers she takes her low out.
+        case waiting(phrase: Double)
+        /// Her low goes down over two beats from this beat.
+        case cutting(from: Double)
+        /// Her low is out; she waits for yours to come back in (or two bars).
+        case swapped(since: Double)
+        /// Her fader comes down over four bars from this beat and level; then she stops.
+        case fading(from: Double, level: Double)
+        /// Her record is out and stopped.
+        case out
+    }
+
     /// Radians per second of a record at 33⅓ rpm.
     private static let turn = 2 * Double.pi * (100.0 / 3.0) / 60
     /// The pitch fader covers ±8 %, like a classic turntable.
@@ -41,6 +58,11 @@ final class BoothScene: SKScene {
     private var wander: (deck: Int, since: Double)?
     /// A channel fader that is broken in this booth (stuck where it is).
     private var deadFader: Int?
+    /// Back to back: the deck the other DJ plays herself, what she is doing, and the hands put
+    /// on her deck so far (refused; the lesson counts them).
+    private var partnerDeck: Int?
+    private var partnerMove = PartnerMove.alone
+    private var stepOns = 0
     private var pointer: SKShapeNode?
     private var pointedAt: LessonTarget?
     private var lessonReady = false
@@ -222,6 +244,11 @@ final class BoothScene: SKScene {
             for band in 0..<3 { deck.setEQ(band: band, value: 0.5) }
             deck.setFilter(0.5)
         }
+        // Back to back: her record is already on air when the lesson starts.
+        partnerDeck = desk.partner
+        partnerMove = .alone
+        stepOns = 0
+        if let h = desk.partner, decks[h].isLoaded { decks[h].motorOn = true }
         needsBuild = true
     }
 
@@ -719,6 +746,10 @@ final class BoothScene: SKScene {
         for touch in touches {
             let p = touch.location(in: self)
             guard let kind = control(at: p) else { continue }
+            if partnerHolds(kind) {
+                stepOn()
+                continue
+            }
             var grab = Grab(kind: kind, start: p, startValue: value(of: kind))
             switch kind {
             case .platter(let d):
@@ -942,6 +973,7 @@ final class BoothScene: SKScene {
         if game.demo && !demoStarted && lesson == nil { startDemo() }
         moveHands(dt)
         runSync()
+        drivePartner()
         refresh(dt)
         teach(dt, at: currentTime)
     }
@@ -955,7 +987,9 @@ final class BoothScene: SKScene {
             lesson.begin()
         }
         // In a lesson a record that runs out starts again, so nobody gets stuck waiting.
-        for deck in decks where deck.motorOn && deck.progress > 0.985 {
+        for (d, deck) in decks.enumerated() where deck.motorOn && deck.progress > 0.985 {
+            // Back to back: her record never jumps while yours is in the room with it.
+            if d == partnerDeck && channel[1 - d] > 0.04 { continue }
             deck.seek(to: deck.cuePoint < deck.duration * 0.9 ? deck.cuePoint : deck.grid.firstBeat)
         }
         lesson.update(BoothFacts(motorOn: decks.map { $0.motorOn },
@@ -978,7 +1012,8 @@ final class BoothScene: SKScene {
                                  filter: filterSetting,
                                  pattern: game.pattern.rows,
                                  page: game.studioPage,
-                                 cuts: game.cuts))
+                                 cuts: game.cuts,
+                                 stepOns: stepOns))
         let wanted: Float = lesson.speaking || game.jinglePlaying ? 0.5 : 1
         let now = game.engine.masterVolume
         if abs(wanted - now) > 0.002 {
@@ -1067,6 +1102,73 @@ final class BoothScene: SKScene {
             } else if deck.bend != 0 {
                 deck.bend = 0
             }
+        }
+    }
+
+    // MARK: - Back to back
+
+    /// Her deck is hers all lesson (PHONES aside: cueing her in your headphones is fine); the
+    /// crossfader is hers too while her record is on.
+    private func partnerHolds(_ kind: Kind) -> Bool {
+        guard let h = partnerDeck else { return false }
+        switch kind {
+        case .platter(let d), .rim(let d), .pitch(let d), .channel(let d), .play(let d), .cue(let d),
+             .sync(let d), .needle(let d), .wave(let d), .filter(let d):
+            return d == h
+        case .eq(let d, _):
+            return d == h
+        case .cross:
+            return partnerMove != .out
+        case .phones, .cueMix:
+            return false
+        }
+    }
+
+    /// A hand on the other DJ's deck: refused, with a buzz, and counted (the lesson says so).
+    private func stepOn() {
+        stepOns += 1
+        UINotificationFeedbackGenerator().notificationOccurred(.error)
+    }
+
+    /// The crate asks before putting a record on a deck: never on hers (that counts as a step-on).
+    func refuseLoad(on d: Int) -> Bool {
+        guard d == partnerDeck else { return false }
+        stepOn()
+        return true
+    }
+
+    /// She plays her own deck: once your record is up she takes her low out at her next phrase,
+    /// waits for yours to come in, then fades her record out over four bars and stops it.
+    private func drivePartner() {
+        guard let h = partnerDeck, h < 2 else { return }
+        let her = decks[h], you = 1 - h
+        let beat = her.beat
+        switch partnerMove {
+        case .alone:
+            if her.rate > 0.5 && decks[you].rate > 0.5 && channel[you] >= 0.8 {
+                partnerMove = .waiting(phrase: (beat / Lessons.phrase).rounded(.down))
+            }
+        case .waiting(let phrase):
+            if (beat / Lessons.phrase).rounded(.down) > phrase { partnerMove = .cutting(from: beat) }
+        case .cutting(let from):
+            let t = min(1, max(0, (beat - from) / 2))
+            eq[h][0] = 0.5 * (1 - t)
+            if h < knob.count { knob[h][0].value = eq[h][0] }
+            her.setEQ(band: 0, value: eq[h][0])
+            if t >= 1 { partnerMove = .swapped(since: beat) }
+        case .swapped(let since):
+            if eq[you][0] >= 0.45 || beat - since >= 8 { partnerMove = .fading(from: beat, level: channel[h]) }
+        case .fading(let from, let level):
+            let t = min(1, max(0, (beat - from) / 16))
+            channel[h] = level * (1 - t)
+            if h < channelNode.count { channelNode[h].value = channel[h] }
+            applyMix()
+            if t >= 1 {
+                her.motorOn = false
+                partnerMove = .out
+            }
+        case .out:
+            break
         }
     }
 

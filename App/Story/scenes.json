@@ -257,5 +257,14 @@
         {"who": "", "text": "END OF CHAPTER 10"}
       ] }
     ]
+  },
+  {
+    "id": "helena-b2b",
+    "shots": [
+      { "art": "scene-helena-b2b", "lines": [
+        {"who": "HELENA", "clip": "helena-b2b-01", "text": "Back to back. One booth, two DJs. I play a record, you answer it. And you never touch my deck."},
+        {"who": "TÓ", "voice": "vo-helena-b2b-to", "text": "Helena Voss. In the same booth as me. Don't touch her deck. Got it."}
+      ] }
+    ]
   }
 ]

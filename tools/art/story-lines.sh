@@ -54,3 +54,9 @@ wait
 #   DANI: "a seventeen-year-old boy's voice, cocky and teasing, lazy drawl"
 #   MIRA: "a seventeen-year-old girl's voice, bright, proud and theatrical"
 # Tó never speaks on camera: his lines are tools/voice/say.sh with the voice helios.
+#   CARLA: "a woman's voice, mid forties, brisk, warm and businesslike, with a light Portuguese accent"
+#   JOLI: "a woman's voice, about thirty, low and dry, with a light German accent, amused"
+#   HELENA (on Omni from chapter 11; her voice-overs stay xAI luna, so keep it close to luna):
+#     "a woman's voice, about fifty, low, dry and unhurried"
+# Since 17 Nov: --seconds 9 and NO --return (Omni closes the mouth early to land on the still),
+# then tools/art/trim-line.py --keep-end. Prompts go in a file (a quote in the shell broke a run).
