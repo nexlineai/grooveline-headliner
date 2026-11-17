@@ -71,7 +71,9 @@ struct StudioGrid: View {
                                 .font(.system(size: 10, weight: .heavy))
                                 .tracking(1.5)
                                 .foregroundStyle(tints[row])
-                                .frame(width: 42, alignment: .leading)
+                                .lineLimit(1)
+                                .fixedSize()
+                                .frame(width: 50, alignment: .leading)
                             ForEach(0..<DrumPattern.steps, id: \.self) { step in
                                 cell(row: row, step: step, now: now)
                                     .padding(.leading, step > 0 && step % 4 == 0 ? 5 : 0)
