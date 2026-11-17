@@ -63,11 +63,13 @@ enum Chapters {
                     screens: [.lesson("on-the-phrase")]),
         ChapterStep(id: "bass-swap", kind: .lesson, title: "THE BASS SWAP", detail: "Two basslines are mud. Hand the low end over.",
                     screens: [.lesson("bass-swap")]),
+        ChapterStep(id: "dani", kind: .story, title: "DANI", detail: "Your oldest friend has opinions.",
+                    screens: [.story("dani")]),
         ChapterStep(id: "in-your-ears", kind: .lesson, title: "IN YOUR EARS", detail: "Hear the next record before the room does.",
                     screens: [.lesson("in-your-ears")]),
-        // The finale: Dani's dare, Mira's lights, the party, the end card.
-        ChapterStep(id: Nights.firstParty.id, kind: .night, title: Nights.firstParty.title, detail: "Dani dares you. Six friends, no help.",
-                    screens: [.story("dani"), .story("mira-lights"), .night(Nights.firstParty.id), .story("chapter-1-end")]),
+        // The finale: Mira's lights, the party, the end card.
+        ChapterStep(id: Nights.firstParty.id, kind: .night, title: Nights.firstParty.title, detail: "Six friends, four and a half minutes, no help.",
+                    screens: [.story("mira-lights"), .night(Nights.firstParty.id), .story("chapter-1-end")]),
     ])
 }
 

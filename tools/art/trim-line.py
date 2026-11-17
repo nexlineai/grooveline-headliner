@@ -23,7 +23,9 @@ def run(*cmd, **kw):
     return subprocess.run(cmd, check=True, **kw)
 
 def main():
-    src, out = sys.argv[1], sys.argv[2]
+    keep_end = "--keep-end" in sys.argv  # a clip that does not return to the still: no dissolve at the end
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    src, out = args[0], args[1]
     raw = run("ffmpeg", "-v", "error", "-i", src, "-ac", "1", "-ar", "8000", "-f", "s16le", "-", capture_output=True).stdout
     samples = struct.unpack("<%dh" % (len(raw) // 2), raw)
     loud = []
@@ -52,9 +54,11 @@ def main():
         while end < min(total, speech_end + LINGER) and psnr[min(len(psnr) - 1, int(end * fps))] < NEAR:
             end += 1 / fps
         length = end - start
+        end_melt = "" if keep_end else f"[2:v]format=rgba,fade=t=in:st={length - MELT_OUT:.3f}:d={MELT_OUT}:alpha=1[b];"
+        end_mix = "[x]format=yuv420p[v];" if keep_end else "[x][b]overlay=shortest=1,format=yuv420p[v];"
         graph = (f"[1:v]format=rgba,fade=t=out:st=0:d={MELT_IN}:alpha=1[a];"
-                 f"[2:v]format=rgba,fade=t=in:st={length - MELT_OUT:.3f}:d={MELT_OUT}:alpha=1[b];"
-                 f"[0:v][a]overlay=shortest=1[x];[x][b]overlay=shortest=1,format=yuv420p[v];"
+                 + end_melt +
+                 f"[0:v][a]overlay=shortest=1[x];" + end_mix +
                  f"[0:a]afade=t=in:d=0.03,afade=t=out:st={length - 0.06:.3f}:d=0.06[s]")
         run("ffmpeg", "-v", "error", "-y", "-ss", f"{start:.3f}", "-t", f"{length:.3f}", "-i", src,
             "-loop", "1", "-framerate", str(fps), "-t", f"{length:.3f}", "-i", first,

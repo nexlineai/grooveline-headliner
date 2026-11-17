@@ -122,6 +122,9 @@ Design, story, decisions and the build log are in the vault:
   comes from the model: use the same voice description for a character in every prompt.
   Only about two lines per scene go on camera, the rest is voice over the picture (cost).
   `animate.py` (Grok, cast voices, twice the price) made the first two scenes.
+  Do NOT pin the last frame (`--return`) on Omni clips: the model closes the mouth early to land
+  on the still while the voice goes on (Zé saw it on Mira, 17 Nov). Give 2 s of slack (a 9 s
+  clip for ~7 s of speech), then `trim-line.py --keep-end`.
   `google/veo-3.1-lite` refused our picture ("violates Vertex AI's usage guidelines").
 - `tools/voice/say.sh OUT.m4a VOICE "text"`: spoken lines without a picture. `voice/casting/` has every voice
   saying one line, for Zé to cast by ear.
