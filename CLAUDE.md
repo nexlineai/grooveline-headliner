@@ -125,10 +125,11 @@ Design, story, decisions and the build log are in the vault:
   `--loop`, for anything that looks wrong in reverse). `tools/art/story-lines.sh` holds the
   prompts of every spoken line. Check the words of each clip with `voxtype transcribe`.
   Work files go in `/data/headliner-work/` (root disk is nearly full), only finished clips in git.
-- **Voice rule (17 Nov):** a character who coaches by voice-over keeps one xAI voice everywhere,
-  and their on-camera lines are made on Grok with `animate.py --voice`: Tó `helios` (never on
-  camera), Lia `ara`, Nuno `zagan`. Characters who only appear on camera (Dani, Mira, Sara, ...)
-  are made with Omni and their voice comes from Omni (same voice description every clip).
+- **On-camera clips: OpenRouter Omni for every character (Zé, 17 Nov).** Voice-over lines
+  without a picture are xAI TTS (`say.sh`: Tó `helios`, Lia `ara`, Nuno `zagan`, Helena `luna`);
+  on camera the voice comes from Omni (same voice description every clip). An earlier "Grok
+  `--voice` for voice-over characters" rule was Claude's own, never Zé's: Grok made the cold open,
+  Nuno's door lines and Helena's first line, and is not used for new clips unless Zé asks.
 - Lessons can set the room (`LessonDesk.room`, `room-<room>.jpg` + `room-<room>-<mood>.mp4`,
   falling back to the room's nearest mood) and turn SYNC off (`syncAllowed: false`, vinyl).
   Pitch fader fine mode: finger more than 60 pt to the side of the fader = four times slower.
