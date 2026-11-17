@@ -40,6 +40,12 @@ enum Chapters {
                     screens: [.lesson("filter")]),
         ChapterStep(id: Nights.fridayCave.id, kind: .night, title: Nights.fridayCave.title, detail: "Peak time, records in key, and the power goes.",
                     screens: [.night(Nights.fridayCave.id)]),
+        ChapterStep(id: "vex", kind: .story, title: "VEX", detail: "Dani's guest night. Two hours, every second planned.",
+                    screens: [.story("vex")]),
+        ChapterStep(id: "tempo", kind: .lesson, title: "TEMPO", detail: "From 128 to 120, and nobody notices.",
+                    screens: [.lesson("tempo")]),
+        ChapterStep(id: Nights.afterhours.id, kind: .night, title: Nights.afterhours.title, detail: "Six a.m. Bring them down, slowly.",
+                    screens: [.night(Nights.afterhours.id), .story("chapter-7-end")]),
     ])
 
     /// Chapter 6: club CAVE, the warm-up slot. Nuno at the door, a bag of records, the headliner late.

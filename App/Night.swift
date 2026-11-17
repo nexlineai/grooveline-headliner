@@ -47,6 +47,9 @@ struct NightInfo {
     var clockStart = 23 * 60
     /// Blends in keys that fight (or pitched apart) drain the room (`Harmony.clash`).
     var judgeKeys = false
+    /// An afterhours: the tempo on air must end at or below this, and must not drop more than
+    /// 2 BPM within 2 seconds (the room feels the brakes).
+    var endBPM: Double? = nil
 }
 
 /// What goes wrong in a night: the cable is kicked (the record stops), the needle jumps a groove,
@@ -171,7 +174,25 @@ enum Nights {
                                               "cable": [("fri-power", "Power cut! It's back, it's back! Restart, quick!")]],
                                       bag: ["residente", "portao", "sinal", "sem-lista", "seguranca", "coro", "cave", "oito-oito"],
                                       clockStart: 2 * 60, judgeKeys: true)
-    static let all = [firstParty, garageParty, saturdayShift, emptyTuesday, thursdayShow, caveWarmUp, fridayCave]
+    /// Chapter 7: the afterhours after VEX's guest set, 05:00-06:30. Coro (132) is where he left
+    /// it; bring the room down to 122 or below without anyone feeling the brakes.
+    static let afterhours = NightInfo(id: "afterhours", title: "AFTERHOURS", length: 360, room: "cave",
+                                      records: ["coro", "oito-oito"], chapter: 7, mixesFor3Stars: 2,
+                                      maxMood: 2, remarks: [(at: 0.1, moment: "slow")],
+                                      lines: ["wait": [("after-wait", "Six a.m. VEX's laptop is off. Play something.")],
+                                              "start": [("after-start", "And we're back. Easy now.")],
+                                              "clean": [("after-clean-1", "Smooth. They're floating."), ("after-clean-2", "Lovely. Nobody's leaving.")],
+                                              "rough": [("after-rough", "Bumpy. Even at six a.m. they heard that.")],
+                                              "dead": [("after-dead", "Silence! Don't lose them now!")],
+                                              "stale": [("fri-stale", "This one's done. Next.")],
+                                              "slip": [("fri-slip", "It's drifting. Nudge it.")],
+                                              "wreck": [("fri-wreck", "Ouch. Two kicks fighting.")],
+                                              "clash": [("fri-clash", "Two basslines. Kill a low.")],
+                                              "brakes": [("after-brakes", "Whoa, the brakes! Slower. A little every bar.")],
+                                              "slow": [("after-slow", "It's six in the morning. Bring them down. Slowly.")]],
+                                      bag: ["coro", "oito-oito", "manha", "fumo", "residente", "portao"],
+                                      clockStart: 5 * 60, endBPM: 122)
+    static let all = [firstParty, garageParty, saturdayShift, emptyTuesday, thursdayShow, caveWarmUp, fridayCave, afterhours]
     static func find(_ id: String) -> NightInfo? { all.first { $0.id == id } }
 }
 
@@ -200,6 +221,9 @@ final class NightRunner: ObservableObject {
     private var keyClashRun = 0.0
     private var sourTime = 0.0
     private var graceUntil = -1.0
+    /// Afterhours: the tempo on air two seconds ago, and the last tempo heard.
+    private var bpmAnchor: (time: Double, bpm: Double)?
+    private var lastBPM = 0.0
 
     /// Listeners on the stream, from the energy (radio nights).
     var listeners: Int { Int((40 + energyShown * 1260).rounded()) }
@@ -311,7 +335,7 @@ final class NightRunner: ObservableObject {
     /// how well they sit together. `lead` is the louder deck. `stuck`: the room hears a record
     /// stuck in one groove.
     func update(dt: Double, state: MixReading.State, quality: Double, bassClash: Bool, lead: Int, onAirRecord: String?, channel: [Double],
-                jingles: Int, beat: Double, stuck: Bool = false, keyClash: Bool = false) {
+                jingles: Int, beat: Double, stuck: Bool = false, keyClash: Bool = false, onAirBPM: Double = 0) {
         guard stars == nil else { return }
         // Requests and the cable come at their moment of the night, and cannot wait for silence.
         if began {
@@ -475,6 +499,19 @@ final class NightRunner: ObservableObject {
         } else {
             keyClashRun = 0
         }
+        // Afterhours: the tempo may only come down gently.
+        if info.endBPM != nil, state != .silence {
+            if let a = bpmAnchor, now - a.time < 2 {
+                if a.bpm - onAirBPM > 2 {
+                    energy = max(0, energy - 0.06)
+                    say("brakes", urgent: true)
+                    bpmAnchor = (now, onAirBPM)
+                }
+            } else {
+                bpmAnchor = (now, onAirBPM)
+            }
+            lastBPM = onAirBPM
+        }
         // A small room only gets so wild.
         let cap = [0.24, 0.48, 0.75, 1.0][min(3, max(0, info.maxMood))]
         energy = min(cap, max(0, energy + rate * dt))
@@ -506,7 +543,8 @@ final class NightRunner: ObservableObject {
         let allRequests = requestsMet >= info.requests.count
         // A small room tops out lower, so it needs less for three stars.
         let need = info.maxMood >= 3 ? 0.6 : 0.5
-        if crowd >= need && transitions >= info.mixesFor3Stars && deadAir < 3 && wreck < 4 && allRequests && !hotPlayed {
+        let broughtDown = info.endBPM.map { lastBPM <= $0 + 0.5 } ?? true
+        if crowd >= need && transitions >= info.mixesFor3Stars && deadAir < 3 && wreck < 4 && allRequests && !hotPlayed && broughtDown {
             earned = 3
         } else if crowd >= 0.42 && transitions >= 1 {
             earned = 2
@@ -519,6 +557,7 @@ final class NightRunner: ObservableObject {
         if !info.requests.isEmpty { summary += "   ·   requests \(requestsMet) / \(info.requests.count)" }
         if !info.hot.isEmpty { summary += hotPlayed ? "   ·   too hot, too early" : "   ·   kept it warm" }
         if info.judgeKeys { summary += sourTime < 1 ? "   ·   in key" : "   ·   sour \(Int(sourTime.rounded())) s" }
+        if info.endBPM != nil { summary += "   ·   ended at \(Int(lastBPM.rounded())) BPM" }
         comment = ""
         stars = earned
     }

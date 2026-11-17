@@ -162,5 +162,24 @@
         {"who": "TÓ", "voice": "vo-helena-to", "text": "Fridays. At CAVE. Peak time. Somebody pinch me."}
       ] }
     ]
+  },
+  {
+    "id": "vex",
+    "shots": [
+      { "art": "scene-vex", "lines": [
+        {"who": "VEX", "clip": "vex-01", "text": "All yours, superstar. Two hours, every second planned. Try that some time."},
+        {"who": "TÓ", "voice": "vo-vex-to", "text": "He pressed play two hours ago and went to the bar. Go and show them what a DJ does."}
+      ] }
+    ]
+  },
+  {
+    "id": "chapter-7-end",
+    "shots": [
+      { "lines": [
+        {"who": "", "text": "06:30. THE LIGHTS COME ON. NOBODY WANTS TO GO HOME."},
+        {"who": "", "text": "VEX POSTS A PHOTO OF YOUR CROWD. CAPTION: \"MY PEOPLE.\""},
+        {"who": "", "text": "END OF CHAPTER 7"}
+      ] }
+    ]
   }
 ]

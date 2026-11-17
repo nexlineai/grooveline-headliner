@@ -69,6 +69,9 @@ enum LessonGoal: Equatable {
     /// The deck's filter knob is in this part of its travel (0 = low-pass closed, 0.5 = off,
     /// 1 = high-pass all the way up).
     case filter(deck: Int, ClosedRange<Double>)
+    /// The deck's tempo is brought down to `to` BPM with its pitch fader, never more than 1.5 BPM
+    /// within one bar (faster and the room feels the brakes: a miss, then carry on).
+    case rideTempo(deck: Int, to: Double)
     /// The deck's motor is off.
     case stopDeck(Int)
     /// Nothing to do: the step ends with the coach's line.
@@ -131,7 +134,36 @@ struct Lesson {
 enum Lessons {
     static func find(_ id: String) -> Lesson? { all.first { $0.id == id } }
 
-    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars, requests, syncOff, byEar, holdIt, longBlend, onAir, warmUp, keys, filterMix]
+    static let all: [Lesson] = [firstMix, onThePhrase, bassSwap, inYourEars, requests, syncOff, byEar, holdIt, longBlend, onAir, warmUp, keys, filterMix, tempo]
+
+    /// Lesson 14, chapter 7, six in the morning: the tempo comes down. Manhã (120) comes in pushed
+    /// up to 128 by SYNC, on its drums-only intro (no notes to clash while it is out of tune),
+    /// then its pitch is ridden down to 120, a little every bar.
+    static let tempo = Lesson(id: "tempo", number: 14, title: "TEMPO", coach: "LIA",
+                              desk: LessonDesk(crossfader: 0.5, channel: [0.85, 0], sync: [false, true], room: "cave",
+                                               records: ["oito-oito", "manha"], chapter: 7), steps: [
+        LessonStep(voice: "tempo-01",
+                   text: "Six in the morning. The ones still here want to float, not run. We're going from 128 down to 120, and nobody's going to notice. Start the left one.",
+                   task: "PRESS PLAY ON THE LEFT DECK", goal: .startDeck(0), target: .play(0)),
+        LessonStep(voice: "tempo-02",
+                   text: "The right one is Manhã. It's 120, but sync has pushed it up to 128. Start it on the one. Its fader is down.",
+                   task: "PRESS PLAY ON THE RIGHT DECK, ON THE ONE", goal: .startOnTheOne(deck: 1, against: 0), target: .play(1),
+                   missVoice: "ear-02-miss", missText: "Not the one. Cue it, and try again.",
+                   missTask: "PRESS CUE ON THE RIGHT DECK, THEN TRY AGAIN", missTarget: .cue(1)),
+        LessonStep(voice: "tempo-03",
+                   text: "Its intro is only drums. No notes to fight, so being pushed up doesn't hurt. Fader up.",
+                   task: "RIGHT CHANNEL FADER UP", goal: .channelFader(1, 0.8...1, onThePhrase: false), target: .channel(1)),
+        LessonStep(voice: "tempo-04",
+                   text: "Left one out, at the next phrase.",
+                   task: "LEFT CHANNEL FADER DOWN, AT THE NEXT PHRASE", goal: .channelFader(0, 0...0.04, onThePhrase: true), target: .channel(0)),
+        LessonStep(voice: "tempo-05",
+                   text: "Now the slow part. Push the right pitch fader up, towards 120. A little every bar. Finger to the side for small moves.",
+                   task: "RIGHT PITCH FADER UP TO 120, A LITTLE EVERY BAR", goal: .rideTempo(deck: 1, to: 120), target: .pitch(1),
+                   missVoice: "tempo-05-miss", missText: "Too fast! Everyone felt the brakes. Slower. A little every bar."),
+        LessonStep(voice: "tempo-06",
+                   text: "120. Nobody noticed, and everybody's floating. That's an afterhours.",
+                   task: "TEMPO", goal: .listen, target: nil),
+    ])
 
     /// Lesson 13, chapter 7, Helena watches the first Friday: the filter. Sink a record with the
     /// low-pass and bring it back; bring the next one in thin (high-pass), thin the old one out
@@ -669,6 +701,10 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private var recordsSeen: [String?]?
     private var pickMisses = 0
     private var picked = false
+    /// For `rideTempo`: where the deck was a bar ago (beat, BPM), and the jolts so far.
+    private var rideAnchor: (beat: Double, bpm: Double)?
+    private var rideMisses = 0
+    private var rode = false
     private var wasOn = [false, false]
     private var armed = false
     private var fresh = true
@@ -708,6 +744,7 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
         postAt = nil
         postRearm = false
         recordsSeen = nil
+        rideAnchor = nil
         let step = lesson.steps[i]
         show(text: step.text, task: step.task, target: step.target)
         say(step.voice)
@@ -942,6 +979,26 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
                 if !facts.motorOn[d] { met() }
             case .filter(let d, let range):
                 if range.contains(facts.filter[d]) { met() }
+            case .rideTempo(let d, let target):
+                let bpm = facts.bpm[d], beat = facts.beat[d]
+                if let a = rideAnchor, beat >= a.beat, beat - a.beat < 4 {
+                    if a.bpm - bpm > 1.5 {
+                        // More than 1.5 BPM down within one bar: everybody felt the brakes.
+                        rideMisses += 1
+                        buzz.notificationOccurred(.warning)
+                        show(text: step.missText ?? step.text, task: step.task, target: step.target)
+                        if let name = step.missVoice { say(name) }
+                        rideAnchor = (beat, bpm)
+                    }
+                } else {
+                    rideAnchor = (beat, bpm)
+                }
+                let text = String(format: "%.1f BPM → %.0f", bpm, target)
+                if text != progress { progress = text }
+                if bpm <= target + 0.3 && facts.turning[d] {
+                    rode = true
+                    met()
+                }
             case .listen:
                 if !speaking { met() }
             }
@@ -970,7 +1027,7 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
         // Stars for what took skill: how close the start was and on which try, and, where the
         // lesson asks for it, taking the old record out at a phrase change.
         var earned: Int
-        let misses = self.misses + pickMisses
+        let misses = self.misses + pickMisses + rideMisses
         if misses == 0 && oneError <= 0.15 {
             earned = 3
         } else if misses <= 1 && oneError <= 0.3 {
@@ -988,6 +1045,9 @@ final class LessonRunner: NSObject, ObservableObject, AVAudioPlayerDelegate {
         var parts: [String] = []
         if picked {
             parts.append(pickMisses == 0 ? "Pick: right first time" : "Pick: \(pickMisses) too hot")
+        }
+        if rode {
+            parts.append(rideMisses == 0 ? "Tempo: nobody felt it" : "Tempo: \(rideMisses) jolt\(rideMisses == 1 ? "" : "s")")
         }
         if startJudged {
             let tries = misses == 0 ? "first try" : (misses == 1 ? "second try" : "try \(misses + 1)")

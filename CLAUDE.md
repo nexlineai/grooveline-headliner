@@ -87,6 +87,10 @@ Design, story, decisions and the build log are in the vault:
   next 6 s of silence do not count. `judgeKeys`: a blend that `Harmony.clash`es for more than 3 s
   drains the room. `LessonDesk.cueBar` cues every record in the lesson (crate loads too) that many
   bars in, past the drum intros, so the music is heard at once.
+  `endBPM` (afterhours): the tempo on air must end at or below it for three stars, and a drop of
+  more than 2 BPM within 2 s costs energy ("the brakes"). Lesson goal `rideTempo(deck, to)`: bring
+  the pitch down to a tempo, never more than 1.5 BPM within one bar. SpriteKit: `SKScene` already
+  has `filter` (CIFilter); the scene's own knob values are `filterSetting` (build 34 broke on it).
 - **Keys (`HeadlinerCore/Harmony.swift`):** Camelot neighbours (same, ±1 with 12/1 wrapping, or
   same number other letter). The decks have NO key lock: the pitch fader and SYNC move the key
   too, so `clash` also counts records pitched more than 0.3 semitone apart (128 -> 130 is 0.27,

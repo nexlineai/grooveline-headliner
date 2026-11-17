@@ -84,6 +84,9 @@ shot lesson-keys-pick 6 -screen lesson -lesson keys -lessonStep 4 -crate 1
 shot friday-night 10 -screen night -night friday-cave -demo 1
 shot story-helena 5 -screen story -scene helena
 shot lesson-filter 6 -screen lesson -lesson filter -lessonStep 1
+shot lesson-tempo 6 -screen lesson -lesson tempo -lessonStep 4
+shot afterhours-night 10 -screen night -night afterhours -demo 1
+shot story-vex 5 -screen story -scene vex
 shot lesson-requests 6 -screen lesson -lesson requests
 shot garage 10 -screen night -night garage-party -demo 1
 shot garage-crate 6 -screen night -night garage-party -crate 1
