@@ -17,12 +17,12 @@ struct BagView: View {
     @State private var slot = 0
     @State private var voice: AVAudioPlayer?
 
-    /// Your records: the chapters played so far, and your dubplate. With only a few chapters
-    /// played (a save from testing), every record up to chapter 12, so there is a real choice.
+    /// Your records: every record of the career (by chapter 12 they are all yours; with the
+    /// chapters locked for release every earlier chapter is played by now), and your dubplate.
+    /// Not `Chapters.recordsOpen`: chapter 12 only opens once THE NIGHT BEFORE has a star, which
+    /// comes after this, so its own records would be missing.
     private var records: [TrackInfo] {
-        let open = Chapters.recordsOpen(game.progress)
-        var list = game.tracks.filter { open.contains($0.chapter ?? 1) }
-        if list.count < 18 { list = game.tracks.filter { ($0.chapter ?? 1) <= 12 } }
+        var list = game.tracks.filter { ($0.chapter ?? 1) <= 12 }
         if game.progress.track != nil { list.append(Studio.cutInfo()) }
         return list
     }
