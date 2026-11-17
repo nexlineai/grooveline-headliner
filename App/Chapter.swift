@@ -46,8 +46,6 @@ enum Chapters {
                                  steps: [
         ChapterStep(id: "cold-open", kind: .story, title: "MERIDIAN", detail: "Sixty thousand people. Nine years from now.",
                     screens: [.story("cold-open"), .story("nine-years")]),
-        ChapterStep(id: "dani", kind: .story, title: "DANI", detail: "Your oldest friend has opinions.",
-                    screens: [.story("dani")]),
         ChapterStep(id: "first-mix", kind: .lesson, title: "FIRST MIX", detail: "Play, count the bars, start on the one, crossfade.",
                     screens: [.lesson("first-mix")]),
         ChapterStep(id: "on-the-phrase", kind: .lesson, title: "ON THE PHRASE", detail: "Eight bars make a phrase. Mix where it changes.",
@@ -56,8 +54,9 @@ enum Chapters {
                     screens: [.lesson("bass-swap")]),
         ChapterStep(id: "in-your-ears", kind: .lesson, title: "IN YOUR EARS", detail: "Hear the next record before the room does.",
                     screens: [.lesson("in-your-ears")]),
-        ChapterStep(id: Nights.firstParty.id, kind: .night, title: Nights.firstParty.title, detail: "Six friends, four and a half minutes, no help.",
-                    screens: [.story("mira-lights"), .night(Nights.firstParty.id), .story("chapter-1-end")]),
+        // The finale: Dani's dare, Mira's lights, the party, the end card.
+        ChapterStep(id: Nights.firstParty.id, kind: .night, title: Nights.firstParty.title, detail: "Dani dares you. Six friends, no help.",
+                    screens: [.story("dani"), .story("mira-lights"), .night(Nights.firstParty.id), .story("chapter-1-end")]),
     ])
 }
 

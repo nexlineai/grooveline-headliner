@@ -35,7 +35,7 @@
     "shots": [
       { "art": "scene-dani", "lines": [
         {"who": "DANI", "clip": "dani-01", "text": "This is it? A plastic controller with a sync button? Fine. Make them dance, superstar."},
-        {"who": "TÓ", "voice": "vo-dani-to", "text": "Ignore him. He's been like that since we were eight. Lesson one, I'll talk you through it."}
+        {"who": "TÓ", "voice": "vo-dani-to", "text": "Ignore him. He's been like that since we were eight. Go on. Show him."}
       ] }
     ]
   },
