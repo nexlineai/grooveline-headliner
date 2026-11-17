@@ -112,6 +112,9 @@ final class BoothScene: SKScene {
     private static let moodNames = ["waiting", "nodding", "dancing", "nuts"]
     /// Which room is above the gear (`room-<room>.jpg`); a lesson can name another.
     private var room = "bedroom"
+    /// Extra lift of a room's picture, as a part of its height, for rooms whose people stand low
+    /// in the picture (chapter 10's open air: at the default only sky and trees showed, build 46).
+    private static let roomLift: [String: CGFloat] = ["field": 0.28, "forest": 0.32, "festival": 0.2, "tent": 0.2]
     /// False on vinyl: SYNC is dim and does nothing.
     private var syncAllowed = true
     /// Ear training: the tempo readouts, the phase dot and the verdict are hidden.
@@ -271,9 +274,13 @@ final class BoothScene: SKScene {
     private func buildRoom(above gearTop: CGFloat) {
         let W = size.width, H = size.height
         // Picture and clip are the same crop (1456 x 472). Lifted a little so heads and shoulders
-        // sit in the part the gear leaves free.
+        // sit in the part the gear leaves free. Open-air rooms have their people lower in the
+        // picture (and in the clip, which is the same crop): they are lifted further, never so far
+        // that the picture's bottom edge comes above the gear.
         let pictureSize = CGSize(width: W, height: W * 472 / 1456)
-        let centre = CGPoint(x: W / 2, y: H + W * 0.026 - pictureSize.height / 2)
+        let maxLift = max(0, gearTop + pictureSize.height - H - W * 0.026)
+        let lift = min((Self.roomLift[room] ?? 0) * pictureSize.height, maxLift)
+        let centre = CGPoint(x: W / 2, y: H + W * 0.026 + lift - pictureSize.height / 2)
         if let image = Art.image("room-\(room)") ?? Art.image("room-bedroom") {
             let still = SKSpriteNode(texture: SKTexture(image: image))
             still.size = pictureSize
