@@ -8,9 +8,13 @@ Design, story, decisions and the build log are in the vault:
 - Public repo `nexlineai/grooveline-headliner`, all rights reserved (`LICENSE`), not open source.
 - The app ships no keys and has no network code. Art, voices and music are made on Omarchy with
   the scripts in `tools/` (xAI key from the GNOME Keyring, never in a file) and committed as files.
-- No repo-level secrets, ever. A signing key will exist only in an approval-gated `testflight`
-  environment (not set up yet; do not push `v*` tags or add a workflow naming it before it exists).
-  Never use `pull_request_target`.
+- No repo-level secrets, ever. The App Store Connect key (team key "Grooveline CI", Admin, Key ID
+  `VBXBBQSHYJ`) exists only in the approval-gated `testflight` environment (created 18 Nov 2026:
+  required reviewer Zé, `v*` tags only; secrets ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8).
+  `.github/workflows/testflight.yml` runs on `v*` tags (the tag must match MARKETING_VERSION, or
+  `vX.Y.Z-N` for another build of it), waits for his approval, then `scripts/ci-testflight.sh`
+  archives with cloud signing (team TBVQAB4342) and uploads (ExportOptions.plist, destination
+  upload). Never use `pull_request_target`.
 - Check `.github/workflows/` before every push (exfil-workflow history on other repos).
 - Commits use `58702721+nexlineai@users.noreply.github.com` (set in this clone's git config).
 - No commercial music, ever: only tracks made by `tools/music/make.mjs` or supplied by Zé as his own.

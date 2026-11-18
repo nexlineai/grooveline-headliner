@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyLists/PROPERTY_LIST-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Signed by Apple's cloud signing with the App Store Connect key, then uploaded straight to
+	     App Store Connect (TestFlight). Team TBVQAB4342 is Zé's developer team (not a secret). -->
+	<key>method</key>
+	<string>app-store-connect</string>
+	<key>destination</key>
+	<string>upload</string>
+	<key>signingStyle</key>
+	<string>automatic</string>
+	<key>teamID</key>
+	<string>TBVQAB4342</string>
+	<key>manageAppVersionAndBuildNumber</key>
+	<false/>
+	<!-- Builds may go to external testers too (a public TestFlight link after Beta App Review). -->
+	<key>testFlightInternalTestingOnly</key>
+	<false/>
+	<key>uploadSymbols</key>
+	<true/>
+</dict>
+</plist>
