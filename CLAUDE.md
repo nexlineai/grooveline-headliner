@@ -244,6 +244,10 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
   headphones' pair -> MediaStream -> `<audio>.setSinkId`; the room via `AudioContext.setSinkId`).
   Never recreate the AudioContext (the records live in the worklet). A vanished device -> OFF (the
   cue must never fall back to the room). Not testable headless: needs Zé's hardware.
+- **Layout unit (18 Nov):** `u = min(height share / 210, width / 816)` (816u = the iPhone's gear width), the gear sits at the
+  bottom and the room takes the rest; `build()` publishes `--gear-h` (the gear's height in px) and the overlays (lesson, night,
+  studio grid) size themselves from it, so fullscreen 16:9 no longer overlaps. FULLSCREEN button in the top bar (hidden where
+  the browser has none). Windows below about 1.45:1 (4:3, 5:4) leave an empty band above the gear (the room picture is fixed 3.08:1).
 - Booth: `src/booth/booth.ts` draws in SpriteKit's world (y up, CSS pixels), so `BoothScene`'s layout
   numbers, angles and touch arithmetic port unchanged; the room picture and its clips are DOM
   layers under the canvas. Labels use Barlow Condensed (OFL, `web/fonts/`), the same on every system.

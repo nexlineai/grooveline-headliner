@@ -151,7 +151,7 @@ button.quiet[hidden] { display: none; }
 .chapter-steps .s { color: var(--orange); font-size: 15px; letter-spacing: 0.1em; white-space: nowrap; }
 
 /* A lesson over the room: the thing to do top left, the coach's words just above the gear. */
-#lesson { position: fixed; left: 0; right: 0; top: 0; height: 42vh; height: 42dvh; z-index: 2; pointer-events: none;
+#lesson { position: fixed; left: 0; right: 0; top: 0; height: calc(100vh - var(--gear-h, 58vh)); height: calc(100dvh - var(--gear-h, 58dvh)); z-index: 2; pointer-events: none;
   display: flex; flex-direction: column; justify-content: space-between; padding: 2vh 2vw 1.2vh 2vw; }
 #lesson[hidden] { display: none; }
 #lesson-top { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; max-width: min(460px, 55vw); margin-left: 46px; }
@@ -184,7 +184,7 @@ button.quiet[hidden] { display: none; }
 #result-retry + #result-continue:not([hidden]) { background: none; color: rgba(255, 255, 255, 0.85); border: 1px solid rgba(255, 255, 255, 0.45); }
 
 /* A night over the room: the clock and the crowd's energy top left, what a friend says above the gear. */
-#night { position: fixed; left: 0; right: 0; top: 0; height: 42vh; height: 42dvh; z-index: 2; pointer-events: none;
+#night { position: fixed; left: 0; right: 0; top: 0; height: calc(100vh - var(--gear-h, 58vh)); height: calc(100dvh - var(--gear-h, 58dvh)); z-index: 2; pointer-events: none;
   display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; padding: 2vh 2vw 1.2vh 2vw; }
 #night[hidden] { display: none; }
 #night-meter { margin-left: 46px; display: flex; align-items: center; gap: 10px; padding: 7px 14px; border-radius: 999px; background: rgba(0, 0, 0, 0.72); }
@@ -204,7 +204,7 @@ button.quiet[hidden] { display: none; }
 @keyframes pulse { from { box-shadow: 0 0 2px rgba(255, 153, 61, 0.2); } to { box-shadow: 0 0 14px rgba(255, 153, 61, 0.9); } }
 
 /* The studio's step grid, over the room just above the gear. */
-#studio { position: fixed; z-index: 2; left: 50%; transform: translateX(-50%); bottom: calc(58vh + 6px); bottom: calc(58dvh + 6px);
+#studio { position: fixed; z-index: 2; left: 50%; transform: translateX(-50%); bottom: calc(var(--gear-h, 58vh) + 6px); bottom: calc(var(--gear-h, 58dvh) + 6px);
   display: flex; gap: 8px; align-items: center; padding: 8px 12px; border-radius: 14px;
   background: rgba(0, 0, 0, 0.72); border: 1px solid rgba(255, 255, 255, 0.12); }
 #studio[hidden] { display: none; }

@@ -321,10 +321,16 @@ export class Booth {
     this.canvas.height = Math.round(H * this.dpr);
     if (W <= 200 || H <= 200) { this.L = null; return; }
     const left = 10, right = 10, bottom = 8;
-    const gearTop = H * 0.58;
     const gx0 = left, gy0 = bottom;
-    const gw = W - left - right, gh = gearTop - 6 - bottom;
-    const u = gh / 210;
+    const gw = W - left - right;
+    // The gear is drawn in units `u` (the iPhone's: 210 high, 816 wide with a mixer 224 wide): as big
+    // as the height (at most the lower 58 %) and the width both allow. On a tall screen (fullscreen
+    // 16:9) the width is the limit; the gear then sits at the bottom and the room takes the rest.
+    const u = Math.min((H * 0.58 - 6 - bottom) / 210, gw / 816);
+    const gh = 210 * u;
+    const gearTop = bottom + gh + 6;
+    // The overlays (lesson, night, studio grid) take the room's real height from here.
+    document.documentElement.style.setProperty("--gear-h", `${H - gearTop}px`);
     const gap = 8 * u;
     const mixerW = Math.min(gw * 0.31, 224 * u);
     const deckW = (gw - mixerW - gap * 2) / 2;

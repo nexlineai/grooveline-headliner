@@ -587,6 +587,17 @@ $("crate-close").addEventListener("click", () => { crate.hidden = true; });
 $("phones-close").addEventListener("click", () => { phonesPanel.hidden = true; });
 $("jingle-button").addEventListener("click", playJingle);
 $("controls-button").addEventListener("click", () => { fillControls(); toggle($("controls")); });
+
+// FULLSCREEN: the whole page (the booth redraws to the new size by itself). Not offered where the
+// browser has none (iPhone Safari).
+const fullscreenButton = $("fullscreen-button");
+if (document.fullscreenEnabled) {
+  fullscreenButton.hidden = false;
+  fullscreenButton.addEventListener("click", () => {
+    (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {});
+  });
+  document.addEventListener("fullscreenchange", () => { fullscreenButton.textContent = document.fullscreenElement ? "EXIT FULLSCREEN" : "FULLSCREEN"; });
+}
 $("controls-close").addEventListener("click", () => { $("controls").hidden = true; });
 $("phones-button").addEventListener("click", () => { fillPhones().then(() => toggle(phonesPanel)).catch(failed); });
 
