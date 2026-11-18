@@ -224,6 +224,11 @@ enum Chapters {
 
     static func find(_ number: Int) -> Chapter? { all.first { $0.number == number } }
 
+    /// The chapter a screen belongs to (the first one that lists it); nil for free play.
+    static func chapter(of screen: Game.Screen) -> Int? {
+        all.first { $0.steps.contains { $0.screens.contains(screen) } }?.number
+    }
+
     /// Chapters whose records are in the free-play crate: the first from the start, the others
     /// once their night has been played (one star is enough); a chapter without a night yet,
     /// once one of its lessons has been done. Records belong to the chapter that brought them.
@@ -289,7 +294,11 @@ struct CareerProgress: Codable, Equatable {
 
 struct ChapterView: View {
     @EnvironmentObject var game: Game
+    @EnvironmentObject var store: Store
     let chapter: Chapter
+
+    /// A paid chapter without the purchase: its steps are shown but locked, with the offer.
+    private var paywalled: Bool { Store.isPaid(chapter: chapter.number) && !store.careerOpen }
 
     private var nextIndex: Int? { chapter.steps.firstIndex { !game.progress.done($0) } }
     private var earned: Int { chapter.steps.reduce(0) { $0 + (game.progress.stars[$1.id] ?? 0) } }
@@ -313,7 +322,9 @@ struct ChapterView: View {
                     // yet show a lock and do nothing.
                     HStack(spacing: 4) {
                         ForEach(Chapters.all.filter { $0.number != chapter.number }, id: \.number) { other in
-                            let open = Chapters.reached(other.number, game.progress)
+                            let reachedByOrder = Chapters.reached(other.number, game.progress)
+                            // Reached but not bought: shows a lock, opens the chapter's offer.
+                            let open = reachedByOrder && !(Store.isPaid(chapter: other.number) && !store.careerOpen)
                             Button {
                                 game.screen = .chapter(other.number)
                             } label: {
@@ -328,7 +339,7 @@ struct ChapterView: View {
                                 .frame(width: 21, height: 21)
                                 .background(Circle().stroke(.white.opacity(open ? 0.35 : 0.12), lineWidth: 1))
                             }
-                            .disabled(!open)
+                            .disabled(!reachedByOrder)
                         }
                     }
                     Text(chapter.title)
@@ -348,7 +359,9 @@ struct ChapterView: View {
                             .foregroundStyle(.white)
                     }
                     .padding(.top, 2)
-                    if let next = nextChapter {
+                    if paywalled {
+                        unlockCard
+                    } else if let next = nextChapter {
                         // Chapter finished: on to the next one (this one can still be played again).
                         Button { game.screen = .chapter(next) } label: {
                             Text("CHAPTER \(next)  →")
@@ -404,6 +417,58 @@ struct ChapterView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         // In the background, so the picture (wider than the screen) cannot make the screen wider.
         .background { backdrop }
+        .task { if paywalled { await store.loadProduct() } }
+    }
+
+    /// The offer at the door of chapter 3: one purchase opens the rest of the career.
+    private var unlockCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("The rest of the career: chapters 3 to 12. One purchase, no ads, no account.")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.white.opacity(0.8))
+                .fixedSize(horizontal: false, vertical: true)
+            if let price = store.priceText {
+                Button { Task { await store.buy() } } label: {
+                    Text("UNLOCK  ·  \(price)")
+                        .font(.system(size: 15, weight: .heavy))
+                        .tracking(3)
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 28)
+                        .padding(.vertical, 12)
+                        .background(Capsule().fill(GroovelineLogo.teal))
+                }
+                .disabled(store.busy)
+            } else if store.productFailed {
+                Text("Can't reach the App Store right now.")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.6))
+                Button { Task { await store.loadProduct() } } label: {
+                    Text("TRY AGAIN")
+                        .font(.system(size: 13, weight: .heavy))
+                        .tracking(3)
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 28)
+                        .padding(.vertical, 10)
+                        .background(Capsule().fill(GroovelineLogo.teal))
+                }
+            } else {
+                ProgressView().tint(.white)
+            }
+            Button { Task { await store.restore() } } label: {
+                Text("RESTORE PURCHASE")
+                    .font(.system(size: 11, weight: .heavy))
+                    .tracking(2)
+                    .foregroundStyle(.white.opacity(0.8))
+            }
+            .disabled(store.busy)
+            if let message = store.message {
+                Text(message)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Color(Palette.orange))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.top, 8)
     }
 
     private var backdrop: some View {
@@ -426,7 +491,7 @@ struct ChapterView: View {
 
     private func row(_ step: ChapterStep, index: Int) -> some View {
         let done = game.progress.done(step)
-        let open = !Chapters.locked || index <= (nextIndex ?? chapter.steps.count)
+        let open = !paywalled && (!Chapters.locked || index <= (nextIndex ?? chapter.steps.count))
         let isNext = index == nextIndex
         let icon: String
         switch step.kind {

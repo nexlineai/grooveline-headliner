@@ -40,7 +40,12 @@ final class Game: ObservableObject {
     /// Zé's hidden unlock: every chapter and step open (`Chapters.locked` reads the same default).
     @Published var unlockAll = UserDefaults.standard.bool(forKey: "unlockAll")
 
+    /// The one purchase (chapters 3 to 12); injected into the views too.
+    let store = Store()
+
     func toggleUnlock() {
+        // The App Store build ignores the hidden hold (TestFlight and Zé's own builds keep it).
+        guard store.devUnlockAllowed else { return }
         unlockAll.toggle()
         UserDefaults.standard.set(unlockAll, forKey: "unlockAll")
     }
@@ -224,6 +229,11 @@ final class Game: ObservableObject {
 
     /// Shows these screens one after the other, then `home`.
     func run(_ screens: [Screen], home: Screen = .title) {
+        // Paid chapters never start without the purchase (the chapter screen shows the offer).
+        if !store.careerOpen, screens.contains(where: { Chapters.chapter(of: $0).map(Store.isPaid(chapter:)) ?? false }) {
+            screen = home
+            return
+        }
         self.home = home
         queue = screens
         // THE NIGHT BEFORE and MERIDIAN play the bag you packed: with none packed yet, THE BAG

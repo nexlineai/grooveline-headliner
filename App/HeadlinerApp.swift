@@ -8,6 +8,7 @@ struct HeadlinerApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(game)
+                .environmentObject(game.store)
                 .preferredColorScheme(.dark)
                 .statusBarHidden(true)
                 .persistentSystemOverlays(.hidden)

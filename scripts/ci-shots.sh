@@ -62,6 +62,8 @@ shot title-new 5 -unlockAll 0
 shot chapter 5 -screen chapter -demoProgress 1 -unlockAll 0
 shot chapter-locked 5 -screen chapter -chapter 1 -unlockAll 0
 shot chapter3 5 -screen chapter -chapter 3
+# The offer at the door of chapter 3 (Debug-only -forceLocked / -shotPrice; also the IAP review screenshot).
+shot paywall 5 -screen chapter -chapter 3 -forceLocked 1 -shotPrice '$4.99'
 shot chapter2 5 -screen chapter -chapter 2
 shot booth 9 -screen booth -demo 1
 shot lesson 6 -screen lesson

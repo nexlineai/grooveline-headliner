@@ -164,6 +164,14 @@ Design, story, decisions and the build log are in the vault:
   `Chapters.current` show a lock; a finished chapter offers CHAPTER N+1; PLAY opens the current
   chapter). Zé's hidden unlock: hold the title's Grooveline logo 3 s (`Game.unlockAll`, default
   `unlockAll`). `ci-shots.sh` passes `-unlockAll 1` to every shot unless the shot names it.
+- **Paywall (`Store.swift`, 18 Nov):** chapters 1-2 free, `Store.firstPaidChapter` = 3 (one constant).
+  One non-consumable `org.grooveline.headliner.career` (id can never be reused), price 4.99 set in App
+  Store Connect, shown with `product.displayPrice`. `Store.careerOpen` = owned, or the hidden logo hold
+  (`devUnlockAllowed`: not in the App Store build; REMOVE the TestFlight/review allowance before the
+  build that goes to App Review), or a non-production receipt whose product failed to load (testers are
+  never stuck). `Game.run` refuses paid screens; `ChapterView.paywalled` shows the offer + RESTORE.
+  Ownership only ever turns on at launch (refunds arrive via `Transaction.updates`). Debug-only
+  launch args for shots: `-forceLocked 1`, `-shotPrice '$4.99'`.
 - Nights (`Night.swift`, `Nights`, `Screen.night(id)`): no coach; `NightRunner` turns what the
   room hears (`MixJudge` reading: silence / one record / blend quality, bass clash, which deck is
   on air) into crowd energy, a mood 0-3 and short comments from the friends; stars from the

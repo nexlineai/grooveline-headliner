@@ -28,6 +28,7 @@ struct TitleView: View {
                 .padding(.bottom, 6)
                 // Hidden: hold for three seconds to open (or lock again) every chapter, for testing.
                 .onLongPressGesture(minimumDuration: 3) {
+                    guard game.store.devUnlockAllowed else { return }
                     game.toggleUnlock()
                     UINotificationFeedbackGenerator().notificationOccurred(.success)
                     toast = game.unlockAll ? "EVERY CHAPTER OPEN" : "CHAPTERS IN ORDER"
