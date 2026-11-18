@@ -37,6 +37,14 @@ final class Game: ObservableObject {
     private var home: Screen = .title
     /// Best stars and scenes seen, saved on the phone.
     @Published private(set) var progress = CareerProgress.load()
+    /// Zé's hidden unlock: every chapter and step open (`Chapters.locked` reads the same default).
+    @Published var unlockAll = UserDefaults.standard.bool(forKey: "unlockAll")
+
+    func toggleUnlock() {
+        unlockAll.toggle()
+        UserDefaults.standard.set(unlockAll, forKey: "unlockAll")
+    }
+
     /// The screenshot run starts the app with `-demo 1`: the decks start by themselves.
     let demo: Bool
     /// The studio's drum pattern (chapter 8). Not saved yet.

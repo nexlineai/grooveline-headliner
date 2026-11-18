@@ -46,15 +46,20 @@ xcrun simctl boot "$udid"
 xcrun simctl bootstatus "$udid" -b
 xcrun simctl install "$udid" "$app"
 
-shot() { # name, seconds to wait, launch arguments...
+shot() { # name, seconds to wait, launch arguments... (every chapter open unless -unlockAll is given)
   local name=$1 wait=$2; shift 2
-  xcrun simctl launch "$udid" "$bundle" "$@"
+  if [[ " $* " == *" -unlockAll "* ]]; then
+    xcrun simctl launch "$udid" "$bundle" "$@"
+  else
+    xcrun simctl launch "$udid" "$bundle" -unlockAll 1 "$@"
+  fi
   sleep "$wait"
   xcrun simctl io "$udid" screenshot "build/shots/$name.png"
   xcrun simctl terminate "$udid" "$bundle" || true
 }
 shot title 6
-shot chapter 5 -screen chapter -demoProgress 1
+shot chapter 5 -screen chapter -demoProgress 1 -unlockAll 0
+shot chapter-locked 5 -screen chapter -chapter 1 -unlockAll 0
 shot chapter3 5 -screen chapter -chapter 3
 shot chapter2 5 -screen chapter -chapter 2
 shot booth 9 -screen booth -demo 1

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct TitleView: View {
     @EnvironmentObject var game: Game
+    @State private var toast: String?
 
     private func small(_ title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
@@ -20,6 +21,13 @@ struct TitleView: View {
             Spacer()
             GroovelineLogo(height: 30)
                 .padding(.bottom, 6)
+                // Hidden: hold for three seconds to open (or lock again) every chapter, for testing.
+                .onLongPressGesture(minimumDuration: 3) {
+                    game.toggleUnlock()
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    toast = game.unlockAll ? "EVERY CHAPTER OPEN" : "CHAPTERS IN ORDER"
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) { toast = nil }
+                }
             Text("HEADLINER")
                 .font(.custom("Orbitron-Black", size: 58))
                 .tracking(4)
@@ -29,7 +37,8 @@ struct TitleView: View {
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(.white.opacity(0.75))
             Button {
-                game.screen = .chapter(1)
+                // The chapter you are up to.
+                game.screen = .chapter(Chapters.current(game.progress))
             } label: {
                 Text("PLAY")
                     .font(.system(size: 17, weight: .heavy))
@@ -45,6 +54,18 @@ struct TitleView: View {
                 .padding(.bottom, 24)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .overlay(alignment: .top) {
+            if let toast {
+                Text(toast)
+                    .font(.system(size: 12, weight: .heavy))
+                    .tracking(3)
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(Capsule().fill(Color(Palette.teal)))
+                    .padding(.top, 14)
+            }
+        }
         .background {
             ZStack {
                 if let art = Art.image("title-floor") {

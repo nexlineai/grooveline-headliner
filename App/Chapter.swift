@@ -25,9 +25,26 @@ struct Chapter {
 }
 
 enum Chapters {
-    /// Locks every step after the first one not done yet. Off while Zé tests, so any part can be
-    /// played straight away; on for the release.
-    static let locked = false
+    /// A new player goes through the career in order: every step after the first one not done
+    /// is locked, and every chapter after the first one not finished. Zé's hidden unlock (hold the
+    /// Grooveline logo on the title for three seconds) opens everything; the screenshot run passes
+    /// `-unlockAll 1`.
+    static var locked: Bool { !UserDefaults.standard.bool(forKey: "unlockAll") }
+
+    /// Every step of the chapter done (a story seen, a lesson or night with a star).
+    static func finished(_ chapter: Chapter, _ progress: CareerProgress) -> Bool {
+        chapter.steps.allSatisfy { progress.done($0) }
+    }
+
+    /// The chapter the player is up to: the first one not finished (the last one when all are).
+    static func current(_ progress: CareerProgress) -> Int {
+        all.first { !finished($0, progress) }?.number ?? all[all.count - 1].number
+    }
+
+    /// Can this chapter be opened yet?
+    static func reached(_ number: Int, _ progress: CareerProgress) -> Bool {
+        !locked || number <= current(progress)
+    }
 
     static let all: [Chapter] = [bedroom, houseParties, shop, pubs, radio, door, resident, studio, road, festivals, backToBack, headliner]
 
@@ -277,6 +294,11 @@ struct ChapterView: View {
     private var nextIndex: Int? { chapter.steps.firstIndex { !game.progress.done($0) } }
     private var earned: Int { chapter.steps.reduce(0) { $0 + (game.progress.stars[$1.id] ?? 0) } }
     private var possible: Int { chapter.steps.filter { $0.kind != .story }.count * 3 }
+    /// The chapter after this one, once this one is finished (none after the last).
+    private var nextChapter: Int? {
+        guard nextIndex == nil, Chapters.find(chapter.number + 1) != nil else { return nil }
+        return chapter.number + 1
+    }
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -287,20 +309,26 @@ struct ChapterView: View {
                         .tracking(5)
                         .foregroundStyle(GroovelineLogo.teal)
                         .fixedSize()
-                    // Other chapters, while nothing is locked: their own line, so twelve still fit.
-                    if !Chapters.locked {
-                        HStack(spacing: 4) {
-                            ForEach(Chapters.all.filter { $0.number != chapter.number }, id: \.number) { other in
-                                Button {
-                                    game.screen = .chapter(other.number)
-                                } label: {
-                                    Text("\(other.number)")
-                                        .font(.system(size: 10, weight: .heavy))
-                                        .foregroundStyle(.white.opacity(0.8))
-                                        .frame(width: 21, height: 21)
-                                        .background(Circle().stroke(.white.opacity(0.35), lineWidth: 1))
+                    // The other chapters on their own line, so twelve still fit; the ones not reached
+                    // yet show a lock and do nothing.
+                    HStack(spacing: 4) {
+                        ForEach(Chapters.all.filter { $0.number != chapter.number }, id: \.number) { other in
+                            let open = Chapters.reached(other.number, game.progress)
+                            Button {
+                                game.screen = .chapter(other.number)
+                            } label: {
+                                Group {
+                                    if open {
+                                        Text("\(other.number)").font(.system(size: 10, weight: .heavy))
+                                    } else {
+                                        Image(systemName: "lock.fill").font(.system(size: 8, weight: .bold))
+                                    }
                                 }
+                                .foregroundStyle(.white.opacity(open ? 0.8 : 0.3))
+                                .frame(width: 21, height: 21)
+                                .background(Circle().stroke(.white.opacity(open ? 0.35 : 0.12), lineWidth: 1))
                             }
+                            .disabled(!open)
                         }
                     }
                     Text(chapter.title)
@@ -320,16 +348,37 @@ struct ChapterView: View {
                             .foregroundStyle(.white)
                     }
                     .padding(.top, 2)
-                    Button(action: playOn) {
-                        Text(nextIndex == nil ? "PLAY IT AGAIN" : (nextIndex == 0 ? "START" : "CONTINUE"))
-                            .font(.system(size: 16, weight: .heavy))
-                            .tracking(5)
-                            .foregroundStyle(.black)
-                            .padding(.horizontal, 44)
-                            .padding(.vertical, 12)
-                            .background(Capsule().fill(GroovelineLogo.teal))
+                    if let next = nextChapter {
+                        // Chapter finished: on to the next one (this one can still be played again).
+                        Button { game.screen = .chapter(next) } label: {
+                            Text("CHAPTER \(next)  →")
+                                .font(.system(size: 16, weight: .heavy))
+                                .tracking(5)
+                                .foregroundStyle(.black)
+                                .padding(.horizontal, 36)
+                                .padding(.vertical, 12)
+                                .background(Capsule().fill(GroovelineLogo.teal))
+                        }
+                        .padding(.top, 8)
+                        Button(action: playOn) {
+                            Text("PLAY IT AGAIN")
+                                .font(.system(size: 11, weight: .heavy))
+                                .tracking(2)
+                                .foregroundStyle(.white.opacity(0.8))
+                        }
+                        .padding(.leading, 12)
+                    } else {
+                        Button(action: playOn) {
+                            Text(nextIndex == nil ? "PLAY IT AGAIN" : (nextIndex == 0 ? "START" : "CONTINUE"))
+                                .font(.system(size: 16, weight: .heavy))
+                                .tracking(5)
+                                .foregroundStyle(.black)
+                                .padding(.horizontal, 44)
+                                .padding(.vertical, 12)
+                                .background(Capsule().fill(GroovelineLogo.teal))
+                        }
+                        .padding(.top, 8)
                     }
-                    .padding(.top, 8)
                 }
                 .frame(maxWidth: 300, alignment: .leading)
                 VStack(spacing: 4) {
