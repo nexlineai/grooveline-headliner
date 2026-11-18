@@ -92,6 +92,13 @@ export class StoryPlayer {
     this.waiting = null;
     this.voice?.pause();
     this.voice = null;
+    // A clip cut short by a tap stops talking at once, and is hidden (no mouth frozen mid-word):
+    // only one line is ever heard. A clip that played to its end stays, on the still picture.
+    const current = this.clips.get(this.lineIndex);
+    if (current && !current.paused && !current.ended) {
+      current.pause();
+      current.style.opacity = "0";
+    }
     const shot = this.shot;
     if (!shot) { this.finish(); return; }
     if (this.lineIndex + 1 < shot.lines.length) {
@@ -143,8 +150,13 @@ export class StoryPlayer {
     }
     // The clip of this line on top (an earlier clip stays below, holding its last frame).
     const clip = this.clips.get(this.lineIndex);
+    // Never two voices: every other clip of the shot is silent before this line starts.
+    for (const [i, v] of this.clips) {
+      if (i === this.lineIndex) continue;
+      if (!v.paused) v.pause();
+      if (i > this.lineIndex) v.style.opacity = "0";
+    }
     if (clip) {
-      for (const [i, v] of this.clips) if (i !== this.lineIndex && i > this.lineIndex) v.style.opacity = "0";
       this.root.insertBefore(clip, this.caption);
       clip.currentTime = 0;
       clip.play().catch(() => this.wait(Math.max(2.2, line.text.length * 0.07)));
