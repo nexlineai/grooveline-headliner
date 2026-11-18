@@ -3,7 +3,9 @@
 // - Serves the iPhone app's content from ../App at /assets/ (records, room pictures and clips,
 //   story, coach lines, fonts): one copy on disk for both versions.
 // - Sends the COOP/COEP headers, so the page may share memory with its audio thread.
-// - Listens on localhost only, unless --lan is given (to try it on a phone on the same Wi-Fi).
+// - Listens on localhost only, unless --lan is given. Over plain http a phone on the Wi-Fi gets
+//   the page but NO sound: browsers allow AudioWorklet (and shared memory) only on https or
+//   localhost. Phones need an https preview deploy (or a tunnel).
 
 import http from "node:http";
 import { createReadStream } from "node:fs";

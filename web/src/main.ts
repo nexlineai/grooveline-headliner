@@ -53,10 +53,12 @@ async function begin(): Promise<void> {
   if (c) console.info(`audio ${c.sampleRate} Hz, latency ${(engine.latency * 1000).toFixed(1)} ms, shared memory ${engine.sharedMemory}`);
 }
 
-/** The crate: every record, newest chapter first, onto the left or the right deck. */
+/** The crate: newest chapter first, onto the left or the right deck. A preview without progress
+ * yet, so it lists every chapter (the iPhone opens only chapters played; that comes with the
+ * career). Never the white label: it is the end of the game (zdB's dubplate). */
 function fillCrate(): void {
   crateList.replaceChildren();
-  const order = tracks.map((t, i) => ({ t, i })).sort((x, y) => (y.t.chapter ?? 1) - (x.t.chapter ?? 1) || x.i - y.i);
+  const order = tracks.map((t, i) => ({ t, i })).filter(({ t }) => t.id !== "white-label").sort((x, y) => (y.t.chapter ?? 1) - (x.t.chapter ?? 1) || x.i - y.i);
   for (const { t } of order) {
     const row = document.createElement("div");
     row.className = "record";

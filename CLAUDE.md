@@ -191,8 +191,9 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
 - `web/src/core/` is `HeadlinerCore` line by line; `web/test/core.test.ts` is `CoreTests.swift` case
   by case. A change to one core is made in the other too, with its test twin.
 - Run it: `cd web && node tools/serve.ts` -> http://localhost:5173 (serves `../App` at `/assets/`,
-  one copy of the content; COOP/COEP headers so the page shares memory with its audio thread;
-  `--lan` to try it on a phone on the same Wi-Fi).
+  one copy of the content; COOP/COEP headers so the page shares memory with its audio thread).
+  `--lan` serves the Wi-Fi too, but a phone gets no sound over plain http (AudioWorklet needs
+  https or localhost): phones wait for an https preview deploy.
 - Look at it myself: `node tools/shot.ts OUT.png "http://localhost:5173/?autostart&demo" [--do
   "click X Y; drag X1 Y1 X2 Y2; wait S; eval EXPR"]` = headless, muted Chromium, prints the console
   and errors; `eval` sees `engine` and `booth`.
