@@ -46,7 +46,8 @@ enum Chapters {
                     screens: [.story("night-before"), .night(Nights.nightBefore.id)]),
         // Back where the game began: the cold open again (Nuno, the bag), then the closing set.
         ChapterStep(id: Nights.meridian.id, kind: .night, title: Nights.meridian.title, detail: "The closing set. Sixty thousand people.",
-                    screens: [.story("back-to-meridian"), .story("cold-open"), .night(Nights.meridian.id)]),
+                    screens: [.story("back-to-meridian"), .story("cold-open"), .night(Nights.meridian.id),
+                              .story("meridian-end"), .credits]),
     ])
 
     /// Chapter 11: back to back. Helena first: one booth, two DJs, her deck is hers.

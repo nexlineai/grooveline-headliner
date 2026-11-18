@@ -182,11 +182,12 @@ struct BoothView: View {
             let open = Chapters.recordsOpen(game.progress)
             // The white label is yours once you have played it at MERIDIAN.
             let played = (game.progress.stars[Nights.meridian.id] ?? 0) > 0
-            return game.tracks.filter { open.contains($0.chapter ?? 1) && ($0.id != WhiteLabel.id || played) }
+            return Self.newestFirst(game.tracks.filter { open.contains($0.chapter ?? 1) && ($0.id != WhiteLabel.id || played) })
                 + (game.progress.track != nil ? [Studio.cutInfo()] : [])
         }
         var chapter = Int.max
         var bag: [String]?
+        var collection = false
         if let id = lessonID, let lesson = Lessons.find(id) { chapter = lesson.desk.chapter; bag = lesson.desk.bag }
         if let id = nightID, let info = Nights.find(id) {
             chapter = info.chapter
@@ -195,10 +196,28 @@ struct BoothView: View {
             if info.closingSet, let packed = game.progress.closingSet, packed.count == 6 { bag = packed }
             // MERIDIAN: the white label after the bag.
             if let last = info.lastRecord, var list = bag, !list.contains(last) { list.append(last); bag = list }
+            collection = info.wholeCollection
         }
         // In the bag's own order (a packed closing set reads opener first), the dubplate in its place.
-        if let bag { return bag.compactMap { id in id == "your-dubplate" ? Studio.cutInfo() : game.tracks.first { $0.id == id } } }
-        return game.tracks.filter { ($0.chapter ?? 1) <= chapter }
+        if let bag {
+            var list = bag.compactMap { id in id == "your-dubplate" ? Studio.cutInfo() : game.tracks.first { $0.id == id } }
+            if collection {
+                // MERIDIAN: then everything else you have collected, newest first, and your dubplate.
+                list += Self.newestFirst(game.tracks.filter { ($0.chapter ?? 1) <= 12 && !bag.contains($0.id) && $0.id != WhiteLabel.id })
+                if game.progress.track != nil && !bag.contains("your-dubplate") { list.append(Studio.cutInfo()) }
+            }
+            return list
+        }
+        // The chapter's own records first, then the ones before (the white label only at MERIDIAN).
+        return Self.newestFirst(game.tracks.filter { ($0.chapter ?? 1) <= chapter && $0.id != WhiteLabel.id })
+    }
+
+    /// Newest chapter first; inside a chapter, the order of `tracks.json`.
+    static func newestFirst(_ list: [TrackInfo]) -> [TrackInfo] {
+        list.enumerated().sorted { a, b in
+            let ca = a.element.chapter ?? 1, cb = b.element.chapter ?? 1
+            return ca != cb ? ca > cb : a.offset < b.offset
+        }.map(\.element)
     }
 
     private func pill(_ symbol: String, _ title: String, lit: Bool, action: @escaping () -> Void) -> some View {

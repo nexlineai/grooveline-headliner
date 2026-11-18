@@ -9,7 +9,7 @@ let gameLog = Logger(subsystem: "org.grooveline.headliner", category: "game")
 
 /// App-wide state: which screen is up, what comes after it, the deck engine, the crate and the story.
 final class Game: ObservableObject {
-    enum Screen: Equatable { case title, chapter(Int), story(String), booth, lesson(String), night(String), bag }
+    enum Screen: Equatable { case title, chapter(Int), story(String), booth, lesson(String), night(String), bag, credits }
 
     @Published var screen: Screen = .title { didSet { updateMenuMusic() } }
     /// The radio station's ID, fired with the JINGLE button in the studio.
@@ -107,6 +107,7 @@ final class Game: ObservableObject {
         case "lesson": openBooth(lesson: defaults.string(forKey: "lesson") ?? "first-mix")
         case "night": openBooth(night: defaults.string(forKey: "night") ?? Nights.firstParty.id)
         case "story": screen = .story(defaults.string(forKey: "scene") ?? "cold-open")
+        case "credits": screen = .credits
         case "bag":
             // The screenshot run shows a bag part-way packed (not saved).
             if defaults.bool(forKey: "demoBag") { progress.closingSet = nil; demoBag = ["bastidores", "holofote", "meridiano", "ponte", "tabla"] }
@@ -159,6 +160,13 @@ final class Game: ObservableObject {
     func leave() {
         queue = []
         screen = home
+    }
+
+    /// The game is over (after the credits): back to the title, nothing lined up.
+    func finish() {
+        queue = []
+        home = .title
+        screen = .title
     }
 
     /// Keeps the best stars of a lesson or a night.

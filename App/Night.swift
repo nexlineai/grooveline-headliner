@@ -74,6 +74,8 @@ struct NightInfo {
     var closingSet = false
     /// A record that is always in this night's crate after the bag (MERIDIAN: the white label).
     var lastRecord: String? = nil
+    /// After the bag, every other record of the career, newest first (MERIDIAN: your whole collection).
+    var wholeCollection = false
 }
 
 /// What goes wrong in a night: the cable is kicked (the record stops), the needle jumps a groove,
@@ -96,7 +98,7 @@ struct NightRequest {
     var text: String
 }
 
-/// Lia's record with no name (chapter 2), played last at MERIDIAN. Zé's own track from 2011.
+/// Lia's record with no name (chapter 2), played last at MERIDIAN: a dubplate zdB produced in 2007.
 /// Kept out of THE BAG and out of free play until MERIDIAN has a star.
 enum WhiteLabel {
     static let id = "white-label"
@@ -444,7 +446,7 @@ enum Nights {
                                        clockStart: 22 * 60, judgeKeys: true, closingSet: true)
     /// Chapter 12, the finale: MERIDIAN's main stage, the closing set. The bag you packed, on
     /// vinyl, sixty thousand people; the needle skips, and this time you know what to do.
-    /// After the closer, the white label (Zé's own record, 2011): three stars need it on air at the end.
+    /// After the closer, the white label (zdB's 2007 dubplate): three stars need it on air at the end.
     static let meridian = NightInfo(id: "meridian", title: "MERIDIAN", length: 540, room: "meridian",
                                     records: ["bastidores", "holofote"], chapter: 12, mixesFor3Stars: 5,
                                     mishapAt: 0.4, mishap: .needleSkip, syncAllowed: false,
@@ -463,7 +465,7 @@ enum Nights {
                                             "closer": [("meridian-closer", "Now the one with no name. Lia's record. You know why.")]],
                                     bag: ["bastidores", "holofote", "meridiano", "ponte", "especiaria", "nove-anos"],
                                     clockStart: 23 * 60 + 30, judgeKeys: true, encoreWith: [WhiteLabel.id], closingSet: true,
-                                    lastRecord: WhiteLabel.id)
+                                    lastRecord: WhiteLabel.id, wholeCollection: true)
     static let all = [firstParty, garageParty, saturdayShift, emptyTuesday, thursdayShow, caveWarmUp, fridayCave, afterhours, dubplateNight, berlinNight, ibizaNight, burnout, sunsetSlot, threePM, tentRain, forestStage, boatParty, vexB2B, nightBefore, meridian]
     static func find(_ id: String) -> NightInfo? { all.first { $0.id == id } }
 }

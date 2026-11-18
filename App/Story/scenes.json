@@ -322,5 +322,15 @@
         {"who": "", "text": "MERIDIAN. SIDE STAGE."}
       ] }
     ]
+  },
+  {
+    "id": "meridian-end",
+    "shots": [
+      { "art": "scene-shop-lia", "lines": [
+        {"who": "LIA", "voice": "vo-meridian-end-1", "text": "Sixty thousand people. And the last record had no name on it."},
+        {"who": "LIA", "voice": "vo-meridian-end-2", "text": "They didn't dance for a name. They danced for the record."},
+        {"who": "LIA", "voice": "vo-meridian-end-3", "text": "Now you know why."}
+      ] }
+    ]
   }
 ]
