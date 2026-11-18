@@ -42,7 +42,6 @@
   <button id="back" class="round" aria-label="Back">‹</button>
 
   <div id="top">
-    <button id="career-button" class="pill">CAREER</button>
     <button id="jingle-button" class="pill" hidden>JINGLE</button>
     <button id="phones-button" class="pill"><svg class="icon" viewBox="0 0 24 24" width="1.2em" height="1.2em" aria-hidden="true"><path d="M4 15v-3a8 8 0 0 1 16 0v3" fill="none" stroke="currentColor" stroke-width="2.4"/><rect x="2.5" y="13.5" width="5" height="8" rx="2" fill="currentColor"/><rect x="16.5" y="13.5" width="5" height="8" rx="2" fill="currentColor"/></svg>PHONES</button>
     <button id="crate-button" class="pill">CRATE</button>
@@ -54,11 +53,6 @@
     <div id="crate-list"></div>
   </div>
 
-  <div id="career" class="sheet" hidden>
-    <div class="head"><h2>CAREER</h2><span><button id="free-play" class="pill">FREE PLAY</button> <button id="career-close" class="pill">CLOSE</button></span></div>
-    <div id="career-list"></div>
-  </div>
-
   <div id="phones" class="sheet small" hidden>
     <div class="head"><h2>PHONES</h2><button id="phones-close" class="pill">CLOSE</button></div>
     <p>One stereo output and a splitter cable: the room in the left ear, the next record in the right.</p>
@@ -68,10 +62,16 @@
     </div>
   </div>
 
-  <div id="start">
-    <div class="logo"><span class="bars"><i></i><i></i><i></i><i></i></span>GROOVELINE</div>
+  <div id="chapter" class="screen" hidden></div>
+
+  <div id="start" class="screen" hidden>
+    <div id="title-toast" hidden></div>
+    <div class="logo" title=""><span class="bars"><i></i><i></i><i></i><i></i></span>GROOVELINE</div>
     <h1>HEADLINER</h1>
-    <p>Web preview · tap to start the decks</p>
+    <p class="tagline">From the bedroom to the main stage</p>
+    <button id="title-play" class="primary">PLAY</button>
+    <div class="row"><button id="title-free" class="quiet">FREE PLAY</button><button id="title-ending" class="quiet" hidden>THE ENDING</button></div>
+    <p class="hint">Web preview</p>
   </div>
 
   <script type="module" src="src/main.ts"></script>

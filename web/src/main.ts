@@ -1,42 +1,43 @@
-// Grooveline Headliner in the browser: the booth, free play, the lessons and the nights.
-// Browsers start sound only after a click or a touch, so the page waits for one.
+// Grooveline Headliner in the browser: title, chapters, story, lessons, nights and free play.
+// Browsers start sound only after a click or a touch: the title's buttons are that click.
 //   ?lesson=<id>[&step=<n>]   start straight in a lesson
 //   ?night=<id>[&length=<s>]  start straight in a night (a short length for tests)
-//   ?demo                     both records turning (screenshots)
+//   ?demo                     free play with both records turning (screenshots)
 //   ?autostart                no click needed (screenshots; the browser must allow sound)
+//   ?unlockAll=1|0            the hidden unlock, for tests
 
 import type { TrackInfo } from "./core/beatgrid.ts";
 import { DrumPattern } from "./core/drummachine.ts";
 import { DeckEngine } from "./audio/engine.ts";
 import { Booth } from "./booth/booth.ts";
 import { loadContent } from "./game/content.ts";
-import type { Content, NightInfo } from "./game/content.ts";
+import type { Chapter, ChapterStep, Content, NightInfo, Screen } from "./game/content.ts";
 import { LessonRunner } from "./game/lesson.ts";
 import { NightRunner } from "./game/night.ts";
 import { StudioGrid, cutInfo, loadCut, loadLoop, namedPattern } from "./game/studio.ts";
 import { StoryPlayer, loadScenes } from "./game/story.ts";
 import type { StoryScene } from "./game/story.ts";
-import type { Chapter, ChapterStep, Screen } from "./game/content.ts";
 import * as Progress from "./game/progress.ts";
+import { showChapter } from "./menus.ts";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const engine = new DeckEngine();
 const booth = new Booth($<HTMLCanvasElement>("booth"), $("room"), engine);
-const start = $("start"), crate = $("crate"), crateList = $("crate-list"), phonesPanel = $("phones"), note = $("note");
-const careerSheet = $("career"), careerList = $("career-list");
+const title = $("start"), chapterScreen = $("chapter"), crate = $("crate"), crateList = $("crate-list"), phonesPanel = $("phones"), note = $("note");
 const lessonOverlay = $("lesson"), nightOverlay = $("night"), result = $("result");
 const params = new URLSearchParams(location.search);
-// For the screenshot tool's `eval` (tools/shot.ts) and the browser console.
-Object.assign(window, { headliner: { engine, booth, play: (chapter: number, step: number) => {
-  const c = content?.career.chapters.find((x) => x.number === chapter);
-  if (c) playStep(c, c.steps[step]);
-} } });
 
 let content: Content | null = null;
 let tracks: TrackInfo[] = [];
 let scenes = new Map<string, StoryScene>();
 const progress = Progress.loadProgress();
 if (params.has("unlockAll")) Progress.setUnlockAll(params.get("unlockAll") !== "0");
+
+// For the screenshot tool's `eval` (tools/shot.ts) and the browser console.
+Object.assign(window, { headliner: { engine, booth, progress, play: (chapter: number, step: number) => {
+  const c = content?.career.chapters.find((x) => x.number === chapter);
+  if (c) playSteps(c, [c.steps[step]]);
+} } });
 
 // The canvas only uses a web font once it has loaded; ask for it now.
 document.fonts.load(`600 16px "Barlow Condensed"`).catch(() => {});
@@ -102,32 +103,44 @@ grid.onCut = () => {
 
 // MARK: - Start
 
-async function begin(): Promise<void> {
-  start.classList.add("busy");
-  try {
-    await engine.start();
-    content = await loadContent();
-    scenes = await loadScenes();
-    tracks = content.tracks;
-    booth.tracks = tracks;
-    fillCareer();
-    const lesson = params.get("lesson"), night = params.get("night");
-    if (lesson) await startLesson(lesson, Number(params.get("step") ?? 0));
-    else if (night) await startNight(night, Number(params.get("length") ?? 0) || null);
-    else {
-      // Lessons rely on the first two records (122 and 124 BPM); free play starts with them too.
-      await Promise.all([loadRecord(0, tracks[0]), loadRecord(1, tracks[1])]);
-      freePlay();
-      if (params.has("demo")) booth.demo();
+let starting: Promise<void> | null = null;
+
+/** Sound on, content read (once; the first click on the title does it). */
+function ensureStarted(): Promise<void> {
+  starting ??= (async () => {
+    title.classList.add("busy");
+    try {
+      await engine.start();
+      content = await loadContent();
+      scenes = await loadScenes();
+      tracks = content.tracks;
+      booth.tracks = tracks;
+    } catch (e) {
+      starting = null;
+      title.querySelector(".hint")!.textContent = `Could not start: ${e}`;
+      throw e;
+    } finally {
+      title.classList.remove("busy");
     }
-    start.hidden = true;
-  } catch (e) {
-    start.classList.remove("busy");
-    start.querySelector("p")!.textContent = `Could not start: ${e}`;
-    throw e;
+    const c = engine.context;
+    if (c) console.info(`audio ${c.sampleRate} Hz, latency ${(engine.latency * 1000).toFixed(1)} ms, shared memory ${engine.sharedMemory}`);
+  })();
+  return starting;
+}
+
+const failed = (e: unknown) => { note.textContent = String(e); console.error(e); };
+
+/** The links for tests and screenshots. */
+async function autostart(): Promise<void> {
+  await ensureStarted();
+  const lesson = params.get("lesson"), night = params.get("night");
+  title.hidden = true;
+  if (lesson) await startLesson(lesson, Number(params.get("step") ?? 0));
+  else if (night) await startNight(night, Number(params.get("length") ?? 0) || null);
+  else {
+    await openFreePlay();
+    if (params.has("demo")) booth.demo();
   }
-  const c = engine.context;
-  if (c) console.info(`audio ${c.sampleRate} Hz, latency ${(engine.latency * 1000).toFixed(1)} ms, shared memory ${engine.sharedMemory}`);
 }
 
 const firstTwo = () => [tracks[0].id, tracks[1].id];
@@ -137,12 +150,83 @@ const newestFirst = (list: TrackInfo[]) =>
   list.map((t, i) => ({ t, i })).sort((x, y) => (y.t.chapter ?? 1) - (x.t.chapter ?? 1) || x.i - y.i).map((x) => x.t);
 const upTo = (chapter: number) => newestFirst(tracks.filter((t) => (t.chapter ?? 1) <= chapter && t.id !== "white-label"));
 
-function showMode(mode: "free" | "lesson" | "night" | "story"): void {
+function showMode(mode: "free" | "lesson" | "night" | "story" | "menu"): void {
   lessonOverlay.hidden = mode !== "lesson";
   nightOverlay.hidden = mode !== "night";
   result.hidden = true;
   grid.hide();
-  for (const s of [crate, phonesPanel, careerSheet]) s.hidden = true;
+  for (const s of [crate, phonesPanel]) s.hidden = true;
+  if (mode !== "menu") { title.hidden = true; chapterScreen.hidden = true; }
+}
+
+// MARK: - Title and chapters
+
+/** MERIDIAN played (it has a star) or its ending seen. */
+const careerOver = () => (progress.stars["meridian"] ?? 0) > 0 || progress.seen.includes("meridian-end");
+
+function showTitle(): void {
+  sequence = null;
+  booth.clearSession();
+  for (const deck of engine.decks) deck.motorOn = false;
+  showMode("menu");
+  chapterScreen.hidden = true;
+  title.hidden = false;
+  $("title-ending").hidden = !(careerOver() || Progress.unlockedAll());
+}
+
+function openChapter(n: number): void {
+  if (!content) return;
+  const chapters = content.career.chapters;
+  const chapter = chapters.find((c) => c.number === n) ?? chapters[0];
+  sequence = null;
+  booth.clearSession();
+  for (const deck of engine.decks) deck.motorOn = false;
+  showMode("menu");
+  title.hidden = true;
+  showChapter(chapterScreen, chapters, chapter, progress, {
+    play: (steps) => playSteps(chapter, steps),
+    open: (m) => openChapter(m),
+    back: () => showTitle(),
+  });
+}
+
+$("title-play").addEventListener("click", () => {
+  // The chapter you are up to.
+  ensureStarted().then(() => openChapter(Progress.current(progress, content!.career.chapters))).catch(failed);
+});
+$("title-free").addEventListener("click", () => { ensureStarted().then(() => openFreePlay()).catch(failed); });
+$("title-ending").addEventListener("click", () => {
+  // Once the career is over: Lia, the credits and zdB's record again.
+  ensureStarted().then(() => playScreens([{ type: "story", id: "meridian-end" }, { type: "credits" }])).catch(failed);
+});
+
+// Zé's hidden unlock, as on the iPhone: hold the Grooveline logo three seconds.
+{
+  const logo = title.querySelector<HTMLElement>(".logo")!;
+  let timer: number | null = null;
+  logo.addEventListener("pointerdown", () => {
+    timer = window.setTimeout(() => {
+      Progress.setUnlockAll(!Progress.unlockedAll());
+      const toast = $("title-toast");
+      toast.textContent = Progress.unlockedAll() ? "EVERY CHAPTER OPEN" : "CHAPTERS IN ORDER";
+      toast.hidden = false;
+      setTimeout(() => { toast.hidden = true; }, 2000);
+      $("title-ending").hidden = !(careerOver() || Progress.unlockedAll());
+      timer = null;
+    }, 3000);
+  });
+  const cancel = () => { if (timer !== null) { clearTimeout(timer); timer = null; } };
+  logo.addEventListener("pointerup", cancel);
+  logo.addEventListener("pointerleave", cancel);
+}
+
+// MARK: - Free play and the crate
+
+async function openFreePlay(): Promise<void> {
+  showMode("free");
+  // Lessons rely on the first two records (122 and 124 BPM); free play starts with them too.
+  if (!engine.decks[0].isLoaded || !engine.decks[1].isLoaded) await Promise.all([loadRecord(0, tracks[0]), loadRecord(1, tracks[1])]);
+  freePlay();
 }
 
 /** Free play: the records of the chapters played so far (the white label once it was played at
@@ -178,7 +262,7 @@ function fillCrate(list: TrackInfo[]): void {
       b.addEventListener("click", () => {
         crate.hidden = true;
         if (booth.refuseLoad(d)) return; // back to back: her deck is hers
-        loadRecord(d, t).catch((e) => { note.textContent = String(e); });
+        loadRecord(d, t).catch(failed);
       });
       row.append(b);
     }
@@ -186,49 +270,20 @@ function fillCrate(list: TrackInfo[]): void {
   }
 }
 
-// MARK: - The career (chapters, their lessons and nights)
+// MARK: - Playing steps (their screens one after the other)
 
-/** Every chapter with its steps: stars won, scenes seen, and what is still locked (in order,
- * as on the iPhone, unless everything is unlocked). */
-function fillCareer(): void {
-  if (!content) return;
-  const chapters = content.career.chapters;
-  careerList.replaceChildren();
-  for (const c of chapters) {
-    const open = Progress.reached(progress, chapters, c.number);
-    const earned = c.steps.reduce((n, s) => n + (progress.stars[s.id] ?? 0), 0);
-    const head = document.createElement("div");
-    head.className = `chapter-head${open ? "" : " locked"}`;
-    head.innerHTML = `<span class="n"></span><div><b></b><span class="earned"></span><p></p></div>`;
-    head.querySelector(".n")!.textContent = String(c.number);
-    head.querySelector("b")!.textContent = c.title;
-    head.querySelector(".earned")!.textContent = earned ? `★ ${earned}` : "";
-    head.querySelector("p")!.textContent = open ? c.line : "Locked: finish the chapter before it.";
-    careerList.append(head);
-    if (!open) continue;
-    c.steps.forEach((step, i) => {
-      const row = document.createElement("button");
-      const isDone = Progress.done(progress, step);
-      row.className = `step-row ${step.kind}${isDone ? " done" : ""}`;
-      row.innerHTML = `<span class="k"></span><b></b><span class="c"></span><span class="s"></span>`;
-      row.querySelector(".k")!.textContent = step.kind.toUpperCase();
-      row.querySelector("b")!.textContent = step.title;
-      row.querySelector(".c")!.textContent = step.detail;
-      const stars = progress.stars[step.id] ?? 0;
-      row.querySelector(".s")!.textContent = step.kind === "story" ? (isDone ? "seen" : "") : "★★★".slice(0, stars) + "☆☆☆".slice(stars);
-      row.disabled = !Progress.stepOpen(progress, c, i);
-      row.addEventListener("click", () => { careerSheet.hidden = true; playStep(c, step); });
-      careerList.append(row);
-    });
-  }
+/** What is being played from a chapter: the steps left, and the screens of the current one. */
+let sequence: { chapter: Chapter | null; steps: ChapterStep[]; screens: Screen[]; at: number } | null = null;
+
+function playSteps(chapter: Chapter, steps: ChapterStep[]): void {
+  if (steps.length === 0) return;
+  sequence = { chapter, steps, screens: steps[0].screens, at: -1 };
+  nextScreen();
 }
 
-// MARK: - Playing a step (its screens one after the other)
-
-let sequence: { chapter: Chapter; step: ChapterStep; screens: Screen[]; at: number } | null = null;
-
-function playStep(chapter: Chapter, step: ChapterStep): void {
-  sequence = { chapter, step, screens: step.screens, at: -1 };
+/** Screens with no step around them (THE ENDING from the title). */
+function playScreens(screens: Screen[]): void {
+  sequence = { chapter: null, steps: [], screens, at: -1 };
   nextScreen();
 }
 
@@ -238,17 +293,27 @@ function nextScreen(): void {
   seq.at += 1;
   const screen = seq.screens[seq.at];
   if (!screen) {
-    // The step is over: a story step counts as seen; back to the career.
-    if (seq.step.kind === "story") Progress.markSeen(progress, seq.step.id);
+    // The step is over: a story step counts as seen; then the next step, or back to the chapter.
+    const step = seq.steps[0];
+    if (step?.kind === "story") Progress.markSeen(progress, step.id);
+    seq.steps = seq.steps.slice(1);
+    if (seq.steps.length > 0) {
+      seq.screens = seq.steps[0].screens;
+      seq.at = -1;
+      nextScreen();
+      return;
+    }
+    const back = seq.chapter;
     sequence = null;
-    freePlay();
-    fillCareer();
-    careerSheet.hidden = false;
+    if (back) openChapter(back.number);
+    else showTitle();
     return;
   }
-  const failed = (e: unknown) => { note.textContent = String(e); };
   switch (screen.type) {
-    case "story": playStory(scenes.get(screen.id) ?? card(`(${screen.id})`)); break;
+    case "story":
+      if (screen.id === "meridian-end") Progress.markSeen(progress, "meridian-end");
+      playStory(scenes.get(screen.id) ?? card(`(${screen.id})`));
+      break;
     case "lesson": startLesson(screen.id).catch(failed); break;
     case "night": startNight(screen.id).catch(failed); break;
     case "bag": playStory(card("THE BAG", "Packing your closing set comes to the web soon. MERIDIAN uses the bag as written.")); break;
@@ -274,10 +339,12 @@ async function startLesson(id: string, step = 0): Promise<void> {
   if (!lesson || !content) throw new Error(`no lesson "${id}"`);
   const runner = new LessonRunner(lesson, content.career.handsOff);
   runner.startAt = step;
+  showMode("lesson");
+  lessonOverlay.hidden = true;
   note.textContent = `Lesson ${lesson.number}…`;
   await booth.startLesson(runner, firstTwo());
   note.textContent = "";
-  showMode("lesson");
+  lessonOverlay.hidden = false;
   if (lesson.desk.studio) {
     // A studio lesson starts from its own pattern, or an empty one; the dubplate lesson cuts what
     // you made (or the groove from the lessons).
@@ -334,10 +401,12 @@ async function startNight(id: string, length: number | null = null): Promise<voi
   const info = content?.career.nights.find((n) => n.id === id);
   if (!info || !content) throw new Error(`no night "${id}"`);
   const runner = new NightRunner(info, length ?? info.length, content.career.nightLines, content.career.handsOff);
+  showMode("night");
+  nightOverlay.hidden = true;
   note.textContent = `${info.title}…`;
   await booth.startNight(runner, firstTwo());
   note.textContent = "";
-  showMode("night");
+  nightOverlay.hidden = false;
   $("jingle-button").hidden = info.room !== "studio";
   $("crate-button").hidden = false;
   fillCrate(nightCrate(info));
@@ -370,10 +439,10 @@ function showNight(): void {
 
 // MARK: - The result card (a lesson's stars, a night's)
 
-function showResult(kicker: string, title: string, stars: number, line: string, missed: string | null): void {
+function showResult(kicker: string, heading: string, stars: number, line: string, missed: string | null): void {
   result.hidden = false;
   $("result-number").textContent = kicker;
-  $("result-title").textContent = title;
+  $("result-title").textContent = heading;
   $("result-stars").replaceChildren(...[0, 1, 2].map((i) => {
     const s = document.createElement("span");
     s.textContent = i < stars ? "★" : "☆";
@@ -389,7 +458,7 @@ function showResult(kicker: string, title: string, stars: number, line: string, 
 
 $("result-retry").addEventListener("click", () => {
   const id = booth.night?.info.id;
-  if (id) startNight(id).catch((e) => { note.textContent = String(e); });
+  if (id) startNight(id).catch(failed);
 });
 
 $("result-continue").addEventListener("click", () => {
@@ -398,36 +467,33 @@ $("result-continue").addEventListener("click", () => {
   const missed = !!night?.missed;
   if (lesson && lesson.stars !== null) Progress.record(progress, lesson.lesson.id, lesson.stars);
   if (night && night.stars !== null && !missed) Progress.record(progress, night.info.id, night.stars);
-  if (sequence && !missed) { result.hidden = true; nextScreen(); return; }
-  freePlay();
-  fillCareer();
-  careerSheet.hidden = false;
+  result.hidden = true;
+  if (sequence && !missed) { nextScreen(); return; }
+  leave();
 });
 
-// Back: leaves the lesson, night or story (and whatever was lined up after it).
-$("back").addEventListener("click", () => {
+/** Back: leaves the lesson, night or story (and whatever was lined up after it). */
+function leave(): void {
   for (const v of document.querySelectorAll<HTMLVideoElement>("#story video")) v.pause();
   $("story").hidden = true;
   $("story").replaceChildren();
-  freePlay();
-  fillCareer();
-  careerSheet.hidden = false;
-});
+  const back = sequence?.chapter;
+  sequence = null;
+  if (back) openChapter(back.number);
+  else showTitle();
+}
 
 (function overlays() { showLesson(); showNight(); requestAnimationFrame(overlays); })();
 
 // MARK: - Buttons
 
-const sheets = [crate, phonesPanel, careerSheet];
+const sheets = [crate, phonesPanel];
 const toggle = (sheet: HTMLElement) => { const open = sheet.hidden; for (const s of sheets) s.hidden = true; sheet.hidden = !open; };
-start.addEventListener("click", () => { if (!start.classList.contains("busy")) begin(); });
+$("back").addEventListener("click", leave);
 $("crate-button").addEventListener("click", () => toggle(crate));
 $("crate-close").addEventListener("click", () => { crate.hidden = true; });
 $("phones-button").addEventListener("click", () => toggle(phonesPanel));
 $("phones-close").addEventListener("click", () => { phonesPanel.hidden = true; });
-$("career-button").addEventListener("click", () => { fillCareer(); toggle(careerSheet); });
-$("career-close").addEventListener("click", () => { careerSheet.hidden = true; });
-$("free-play").addEventListener("click", () => freePlay());
 $("jingle-button").addEventListener("click", playJingle);
 for (const b of phonesPanel.querySelectorAll<HTMLButtonElement>("[data-mode]")) {
   b.addEventListener("click", () => {
@@ -436,22 +502,5 @@ for (const b of phonesPanel.querySelectorAll<HTMLButtonElement>("[data-mode]")) 
   });
 }
 
-// Zé's hidden unlock, as on the iPhone: hold the Grooveline logo three seconds.
-{
-  const logo = start.querySelector<HTMLElement>(".logo")!;
-  let timer: number | null = null;
-  logo.addEventListener("pointerdown", (e) => {
-    e.stopPropagation();
-    timer = window.setTimeout(() => {
-      Progress.setUnlockAll(!Progress.unlockedAll());
-      start.querySelector("p")!.textContent = Progress.unlockedAll() ? "Everything unlocked · tap to start" : "Locks back on · tap to start";
-      timer = null;
-    }, 3000);
-  });
-  const cancel = () => { if (timer !== null) { clearTimeout(timer); timer = null; } };
-  logo.addEventListener("pointerup", cancel);
-  logo.addEventListener("pointerleave", cancel);
-  logo.addEventListener("click", (e) => e.stopPropagation());
-}
-
-if (params.has("autostart")) begin(); // screenshots (the browser is told to allow sound without a click)
+if (params.has("autostart")) autostart().catch(failed); // screenshots (the browser allows sound without a click)
+else showTitle();
