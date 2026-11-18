@@ -627,6 +627,27 @@ async function fillPhones(): Promise<void> {
     row.append(b, el("p", "", m.can ? m.about : `${m.about} ${m.why ?? ""}`));
     body.append(row);
   }
+  // TWO DEVICES: the headphones' timing, measured, and set by ear.
+  if (engine.phones === "second") {
+    const t = engine.timing;
+    const box = el("div", "timing");
+    box.append(el("span", "head", "HEADPHONES TIMING"));
+    box.append(el("p", "small", t.ring
+      ? `Room about ${t.roomMs} ms, headphones about ${t.phonesMs} ms: the room waits ${t.roomWaitsMs} ms so both sound together.`
+      : "This page has no shared memory, so the headphones go through a slower stream: set the timing by ear."));
+    const row = el("div", "trim");
+    const slider = document.createElement("input");
+    slider.type = "range"; slider.min = "-150"; slider.max = "400"; slider.step = "5";
+    slider.value = String(engine.phonesTrimMs);
+    const value = el("span", "ms", `${engine.phonesTrimMs > 0 ? "+" : ""}${engine.phonesTrimMs} ms`);
+    slider.addEventListener("input", () => {
+      engine.setPhonesTrim(Number(slider.value));
+      value.textContent = `${engine.phonesTrimMs > 0 ? "+" : ""}${engine.phonesTrimMs} ms`;
+    });
+    row.append(el("span", "end", "HEADPHONES EARLY"), slider, el("span", "end", "HEADPHONES LATE"), value);
+    box.append(row, el("p", "small", "By ear: turn the cue mix knob to ROOM and play a record. Move the slider until the headphones and the speakers sound as one (no echo). Kept for this headphone device."));
+    body.append(box);
+  }
   // The devices, where the browser lets us choose them.
   if (DeckEngine.canChooseRoom || DeckEngine.canChoosePhones) {
     const outputs = await engine.listOutputs().catch(() => []);

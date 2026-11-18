@@ -49,7 +49,9 @@ export type ToWorklet =
    * count changed before this message arrived. */
   | { type: "load"; deck: number; left: Float32Array; right: Float32Array; position: number; keepPlace: boolean; seekSeq: number }
   | { type: "unload"; deck: number }
-  | { type: "sync"; values: Float64Array };
+  | { type: "sync"; values: Float64Array }
+  /** The headphones on a second device: the ring to write their channels into (null: stop). */
+  | { type: "ring"; buffer: SharedArrayBuffer | null; cap: number };
 
 /** Messages from the audio thread to the page (fallback only: the audio thread's fields). */
 export type FromWorklet = { type: "state"; values: Float64Array };

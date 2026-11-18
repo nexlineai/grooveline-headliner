@@ -341,3 +341,10 @@ button.quiet[hidden] { display: none; }
 #learn-choice { display: flex; gap: 8px; flex-wrap: wrap; }
 #learn-choice:empty { display: none; }
 #learn-choice .pill { font-size: 11px; padding: 0.6em 1em; }
+
+#phones-body .timing { margin-top: 10px; padding: 10px 0; border-bottom: 1px solid var(--edge); }
+#phones-body .timing .head { color: var(--teal); font: 800 11px system-ui, sans-serif; letter-spacing: 0.15em; }
+#phones-body .trim { display: flex; align-items: center; gap: 8px; }
+#phones-body .trim input { flex: 1; accent-color: var(--teal); }
+#phones-body .trim .end { color: var(--dim); font: 800 9px system-ui, sans-serif; letter-spacing: 0.08em; white-space: nowrap; }
+#phones-body .trim .ms { min-width: 58px; text-align: right; font: 700 13px system-ui, sans-serif; font-variant-numeric: tabular-nums; }

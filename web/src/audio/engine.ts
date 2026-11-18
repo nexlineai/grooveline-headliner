@@ -256,6 +256,17 @@ export class DeckEngine {
   private phonesPair: ChannelMergerNode | null = null;
   private phonesStream: MediaStreamAudioDestinationNode | null = null;
   private phonesElement: HTMLAudioElement | null = null;
+  // TWO DEVICES the low-delay way: an AudioContext of its own on the headphones' device, fed from
+  // the mixer through a ring of shared memory (phones-worklet.ts); the room waits for it.
+  private phonesContext: AudioContext | null = null;
+  private phonesNode: AudioWorkletNode | null = null;
+  private phonesTarget = 1024;
+  private roomDelay: DelayNode | null = null;
+  private alignTimer: number | null = null;
+  /** The headphones' timing set by ear (ms, + = the room waits more), per headphones device. */
+  phonesTrimMs = 0;
+  /** What the timing is now, for the PHONES panel. */
+  timing = { roomMs: 0, phonesMs: 0, roomWaitsMs: 0, ring: false };
   /** The sound device for the room ("" = the system's default), and the one for the headphones. */
   roomDevice = "";
   phonesDevice = "";
@@ -289,7 +300,12 @@ export class DeckEngine {
       const roomPair = context.createChannelMerger(2);
       splitter.connect(roomPair, 0, 0);
       splitter.connect(roomPair, 1, 1);
-      roomPair.connect(context.destination);
+      // The room can wait for headphones on a slower second device (0 otherwise).
+      const roomDelay = context.createDelay(1);
+      roomDelay.delayTime.value = 0;
+      roomPair.connect(roomDelay);
+      roomDelay.connect(context.destination);
+      this.roomDelay = roomDelay;
       this.splitter = splitter;
       this.roomPair = roomPair;
       this.shared.attach(node.port);
@@ -355,7 +371,18 @@ export class DeckEngine {
     if (this.phonesPair) { splitter.disconnect(this.phonesPair); this.phonesPair.disconnect(); this.phonesPair = null; }
     if (this.phonesElement) { this.phonesElement.pause(); this.phonesElement.srcObject = null; this.phonesElement = null; }
     this.phonesStream = null;
-    try { roomPair.disconnect(); } catch { /* not connected */ }
+    if (this.phonesContext) {
+      this.node?.port.postMessage({ type: "ring", buffer: null, cap: 0 });
+      this.phonesNode?.disconnect();
+      this.phonesContext.close().catch(() => {});
+      this.phonesContext = null;
+      this.phonesNode = null;
+    }
+    if (this.alignTimer !== null) { clearInterval(this.alignTimer); this.alignTimer = null; }
+    this.roomDelay?.delayTime.setTargetAtTime(0, context.currentTime, 0.02);
+    this.timing = { roomMs: 0, phonesMs: 0, roomWaitsMs: 0, ring: false };
+    const roomOut = this.roomDelay ?? roomPair;
+    try { roomOut.disconnect(); } catch { /* not connected */ }
     const dest = context.destination;
     if (mode === "card") {
       // Four channels straight to the card, in order: room 1-2, headphones 3-4.
@@ -371,26 +398,92 @@ export class DeckEngine {
       dest.channelCount = 2;
       dest.channelCountMode = "explicit";
       dest.channelInterpretation = "speakers";
-      roomPair.connect(dest);
+      roomOut.connect(dest);
       if (mode === "second") {
-        // The headphones' pair goes to a stream, played by an audio element on the other device.
-        const pair = context.createChannelMerger(2);
-        splitter.connect(pair, 2, 0);
-        splitter.connect(pair, 3, 1);
-        const stream = context.createMediaStreamDestination();
-        pair.connect(stream);
-        const element = new Audio();
-        element.srcObject = stream.stream;
-        await (element as HTMLAudioElement & { setSinkId(id: string): Promise<void> }).setSinkId(this.phonesDevice);
-        await element.play();
-        this.phonesPair = pair;
-        this.phonesStream = stream;
-        this.phonesElement = element;
+        this.phonesTrimMs = this.savedTrim(this.phonesDevice);
+        if (this.shared.isShared && DeckEngine.canChooseRoom) await this.openPhonesContext(context);
+        else await this.openPhonesStream(context, splitter);
         this.shared.set(mixerAt(M.twoOutputs), 1);
+        this.align();
+        this.alignTimer = window.setInterval(() => this.align(), 2000);
       }
       if (mode === "split") this.shared.set(mixerAt(M.split), 1);
     }
     this._phones = mode;
+  }
+
+  /** The low-delay way: the headphones' own AudioContext on their device, fed by a ring. */
+  private async openPhonesContext(context: AudioContext): Promise<void> {
+    const cap = 8192;
+    const ring = new SharedArrayBuffer(8 + cap * 2 * 4);
+    const phones = new AudioContext({ latencyHint: "interactive", sampleRate: context.sampleRate }) as AudioContext & { setSinkId(id: string): Promise<void> };
+    try {
+      await phones.setSinkId(this.phonesDevice);
+      await phones.audioWorklet.addModule(new URL("./phones-worklet.ts", import.meta.url));
+      const node = new AudioWorkletNode(phones, "headliner-phones", {
+        numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2],
+        processorOptions: { buffer: ring, cap, target: this.phonesTarget },
+      });
+      // The phones' worklet asks for more room after running dry: the room waits a little more.
+      node.port.onmessage = (e: MessageEvent<{ target?: number }>) => { if (e.data.target) { this.phonesTarget = e.data.target; this.align(); } };
+      node.connect(phones.destination);
+      if (phones.state !== "running") await phones.resume();
+      this.phonesContext = phones;
+      this.phonesNode = node;
+      this.node?.port.postMessage({ type: "ring", buffer: ring, cap });
+    } catch (e) {
+      phones.close().catch(() => {});
+      throw e;
+    }
+  }
+
+  /** Without shared memory (a page that is not cross-origin isolated): a media stream played on
+   * the other device. It works, with more delay; the room waits by the trim set by ear. */
+  private async openPhonesStream(context: AudioContext, splitter: ChannelSplitterNode): Promise<void> {
+    const pair = context.createChannelMerger(2);
+    splitter.connect(pair, 2, 0);
+    splitter.connect(pair, 3, 1);
+    const stream = context.createMediaStreamDestination();
+    pair.connect(stream);
+    const element = new Audio();
+    element.srcObject = stream.stream;
+    await (element as HTMLAudioElement & { setSinkId(id: string): Promise<void> }).setSinkId(this.phonesDevice);
+    await element.play();
+    this.phonesPair = pair;
+    this.phonesStream = stream;
+    this.phonesElement = element;
+  }
+
+  /** The room waits as long as the headphones' way is longer (measured), plus the trim set by
+   * ear; when the headphones are the faster ones, their ring holds a little more instead. */
+  private align(): void {
+    const room = this.context, delay = this.roomDelay;
+    if (!room || !delay) return;
+    const roomS = room.baseLatency + (room.outputLatency || 0);
+    const phones = this.phonesContext;
+    const ring = phones !== null;
+    const phonesS = phones ? phones.baseLatency + (phones.outputLatency || 0) + this.phonesTarget / room.sampleRate : roomS;
+    const diff = phonesS - roomS + this.phonesTrimMs / 1000;
+    const wait = Math.max(0, Math.min(0.9, diff));
+    delay.delayTime.setTargetAtTime(wait, room.currentTime, 0.05);
+    if (ring && diff < 0) {
+      // The headphones are ahead: keep more in their ring (at most half of it).
+      const extra = Math.min(4096, Math.round(-diff * room.sampleRate));
+      this.phonesNode?.port.postMessage({ target: Math.max(this.phonesTarget, 1024 + extra) });
+    }
+    this.timing = { roomMs: Math.round(roomS * 1000), phonesMs: Math.round(phonesS * 1000), roomWaitsMs: Math.round(wait * 1000), ring };
+  }
+
+  /** The trim set by ear for a headphones device (kept in this browser). */
+  private savedTrim(device: string): number {
+    try { return Number(localStorage.getItem(`headliner.phonesTrim.${device}`) ?? 0) || 0; } catch { return 0; }
+  }
+
+  /** The headphones' timing by ear: + ms = the room waits more (the headphones sound late). */
+  setPhonesTrim(ms: number): void {
+    this.phonesTrimMs = Math.max(-150, Math.min(400, Math.round(ms)));
+    try { localStorage.setItem(`headliner.phonesTrim.${this.phonesDevice}`, String(this.phonesTrimMs)); } catch { /* private window */ }
+    this.align();
   }
 
   /** Sends the room to a device ("" = the system's default). */

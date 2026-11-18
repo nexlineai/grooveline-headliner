@@ -18,6 +18,8 @@ class HeadlinerProcessor extends AudioWorkletProcessor {
   private readonly scratch = { left: new Float32Array(128), right: new Float32Array(128) };
   private spareR = new Float32Array(128);
   private quanta = 0;
+  /** The headphones on a second device: where their channels are written (see phones-worklet.ts). */
+  private ring: { idx: Int32Array; data: Float32Array; mask: number } | null = null;
 
   constructor(options: { processorOptions?: { buffer?: SharedArrayBuffer | null } }) {
     super();
@@ -59,6 +61,9 @@ class HeadlinerProcessor extends AudioWorkletProcessor {
         this.writeBack(m.deck);
         return;
       }
+      case "ring":
+        this.ring = m.buffer ? { idx: new Int32Array(m.buffer, 0, 2), data: new Float32Array(m.buffer, 8, m.cap * 2), mask: m.cap - 1 } : null;
+        return;
       case "sync": {
         // Fallback without shared memory: take the page's fields, keep our own.
         const own = new Set<number>();
@@ -123,6 +128,18 @@ class HeadlinerProcessor extends AudioWorkletProcessor {
 
     renderMix(this.decks, this.strips, mixer, this.scratch, left, right, two ? out[2] : null, two ? out[3] : null, count);
     if (!two) for (let c = 2; c < out.length; c++) out[c].fill(0);
+    const ring = this.ring;
+    if (two && ring && out.length >= 4) {
+      // The headphones' channels into the ring, for the other device's worklet.
+      const pl = out[2], pr = out[3];
+      const w = Atomics.load(ring.idx, 0);
+      for (let i = 0; i < count; i++) {
+        const j = ((w + i) & ring.mask) * 2;
+        ring.data[j] = pl[i];
+        ring.data[j + 1] = pr[i];
+      }
+      Atomics.store(ring.idx, 0, (w + count) | 0);
+    }
     if (out.length === 1) for (let i = 0; i < count; i++) left[i] = (left[i] + right[i]) * 0.5;
 
     // Where the needles are now.
