@@ -134,6 +134,7 @@ shot meridian-night 10 -screen night -night meridian -demo 1
 shot meridian-missed 27 -screen night -night meridian -demo 1
 shot meridian-packed 6 -screen night -night meridian -crate 1 -demoClosingSet ponte,saturday-job,meridiano,telhado,nove-anos,bastidores
 shot story-meridian-end 4 -screen story -scene meridian-end
+shot credits-start 3 -screen credits
 shot credits 25 -screen credits
 shot credits-zdb 5 -screen credits -creditsPhase zdb
 shot lesson-requests 6 -screen lesson -lesson requests

@@ -11,6 +11,8 @@ struct CreditsView: View {
     static let dropAt: TimeInterval = 414.5
     /// Points per second the text climbs (about 70 s for the whole roll on an iPhone).
     static let rollSpeed: Double = 24
+    /// Where the top of the text starts, as a share of the screen height from the top.
+    static let startAt: CGFloat = 0.42
     static let liveURL = URL(string: "https://grooveline.org/start-dj")!
 
     @State private var music: AVAudioPlayer?
@@ -45,29 +47,30 @@ struct CreditsView: View {
     // MARK: - The roll
 
     private func roll(height: CGFloat) -> some View {
-        ZStack {
-            Color.black
-                .overlay {
-                    if let art = Art.image("room-meridian") {
-                        Image(uiImage: art).resizable().scaledToFill().opacity(0.28)
-                    }
+        Color.black
+            .overlay {
+                if let art = Art.image("room-meridian") {
+                    Image(uiImage: art).resizable().scaledToFill().opacity(0.28)
                 }
-                .clipped()
-                .ignoresSafeArea()
-            credits
-                .background(GeometryReader { g in
-                    Color.clear.onAppear {
-                        textHeight = g.size.height
-                        screenHeight = height
-                        startRoll()
-                    }
-                })
-                // It starts with the title already on screen (just below the middle), not below the
-                // bottom edge: Zé saw a long empty screen after Lia before anything came up.
-                .offset(y: rolling ? -(textHeight / 2 + height / 2 + 20) : (textHeight / 2 + height * 0.1))
-                .animation(.linear(duration: rollSeconds), value: rolling)
-                .opacity(textHeight > 0 ? 1 : 0)
-        }
+            }
+            .clipped()
+            .ignoresSafeArea()
+            // The text hangs from the top of the screen and climbs: its top starts a little below
+            // the middle (the title is there from the first frame; Zé saw a long dark screen after
+            // Lia when it was centred on a block taller than the screen) and ends above the top.
+            .overlay(alignment: .top) {
+                credits
+                    .background(GeometryReader { g in
+                        Color.clear.onAppear {
+                            textHeight = g.size.height
+                            screenHeight = height
+                            startRoll()
+                        }
+                    })
+                    .offset(y: rolling ? -(textHeight + 20) : height * Self.startAt)
+                    .animation(.linear(duration: rollSeconds), value: rolling)
+            }
+            .clipped()
     }
 
     private var credits: some View {
@@ -191,12 +194,12 @@ struct CreditsView: View {
     }
 
     /// How long the climb takes: from the title just below the middle to the last line off the top.
-    private var rollSeconds: Double { Double(textHeight + screenHeight * 0.6 + 20) / Self.rollSpeed }
+    private var rollSeconds: Double { Double(textHeight + screenHeight * Self.startAt + 20) / Self.rollSpeed }
 
     private func startRoll() {
         guard !rolling, !zdb, textHeight > 0 else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { rolling = true }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2 + rollSeconds + 1) { if !zdb { showZdb() } }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { rolling = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8 + rollSeconds + 1) { if !zdb { showZdb() } }
     }
 
     private func showZdb() {
