@@ -339,7 +339,9 @@ struct ChapterView: View {
                                 .frame(width: 21, height: 21)
                                 .background(Circle().stroke(.white.opacity(open ? 0.35 : 0.12), lineWidth: 1))
                             }
-                            .disabled(!reachedByOrder)
+                            // The offer can be opened from any chapter screen (App Review finds the
+                            // purchase in two taps, players see what the rest costs).
+                            .disabled(!reachedByOrder && !(Store.isPaid(chapter: other.number) && !store.careerOpen))
                         }
                     }
                     Text(chapter.title)
