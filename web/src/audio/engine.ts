@@ -615,6 +615,16 @@ export class DeckEngine {
     try { localStorage.setItem("headliner.phonesLevel", String(this._phonesLevel)); } catch { /* private window */ }
   }
 
+  // The effect unit (audio/fx.ts): one, on the master.
+  get fxType(): number { return this.shared.get(mixerAt(M.fxType)); }
+  set fxType(v: number) { this.shared.set(mixerAt(M.fxType), v); }
+  get fxOn(): boolean { return this.shared.get(mixerAt(M.fxOn)) !== 0; }
+  set fxOn(v: boolean) { this.shared.set(mixerAt(M.fxOn), v ? 1 : 0); }
+  get fxAmount(): number { return this.shared.get(mixerAt(M.fxAmount)); }
+  set fxAmount(v: number) { this.shared.set(mixerAt(M.fxAmount), Math.max(0, Math.min(1, v))); }
+  /** The delay time in seconds (a note value at the playing tempo; the flanger sweeps once per eight of them). */
+  set fxDelaySeconds(v: number) { this.shared.set(mixerAt(M.fxDelay), v); }
+
   /** What the headphones hear: 0 = only the cued decks, 1 = only the room. */
   get cueMix(): number { return this.shared.get(mixerAt(M.cueMix)); }
   set cueMix(v: number) { this.shared.set(mixerAt(M.cueMix), Math.max(0, Math.min(1, v))); }

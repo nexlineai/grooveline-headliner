@@ -15,7 +15,7 @@ class HeadlinerProcessor extends AudioWorkletProcessor {
   private readonly decks: DeckShared[] = [];
   private readonly strips: ChannelStrip[] = [];
   private readonly mixer = new MixerShared();
-  private readonly master = new MasterSection();
+  private readonly master = new MasterSection(sampleRate);
   private readonly seekSeen: number[] = [];
   private readonly scratch = { left: new Float32Array(128), right: new Float32Array(128) };
   private spareR = new Float32Array(128);
@@ -129,8 +129,13 @@ class HeadlinerProcessor extends AudioWorkletProcessor {
     mixer.echoGain = v[mixerAt(M.echoGain)];
 
     renderMix(this.decks, this.strips, mixer, this.scratch, left, right, two ? out[2] : null, two ? out[3] : null, count);
-    // The web's master section (headphones level): before the second device's ring is filled.
-    this.master.phonesGain = v[mixerAt(M.phonesGain)];
+    // The web's master section (the effect, the headphones level): before the second device's ring is filled.
+    const m = this.master;
+    m.phonesGain = v[mixerAt(M.phonesGain)];
+    m.fxType = Math.trunc(v[mixerAt(M.fxType)]);
+    m.fxOn = v[mixerAt(M.fxOn)] !== 0;
+    m.fxAmount = v[mixerAt(M.fxAmount)];
+    m.fxDelaySeconds = v[mixerAt(M.fxDelay)] || 0.5;
     this.master.process(left, right, two ? out[2] : null, two ? out[3] : null, mixer.split, mixer.cueMix, count);
     if (!two) for (let c = 2; c < out.length; c++) out[c].fill(0);
     const ring = this.ring;

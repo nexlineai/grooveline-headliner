@@ -23,6 +23,7 @@ import { groovelineLogo } from "./logo.ts";
 import { fade } from "./fade.ts";
 import { BagScreen } from "./game/bag.ts";
 import type { PhonesMode } from "./audio/engine.ts";
+import { FX_DIVISIONS, FX_TYPES } from "./audio/fx.ts";
 import { keyOf } from "./booth/booth.ts";
 import type { Kind } from "./booth/booth.ts";
 import { KEYS, attachKeys } from "./input/keys.ts";
@@ -701,22 +702,29 @@ function kindFromKey(key: string): Kind | null {
     case "cross": return { t: "cross" };
     case "cueMix": return { t: "cueMix" };
     case "phonesLevel": return { t: "phonesLevel" };
+    case "fxOn": return { t: "fxOn" };
+    case "fxAmount": return { t: "fxAmount" };
+    case "fxType": case "fxDiv": return { t, d } as Kind;
     default: return null;
   }
 }
 
 function targetKind(key: string): TargetKind | null {
   const t = key.split(":")[0];
-  if (["play", "sync", "phones"].includes(t)) return "button";
+  if (["play", "sync", "phones", "fxOn", "fxType", "fxDiv"].includes(t)) return "button";
   if (t === "jog") return "relative";
   if (t === "nudge" || t === "cue") return "hold"; // held down: a nudge pushes, CUE plays from its mark
-  if (["pitch", "channel", "cross", "eq", "filter", "cueMix", "phonesLevel"].includes(t)) return "absolute";
+  if (["pitch", "channel", "cross", "eq", "filter", "cueMix", "phonesLevel", "fxAmount"].includes(t)) return "absolute";
   return null;
 }
 
 /** "LEFT PITCH", "RIGHT LOW", "CROSSFADER" for a control. */
 function labelOf(key: string): string {
   const [t, ds, bs] = key.split(":");
+  if (t === "fxOn") return "EFFECT ON";
+  if (t === "fxAmount") return "EFFECT AMOUNT";
+  if (t === "fxType") return `EFFECT ${FX_TYPES[Number(ds)] ?? "(NEXT)"}`;
+  if (t === "fxDiv") return `NOTE ${FX_DIVISIONS[Number(ds)]?.label ?? "(NEXT)"}`;
   const side = ds === "0" ? "LEFT " : ds === "1" ? "RIGHT " : "";
   const names: Record<string, string> = { play: "PLAY", cue: "CUE", sync: "SYNC", phones: "PHONES", pitch: "PITCH", channel: "FADER",
     filter: "FILTER", jog: "JOG (THE RECORD)", cross: "CROSSFADER", cueMix: "CUE MIX", phonesLevel: "HEADPHONES LEVEL" };

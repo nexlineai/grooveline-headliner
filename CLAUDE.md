@@ -239,6 +239,18 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
   kind `hold`; `MidiInput` asks `kindOf(target)`, so CUEs learned as push buttons before still work).
   A preview is hidden from lesson facts (`motorOn`/`turning`) so it never counts as a start; any
   rebuild, blur or desk reset ends it (`endCueHolds`). The iPhone's CUE is still the old one (mark / back).
+- **Master section (web only, 18 Nov): `src/audio/fx.ts`, outside `core/` (no Swift twin).** The worklet calls
+  `MasterSection.process` right after `renderMix` and BEFORE the TWO DEVICES ring is filled. It holds (1) the
+  effect unit: delay (stereo, feedback 0.5, darkened repeats, time = tempo x note value: 1/4 = one beat, the page
+  sends `fxDelay` in seconds from the louder playing deck's BPM), Freeverb reverb, flanger (sweep = 8 x the
+  delay time). Dry stays full, the wet is added to the room AND to the headphones x cue mix (split: left =
+  room, right = phones). Off and finished ringing (under -100 dB for 0.5 s) it does nothing: bit-identical
+  output (tested). Soft clip (0.9 knee) only while it works. (2) the headphones level (VOL knob next to MIX;
+  unity at 0.7, -60..+6 dB, kept in localStorage `headliner.phonesLevel`). The FX bar (DELAY/REVERB/FLANGER,
+  1/4..1/32, AMOUNT, ON; keys G T Y V B; MIDI targets fxOn/fxType:i/fxDiv:i/fxAmount) is a third gear row in FREE
+  PLAY only (no lesson/night: `setTheDesk` forces it off; `build()` reads `lesson/night`, and the booth rebuilds
+  when that changes, which also ends a CUE hold). Settings in localStorage `headliner.fx`; always OFF at start.
+  The old `echoDelay` in `core/mixer.ts` is the far-speakers mishap (one late copy), not this delay.
 - **Outputs (PHONES):** the worklet always renders 4 channels (room 1-2, headphones 3-4); modes only
   rewire a splitter/merger: OFF, SPLIT, SOUND CARD (destination 4 ch, discrete), TWO DEVICES (the
   headphones' pair -> MediaStream -> `<audio>.setSinkId`; the room via `AudioContext.setSinkId`).

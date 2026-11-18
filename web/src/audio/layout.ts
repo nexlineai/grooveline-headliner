@@ -30,7 +30,9 @@ export const S = { lowDB: 0, midDB: 1, highDB: 2, fader: 3, cue: 4, filter: 5, s
 /** The mixer (all written by the page). */
 export const M = { split: 0, cueMix: 1, master: 2, echoDelay: 3, echoGain: 4, twoOutputs: 5,
   /** Web only (audio/fx.ts): the headphones' gain, linear. */
-  phonesGain: 6 } as const;
+  phonesGain: 6,
+  /** The effect unit (audio/fx.ts): which effect, on, amount 0...1, the delay time in seconds. */
+  fxType: 7, fxOn: 8, fxAmount: 9, fxDelay: 10 } as const;
 
 export const DECK_BASE = 0;
 export const STRIP_BASE = DECK_BASE + DECKS * D.stride;

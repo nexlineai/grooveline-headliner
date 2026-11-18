@@ -18,14 +18,16 @@ import type { NightRunner } from "../game/night.ts";
 import type { NightInfo } from "../game/content.ts";
 import type { LessonRunner } from "../game/lesson.ts";
 import { PHRASE } from "../game/lesson.ts";
-import { PHONES_UNITY } from "../audio/fx.ts";
+import { FX, FX_DIVISIONS, FX_TYPES, PHONES_UNITY, beatDelaySeconds } from "../audio/fx.ts";
 
 export type Kind =
   | { t: "jog"; d: number }
   | { t: "platter"; d: number } | { t: "rim"; d: number } | { t: "pitch"; d: number } | { t: "channel"; d: number }
   | { t: "cross" } | { t: "eq"; d: number; band: number } | { t: "play"; d: number } | { t: "cue"; d: number }
   | { t: "sync"; d: number } | { t: "needle"; d: number } | { t: "wave"; d: number } | { t: "phones"; d: number }
-  | { t: "cueMix" } | { t: "phonesLevel" } | { t: "filter"; d: number };
+  | { t: "cueMix" } | { t: "phonesLevel" } | { t: "filter"; d: number }
+  // The effect unit (free play): `d` is the effect or the note value, -1 = the next one.
+  | { t: "fxOn" } | { t: "fxAmount" } | { t: "fxType"; d: number } | { t: "fxDiv"; d: number };
 
 export const keyOf = (k: Kind): string => `${k.t}:${"d" in k ? k.d : ""}:${"band" in k ? k.band : ""}`;
 
@@ -73,6 +75,8 @@ interface Layout {
   channelX: number[]; channelY: number; channelTravel: number;
   phonesY: number; meterX: number[]; meterY: number;
   crossY: number; crossTravel: number; filterY: number;
+  /** The effect bar under the gear (free play only). */
+  fx: { panel: Rect; cy: number; typeX: number[]; divX: number[]; knobX: number; onX: number } | null;
 }
 
 export class Booth {
@@ -134,6 +138,9 @@ export class Booth {
   // to the mark when CUE is let go).
   private cueDown = [false, false];
   private previewing = [false, false];
+  /** The effect unit: which effect, which note value, how much, on or off. Off at every start. */
+  fx = { type: 0, div: 1, amount: 0.5, on: false };
+  private fxSent = 0;
 
   /** Puts a record (by id) on a deck; the page knows where records live. */
   loadRecord: (d: number, id: string) => Promise<void> = async () => {};
@@ -175,6 +182,15 @@ export class Booth {
     this.roomLayer = roomLayer;
     this.engine = engine;
     for (const d of [0, 1]) this.decks[d].volume = faderGain(this.channel[d]) * (d === 0 ? crossfade(this.cross).a : crossfade(this.cross).b);
+    try {
+      const saved = JSON.parse(localStorage.getItem("headliner.fx") ?? "{}") as { type?: number; div?: number; amount?: number };
+      if (saved.type !== undefined && saved.type >= 0 && saved.type < FX_TYPES.length) this.fx.type = Math.trunc(saved.type);
+      if (saved.div !== undefined && saved.div >= 0 && saved.div < FX_DIVISIONS.length) this.fx.div = Math.trunc(saved.div);
+      if (saved.amount !== undefined && saved.amount >= 0 && saved.amount <= 1) this.fx.amount = saved.amount;
+    } catch { /* nothing saved */ }
+    engine.fxType = this.fx.type;
+    engine.fxAmount = this.fx.amount;
+    engine.fxOn = false;
     canvas.addEventListener("pointerdown", (e) => this.down(e));
     canvas.addEventListener("pointermove", (e) => this.move(e));
     canvas.addEventListener("pointerup", (e) => this.up(e));
@@ -244,6 +260,8 @@ export class Booth {
     this.phones = [false, false];
     this.cueDown = [false, false];
     this.previewing = [false, false];
+    this.fx.on = false; // a lesson or a night is the iPhone's desk: no effect unit
+    this.engine.fxOn = false;
     for (const d of [0, 1]) {
       const deck = this.decks[d];
       deck.motorOn = false;
@@ -324,14 +342,18 @@ export class Booth {
     this.canvas.height = Math.round(H * this.dpr);
     if (W <= 200 || H <= 200) { this.L = null; return; }
     const left = 10, right = 10, bottom = 8;
-    const gx0 = left, gy0 = bottom;
+    const gx0 = left;
     const gw = W - left - right;
+    // Free play has the effect bar as a third row under the decks and the mixer (36 units and a gap).
+    const fxBar = this.lesson === null && this.night === null;
+    const BAR = 36, BAR_GAP = 6;
     // The gear is drawn in units `u` (the iPhone's: 210 high, 816 wide with a mixer 224 wide): as big
     // as the height (at most the lower 58 %) and the width both allow. On a tall screen (fullscreen
     // 16:9) the width is the limit; the gear then sits at the bottom and the room takes the rest.
-    const u = Math.min((H * 0.58 - 6 - bottom) / 210, gw / 816);
+    const u = Math.min((H * 0.58 - 6 - bottom) / (210 + (fxBar ? BAR + BAR_GAP : 0)), gw / 816);
     const gh = 210 * u;
-    const gearTop = bottom + gh + 6;
+    const gy0 = bottom + (fxBar ? (BAR + BAR_GAP) * u : 0);
+    const gearTop = gy0 + gh + 6;
     // The overlays (lesson, night, studio grid) take the room's real height from here.
     document.documentElement.style.setProperty("--gear-h", `${H - gearTop}px`);
     const gap = 8 * u;
@@ -405,13 +427,26 @@ export class Booth {
     // Filter knobs last, so they win the little overlap with the crossfader's touch area.
     if (this.hasFilter) for (const d of [0, 1]) first({ t: "filter", d }, centred(knobX[d], filterY, 30 * u, 30 * u));
 
+    let fx: Layout["fx"] = null;
+    if (fxBar) {
+      // Centred under the mixer: effects, note values, amount, ON.
+      const px = mid - 212 * u, cy = bottom + (BAR / 2) * u;
+      fx = { panel: { x: px, y: bottom, w: 424 * u, h: BAR * u }, cy,
+             typeX: [0, 1, 2].map((i) => px + (37 + i * 54) * u), divX: [0, 1, 2, 3].map((i) => px + (200 + i * 36) * u),
+             knobX: px + 348 * u, onX: px + 392 * u };
+      fx.typeX.forEach((x, i) => first({ t: "fxType", d: i }, centred(x, cy, 54 * u, 30 * u)));
+      fx.divX.forEach((x, i) => first({ t: "fxDiv", d: i }, centred(x, cy, 36 * u, 30 * u)));
+      first({ t: "fxAmount" }, centred(fx.knobX, cy, 26 * u, 30 * u));
+      first({ t: "fxOn" }, centred(fx.onX, cy, 44 * u, 30 * u));
+    }
+
     this.hits = hits;
     this.L = {
       W, H, u, gearTop, left, deck, mixer, outer, r, centre, pivot, armLength, armPivotAngle,
       needleReach: Math.max(20, 20 * u), rowY, titleX, timeX, dotX, wave, buttonW, buttonH, buttonX, buttonY,
       pitchX, pitchY, pitchTravel, bpmX: [mx + 32 * u, mx + mw - 32 * u], topY: my + mh - 15 * u, phaseY: my + mh - 30 * u,
       phaseWidth: Math.min(104 * u, mw * 0.5), knobX, knobY, knobTravel: 90 * u, channelX, channelY, channelTravel,
-      phonesY, meterX: [mid - 9 * u, mid + 9 * u], meterY: my + 110 * u, crossY, crossTravel, filterY,
+      phonesY, meterX: [mid - 9 * u, mid + 9 * u], meterY: my + 110 * u, crossY, crossTravel, filterY, fx,
     };
     this.platterImg = TINTS.map((t) => platterPicture(r, t, this.dpr));
     this.sheenImg = sheenPicture(r, this.dpr);
@@ -546,6 +581,7 @@ export class Booth {
       case "filter": return this.filterSetting[k.d];
       case "cueMix": return this.engine.cueMix;
       case "phonesLevel": return this.engine.phonesLevel;
+      case "fxAmount": return this.fx.amount;
       default: return 0;
     }
   }
@@ -614,7 +650,13 @@ export class Booth {
       case "cue":
       case "sync":
       case "phones":
+      case "fxOn":
+      case "fxType":
+      case "fxDiv":
         this.press(kind);
+        break;
+      case "fxAmount":
+        if (doubleTap) { this.setFxAmount(0.5); grab.startValue = 0.5; }
         break;
       case "eq":
         // A double tap puts a knob back at its default: EQ flat, in the middle.
@@ -693,6 +735,9 @@ export class Booth {
       case "phonesLevel":
         this.engine.phonesLevel = clamp01(grab.startValue + (p.y - grab.start.y) / L.knobTravel);
         break;
+      case "fxAmount":
+        this.setFxAmount(grab.startValue + (p.y - grab.start.y) / L.knobTravel);
+        break;
       case "eq":
         this.setEQ(k.d, k.band, clamp01(grab.startValue + (p.y - grab.start.y) / L.knobTravel));
         break;
@@ -743,6 +788,7 @@ export class Booth {
       case "filter": this.setFilter(kind.d, clamp01(this.filterSetting[kind.d] + step)); break;
       case "cueMix": this.engine.cueMix = clamp01(this.engine.cueMix + step); break;
       case "phonesLevel": this.engine.phonesLevel = clamp01(this.engine.phonesLevel + step); break;
+      case "fxAmount": this.setFxAmount(this.fx.amount + step); break;
       default: break;
     }
   }
@@ -779,9 +825,33 @@ export class Booth {
         this.phones[k.d] = !this.phones[k.d];
         decks[k.d].cue = this.phones[k.d];
         break;
+      case "fxOn": if (this.L?.fx) this.setFxOn(!this.fx.on); break;
+      case "fxType": if (this.L?.fx) this.setFxType(k.d < 0 ? (this.fx.type + 1) % FX_TYPES.length : k.d); break;
+      case "fxDiv": if (this.L?.fx) this.setFxDiv(k.d < 0 ? (this.fx.div + 1) % FX_DIVISIONS.length : k.d); break;
       default:
         break;
     }
+  }
+
+  // MARK: - The effect unit
+
+  private setFxOn(on: boolean): void { this.fx.on = on; this.engine.fxOn = on; }
+  private setFxType(i: number): void { this.fx.type = i; this.engine.fxType = i; this.saveFx(); }
+  private setFxDiv(i: number): void { this.fx.div = i; this.saveFx(); }
+  private setFxAmount(x: number): void { this.fx.amount = clamp01(x); this.engine.fxAmount = this.fx.amount; this.saveFx(); }
+  private saveFx(): void {
+    try { localStorage.setItem("headliner.fx", JSON.stringify({ type: this.fx.type, div: this.fx.div, amount: this.fx.amount })); } catch { /* private window */ }
+  }
+
+  /** The delay's time follows the tempo of the record the room hears: the louder of the playing
+   * ones, or the left one when nothing plays. Sent only when it moved a little (SYNC nudges the tempo
+   * all the time). */
+  private updateFxTime(): void {
+    if (!this.L?.fx) return;
+    let best = -1, loudest = 0;
+    this.decks.forEach((deck, d) => { if (deck.isLoaded && deck.motorOn && deck.rate > 0.3 && deck.volume > loudest) { best = d; loudest = deck.volume; } });
+    const seconds = beatDelaySeconds(this.decks[best >= 0 ? best : 0].bpm, this.fx.div);
+    if (Math.abs(seconds - this.fxSent) > 0.0002) { this.fxSent = seconds; this.engine.fxDelaySeconds = seconds; }
   }
 
   /** A button let go. Only CUE cares: it was playing the record while held. */
@@ -803,6 +873,7 @@ export class Booth {
       case "filter": this.setFilter(k.d, x); break;
       case "cueMix": this.engine.cueMix = x; break;
       case "phonesLevel": this.engine.phonesLevel = x; break;
+      case "fxAmount": this.setFxAmount(x); break;
       default: break;
     }
   }
@@ -934,8 +1005,11 @@ export class Booth {
   private frame(time: number): void {
     const dt = this.lastTime > 0 ? Math.min(0.05, Math.max(0.001, (time - this.lastTime) / 1000)) : 1 / 60;
     this.lastTime = time;
+    // The effect bar comes and goes with free play (a lesson or a night is the iPhone's desk).
+    if (this.L && (this.L.fx !== null) !== (this.lesson === null && this.night === null)) this.L = null;
     if (!this.L) this.build();
     if (this.L) {
+      this.updateFxTime();
       this.moveHands(dt);
       this.runSync();
       this.drivePartner(time / 1000);
@@ -1014,7 +1088,7 @@ export class Booth {
     if (h === null) return false;
     switch (k.t) {
       case "cross": return this.channel[h] > 0.04;
-      case "phones": case "cueMix": case "phonesLevel": return false;
+      case "phones": case "cueMix": case "phonesLevel": case "fxOn": case "fxAmount": case "fxType": case "fxDiv": return false;
       default: return "d" in k && k.d === h;
     }
   }
@@ -1347,6 +1421,7 @@ export class Booth {
 
     for (const d of [0, 1]) this.drawDeck(d, dt);
     this.drawMixer(reading, snapshots);
+    this.drawFxBar();
 
     if (!this.engine.running) {
       label(ctx, `AUDIO OFF  ${this.engine.lastError ?? ""}`, L.left + 44, L.H - 14, { size: 10 * u, color: rgba(Palette.red), align: "left" });
@@ -1444,6 +1519,19 @@ export class Booth {
       ctx.fillStyle = rgba(TINTS[d]);
       ctx.fillRect(r.x + r.w * drop - 1.25, r.y - 3, 2.5, r.h + 6);
     }
+  }
+
+  /** The effect bar: the effect, the note value, the amount, ON. */
+  private drawFxBar(): void {
+    const L = this.L!, F = L.fx;
+    if (!F) return;
+    const ctx = this.ctx, u = L.u;
+    roundRect(ctx, F.panel, 10 * u, rgba(Palette.panel), EDGE);
+    F.typeX.forEach((x, i) => button(ctx, x, F.cy, 50 * u, 20 * u, FX_TYPES[i], Palette.orange, this.fx.type === i));
+    // The reverb has no note value.
+    F.divX.forEach((x, i) => button(ctx, x, F.cy, 32 * u, 20 * u, FX_DIVISIONS[i].label, Palette.ink, this.fx.div === i, this.fx.type === FX.reverb ? 0.3 : 1));
+    knob(ctx, F.knobX, F.cy + 3 * u, 8 * u, Palette.orange, "AMOUNT", this.fx.amount);
+    button(ctx, F.onX, F.cy, 40 * u, 20 * u, "ON", Palette.red, this.fx.on);
   }
 
   private drawMixer(reading: MixReading, snapshots: DeckSnapshot[]): void {
