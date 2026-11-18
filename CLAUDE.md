@@ -222,6 +222,19 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
   source until the iPhone release. **After any change to those files, run the tool and commit
   career.json**: web.yml runs `--check` and fails otherwise. A new unlabeled enum value needs a
   name in its `POSITIONAL` table.
+- **Whole game on the web (19 Nov):** title, chapter screen, stories, 22 lessons, 20 nights, THE BAG,
+  credits + zdB card, progress in localStorage (`src/game/progress.ts`). Same hidden unlock (hold the
+  logo 3 s) for testing; **Zé: take it out of the web's last version** (19 Nov).
+- **Inputs:** every way in (touch, keys `src/input/keys.ts`, MIDI `src/input/midi.ts`) goes through
+  the booth's `press` / `setValue` / `nudgeKey` / `jog`, so partner step-ons, dead faders, SYNC and
+  detents hold everywhere (keys skip the pitch detent: steps are smaller than it). MIDI: generic
+  learn for any controller, push/toggle buttons, both jog encodings, soft takeover; pure rules
+  tested in `test/midi.test.ts` (no MIDI device in headless).
+- **Outputs (PHONES):** the worklet always renders 4 channels (room 1-2, headphones 3-4); modes only
+  rewire a splitter/merger: OFF, SPLIT, SOUND CARD (destination 4 ch, discrete), TWO DEVICES (the
+  headphones' pair -> MediaStream -> `<audio>.setSinkId`; the room via `AudioContext.setSinkId`).
+  Never recreate the AudioContext (the records live in the worklet). A vanished device -> OFF (the
+  cue must never fall back to the room). Not testable headless: needs Zé's hardware.
 - Booth: `src/booth/booth.ts` draws in SpriteKit's world (y up, CSS pixels), so `BoothScene`'s layout
   numbers, angles and touch arithmetic port unchanged; the room picture and its clips are DOM
   layers under the canvas. Labels use Barlow Condensed (OFL, `web/fonts/`), the same on every system.
