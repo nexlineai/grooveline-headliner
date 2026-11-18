@@ -4,7 +4,8 @@
 // `voice` is heard over the still picture; a shot without a picture is a title card. Scenes play
 // by themselves; a click or a tap skips to the next line.
 
-export interface StoryLine { who: string; text: string; clip?: string; voice?: string; }
+/** `clipUrl`: a clip that lives with the web version (content/story-web.json), not in the iPhone's Story folder. */
+export interface StoryLine { who: string; text: string; clip?: string; clipUrl?: string; voice?: string; }
 export interface StoryShot { art?: string; lines: StoryLine[]; }
 export interface StoryScene { id: string; shots: StoryShot[]; }
 
@@ -13,6 +14,15 @@ let scenes: Map<string, StoryScene> | null = null;
 export async function loadScenes(): Promise<Map<string, StoryScene>> {
   if (!scenes) {
     const list = await (await fetch("assets/Story/scenes.json")).json() as StoryScene[];
+    // Web-only changes to the iPhone's scenes (clips made for the web first): a line gets an on-camera
+    // clip instead of its voice-over. The iPhone's scenes.json stays as it is.
+    try {
+      const patches = await (await fetch("content/story-web.json")).json() as { scene: string; shot: number; line: number; clip: string }[];
+      for (const p of patches) {
+        const line = list.find((s) => s.id === p.scene)?.shots[p.shot]?.lines[p.line];
+        if (line) { line.clipUrl = p.clip; delete line.voice; }
+      }
+    } catch { /* no web-only changes */ }
     scenes = new Map(list.map((s) => [s.id, s]));
   }
   return scenes;
@@ -123,10 +133,10 @@ export class StoryPlayer {
     this.still.hidden = !shot.art;
     if (shot.art) this.still.src = `assets/Story/${shot.art}.jpg`;
     shot.lines.forEach((line, i) => {
-      if (!line.clip) return;
+      if (!line.clip && !line.clipUrl) return;
       const v = document.createElement("video");
       v.className = "clip";
-      v.src = `assets/Story/${line.clip}.mp4`;
+      v.src = line.clipUrl ?? `assets/Story/${line.clip}.mp4`;
       v.preload = "auto";
       v.playsInline = true;
       v.style.opacity = "0";

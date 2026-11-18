@@ -51,7 +51,7 @@ code(path.join(WEB, "src"));
 writeFileSync(path.join(SITE, "index.html"), readFileSync(path.join(WEB, "index.html"), "utf8").replace('src="src/main.ts"', 'src="src/main.js"'));
 cpSync(path.join(WEB, "icon.svg"), path.join(SITE, "icon.svg"));
 cpSync(path.join(WEB, "fonts"), path.join(SITE, "fonts"), { recursive: true });
-cpSync(path.join(WEB, "content"), path.join(SITE, "content"), { recursive: true });
+cpSync(path.join(WEB, "content"), path.join(SITE, "content"), { recursive: true, filter: (src) => !src.endsWith(".md") }); // notes stay in the repo
 files += 3;
 
 // The media, hard-linked from the iPhone app (same disk: no space used).
@@ -70,6 +70,11 @@ for (const rel of tracked) {
   bytes += size;
   biggest = Math.max(biggest, size);
   media++;
+}
+
+// The web-only story clips (content/story) get byte ranges too.
+for (const name of (existsSync(path.join(WEB, "content/story")) ? readdirSync(path.join(WEB, "content/story")) : []).filter((n) => n.endsWith(".mp4"))) {
+  sizes[`/headliner/content/story/${name}`] = statSync(path.join(WEB, "content/story", name)).size;
 }
 
 // Bundled into the Worker by wrangler (tools/worker.js imports it); outside headliner/, so the
