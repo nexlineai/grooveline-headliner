@@ -1,0 +1,23 @@
+# grooveline.org/headliner/ (Zé, 19 Nov 2026: published, linked from the site later).
+# Build: node tools/build.ts (web/dist, media hard-linked from ../App). Deploy: Zé runs
+# `npm run deploy` in web/ (production deploys are his). The radio site's Pages project, DNS and
+# API are untouched: this Worker only answers grooveline.org/headliner*.
+name = "grooveline-headliner"
+main = "tools/worker.js"
+compatibility_date = "2026-08-27"
+workers_dev = false
+preview_urls = false
+
+[build]
+command = "node tools/build.ts"
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+html_handling = "auto-trailing-slash"
+not_found_handling = "none"
+run_worker_first = true
+
+[[routes]]
+pattern = "grooveline.org/headliner*"
+zone_name = "grooveline.org"

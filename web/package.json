@@ -8,6 +8,9 @@
   "scripts": {
     "test": "node --test test/*.test.ts",
     "dev": "node tools/serve.ts",
-    "check": "tsc -p ."
+    "check": "tsc -p .",
+    "build": "node tools/build.ts",
+    "preview": "wrangler dev --config wrangler.toml --port 8788",
+    "deploy": "wrangler deploy --config wrangler.toml"
   }
 }
