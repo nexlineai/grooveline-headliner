@@ -298,3 +298,32 @@ button.quiet[hidden] { display: none; }
 #credits .zdb .live { padding: 10px 16px; border-radius: 999px; background: var(--teal); color: #000; text-decoration: none; font: 800 13px system-ui, sans-serif; letter-spacing: 0.15em; }
 #credits .zdb .end { padding: 10px 16px; border-radius: 999px; background: none; border: 1px solid rgba(255, 255, 255, 0.5); color: #fff; cursor: pointer;
   font: 800 13px system-ui, sans-serif; letter-spacing: 0.15em; }
+
+/* PHONES: the modes and the devices. */
+#phones-body .mode { display: flex; gap: 12px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--edge); }
+#phones-body .mode .pill { flex: none; min-width: 130px; }
+#phones-body .mode .pill:disabled { opacity: 0.35; cursor: default; }
+#phones-body .mode p { margin: 0; font-size: 14px; }
+#phones-body .device { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; color: var(--dim); font: 800 11px system-ui, sans-serif; letter-spacing: 0.15em; }
+#phones-body select { padding: 8px; border-radius: 8px; background: var(--slot); color: var(--ink); border: 1px solid var(--edge); font: 500 14px system-ui, sans-serif; }
+#phones-body .quiet, #controls-body .pill { margin-top: 10px; }
+.sheet p.small, #controls-body p.small { color: var(--dim); font-size: 13px; margin: 6px 0; }
+.sheet.small { max-height: 90vh; overflow-y: auto; }
+
+/* KEYS & MIDI */
+#controls-body { overflow-y: auto; display: flex; gap: 22px; flex-wrap: wrap; }
+#controls-body h3 { margin: 4px 0; color: var(--teal); font: 700 13px "Orbitron", sans-serif; letter-spacing: 0.2em; }
+#controls-body h4 { margin: 12px 0 4px; font: 700 14px system-ui, sans-serif; }
+#controls-body .keys, #controls-body .midi { flex: 1 1 240px; }
+.keytable { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; align-items: center; }
+.keytable kbd { min-width: 26px; text-align: center; padding: 3px 6px; border-radius: 6px; background: var(--slot); border: 1px solid rgba(255, 255, 255, 0.25);
+  font: 700 13px system-ui, sans-serif; }
+.keytable span { font-size: 14px; }
+.binding { display: flex; gap: 8px; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--edge); font-size: 14px; }
+.binding .src { color: var(--dim); min-width: 120px; }
+.binding .dst { flex: 1; font-weight: 700; }
+.binding .mini { padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.3); background: none; color: var(--ink); cursor: pointer;
+  font: 800 10px system-ui, sans-serif; letter-spacing: 0.1em; }
+#learn { position: fixed; z-index: 4; left: 50%; transform: translateX(-50%); top: 9vh; display: flex; gap: 12px; align-items: center; max-width: 92vw;
+  padding: 10px 16px; border-radius: 14px; background: rgba(0, 0, 0, 0.85); border: 1.5px solid var(--orange); color: var(--ink); font: 600 15px system-ui, sans-serif; }
+#learn[hidden] { display: none; }

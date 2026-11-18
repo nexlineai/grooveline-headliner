@@ -20,6 +20,12 @@ import type { StoryScene } from "./game/story.ts";
 import * as Progress from "./game/progress.ts";
 import { showChapter } from "./menus.ts";
 import { BagScreen } from "./game/bag.ts";
+import type { PhonesMode } from "./audio/engine.ts";
+import { keyOf } from "./booth/booth.ts";
+import type { Kind } from "./booth/booth.ts";
+import { KEYS, attachKeys } from "./input/keys.ts";
+import { MidiInput } from "./input/midi.ts";
+import type { Binding, TargetKind } from "./input/midi.ts";
 import { Credits } from "./game/credits.ts";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -236,6 +242,7 @@ async function openFreePlay(): Promise<void> {
 function freePlay(): void {
   sequence = null;
   booth.clearSession();
+  midi.resetTakeover();
   showMode("free");
   $("crate-button").hidden = false;
   $("jingle-button").hidden = true;
@@ -387,6 +394,7 @@ async function startLesson(id: string, step = 0): Promise<void> {
   lessonOverlay.hidden = true;
   note.textContent = `Lesson ${lesson.number}…`;
   await booth.startLesson(runner, firstTwo());
+  midi.resetTakeover(); // the desk was reset: faders on the controller catch up first
   note.textContent = "";
   lessonOverlay.hidden = false;
   if (lesson.desk.studio) {
@@ -454,6 +462,7 @@ async function startNight(id: string, length: number | null = null): Promise<voi
   nightOverlay.hidden = true;
   note.textContent = `${info.title}…`;
   await booth.startNight(runner, firstTwo());
+  midi.resetTakeover();
   note.textContent = "";
   nightOverlay.hidden = false;
   $("jingle-button").hidden = info.room !== "studio";
@@ -540,20 +549,197 @@ function leave(): void {
 
 // MARK: - Buttons
 
-const sheets = [crate, phonesPanel];
+const sheets = [crate, phonesPanel, $("controls")];
 const toggle = (sheet: HTMLElement) => { const open = sheet.hidden; for (const s of sheets) s.hidden = true; sheet.hidden = !open; };
 $("back").addEventListener("click", leave);
 $("crate-button").addEventListener("click", () => toggle(crate));
 $("crate-close").addEventListener("click", () => { crate.hidden = true; });
-$("phones-button").addEventListener("click", () => toggle(phonesPanel));
 $("phones-close").addEventListener("click", () => { phonesPanel.hidden = true; });
 $("jingle-button").addEventListener("click", playJingle);
-for (const b of phonesPanel.querySelectorAll<HTMLButtonElement>("[data-mode]")) {
-  b.addEventListener("click", () => {
-    engine.phones = b.dataset.mode === "split" ? "split" : "off";
-    for (const o of phonesPanel.querySelectorAll("[data-mode]")) o.classList.toggle("on", o === b);
-  });
+$("controls-button").addEventListener("click", () => { fillControls(); toggle($("controls")); });
+$("controls-close").addEventListener("click", () => { $("controls").hidden = true; });
+$("phones-button").addEventListener("click", () => { fillPhones().then(() => toggle(phonesPanel)).catch(failed); });
+
+// MARK: - PHONES: how the headphones are fed
+
+const el = (tag: string, className = "", text = ""): HTMLElement => {
+  const e = document.createElement(tag);
+  if (className) e.className = className;
+  if (text) e.textContent = text;
+  return e;
+};
+
+engine.onOutputsChanged = (why) => {
+  note.textContent = why;
+  setTimeout(() => { if (note.textContent === why) note.textContent = ""; }, 6000);
+  if (!phonesPanel.hidden) fillPhones().catch(() => {});
+};
+
+/** The modes this browser and this hardware can do, and the sound devices to choose from. */
+async function fillPhones(): Promise<void> {
+  const body = $("phones-body");
+  body.replaceChildren();
+  const modes: { mode: PhonesMode; title: string; about: string; can: boolean; why?: string }[] = [
+    { mode: "off", title: "OFF", about: "The room in stereo. No headphone feed.", can: true },
+    { mode: "split", title: "SPLIT L/R", about: "One stereo output and a splitter cable: the room in the left ear, the next record in the right.", can: true },
+    { mode: "card", title: "SOUND CARD", about: "A sound card with four outputs: the room on 1-2, the headphones on 3-4.", can: engine.cardAvailable,
+      why: "No sound card with four outputs is the output right now (on Linux, give the card a 4.0 or pro-audio profile)." },
+    { mode: "second", title: "TWO DEVICES", about: "The room on one sound device, the headphones on another (a USB headphone adapter, a second card). The headphones can run a little behind the speakers.",
+      can: DeckEngine.canChoosePhones, why: "This browser cannot choose a second sound device (Chrome or Edge on a computer can)." },
+  ];
+  for (const m of modes) {
+    const row = el("div", `mode${engine.phones === m.mode ? " on" : ""}${m.can ? "" : " off"}`);
+    const b = el("button", `pill${engine.phones === m.mode ? " on" : ""}`, m.title) as HTMLButtonElement;
+    b.disabled = !m.can;
+    b.addEventListener("click", () => {
+      engine.setPhones(m.mode).then(() => fillPhones()).catch((e) => { note.textContent = e instanceof Error ? e.message : String(e); });
+    });
+    row.append(b, el("p", "", m.can ? m.about : `${m.about} ${m.why ?? ""}`));
+    body.append(row);
+  }
+  // The devices, where the browser lets us choose them.
+  if (DeckEngine.canChooseRoom || DeckEngine.canChoosePhones) {
+    const outputs = await engine.listOutputs().catch(() => []);
+    const named = outputs.some((o) => o.label && !/^Output \d+$/.test(o.label));
+    const pick = (label: string, current: string, set: (id: string) => Promise<void>) => {
+      const wrap = el("label", "device");
+      wrap.append(el("span", "", label));
+      const select = document.createElement("select");
+      for (const o of [{ id: "", label: "System default" }, ...outputs.filter((x) => x.id !== "")]) {
+        const opt = document.createElement("option");
+        opt.value = o.id;
+        opt.textContent = o.label;
+        opt.selected = o.id === current;
+        select.append(opt);
+      }
+      select.addEventListener("change", () => { set(select.value).then(() => fillPhones()).catch(failed); });
+      wrap.append(select);
+      return wrap;
+    };
+    if (DeckEngine.canChooseRoom) body.append(pick("ROOM (SPEAKERS)", engine.roomDevice, (id) => engine.setRoomDevice(id)));
+    if (DeckEngine.canChoosePhones) body.append(pick("HEADPHONES", engine.phonesDevice, (id) => engine.setPhonesDevice(id)));
+    if (!named) {
+      const ask = el("button", "quiet", "SHOW MY SOUND DEVICES");
+      ask.addEventListener("click", () => { engine.allowDeviceNames().then(() => fillPhones()).catch(failed); });
+      body.append(ask, el("p", "small", "The browser asks for the microphone only to show the names of your sound devices. It is switched off at once; nothing is recorded."));
+    }
+  }
 }
+
+// MARK: - KEYS & MIDI
+
+/** "play:0:" and the like back into a control of the booth. */
+function kindFromKey(key: string): Kind | null {
+  const [t, ds, bs] = key.split(":");
+  const d = Number(ds), band = Number(bs);
+  switch (t) {
+    case "play": case "cue": case "sync": case "phones": case "pitch": case "channel": case "filter": case "jog":
+      return { t, d } as Kind;
+    case "eq": return { t: "eq", d, band };
+    case "cross": return { t: "cross" };
+    case "cueMix": return { t: "cueMix" };
+    default: return null;
+  }
+}
+
+function targetKind(key: string): TargetKind | null {
+  const t = key.split(":")[0];
+  if (["play", "cue", "sync", "phones"].includes(t)) return "button";
+  if (t === "jog") return "relative";
+  if (["pitch", "channel", "cross", "eq", "filter", "cueMix"].includes(t)) return "absolute";
+  return null;
+}
+
+/** "LEFT PITCH", "RIGHT LOW", "CROSSFADER" for a control. */
+function labelOf(key: string): string {
+  const [t, ds, bs] = key.split(":");
+  const side = ds === "0" ? "LEFT " : ds === "1" ? "RIGHT " : "";
+  const names: Record<string, string> = { play: "PLAY", cue: "CUE", sync: "SYNC", phones: "PHONES", pitch: "PITCH", channel: "FADER",
+    filter: "FILTER", jog: "JOG (THE RECORD)", cross: "CROSSFADER", cueMix: "CUE MIX" };
+  if (t === "eq") return `${side}${["LOW", "MID", "HI"][Number(bs)] ?? "EQ"}`;
+  return `${side}${names[t] ?? t.toUpperCase()}`;
+}
+
+const midi = new MidiInput({
+  kindOf: targetKind,
+  press: (key) => { const k = kindFromKey(key); if (k) booth.press(k); },
+  setValue: (key, v) => { const k = kindFromKey(key); if (k) booth.setValue(k, v); },
+  valueOf: (key) => { const k = kindFromKey(key); return k ? booth.valueOf(k) : 0; },
+  jog: (key, ticks) => { const k = kindFromKey(key); if (k && "d" in k) booth.jog(k.d, ticks); },
+});
+midi.onChange = () => { if (!$("controls").hidden) fillControls(); };
+
+const describe = (b: Binding): string => {
+  const [type, ch, num] = b.source.split(":");
+  const what = type === "cc" ? `CC ${num}` : type === "note" ? `NOTE ${num}` : "PITCH BEND";
+  return `${what} · CH ${Number(ch) + 1}`;
+};
+
+function setLearn(on: boolean): void {
+  $("learn").hidden = !on;
+  booth.learnPick = on ? (kind) => {
+    const key = keyOf(kind), kindOf = targetKind(key);
+    if (!kindOf) { $("learn-text").textContent = "That one cannot be learned. Click a button, knob, fader or a record."; return; }
+    midi.learn(key, kindOf);
+    $("learn-text").textContent = `${labelOf(key)}: now move ${kindOf === "button" ? "a button" : kindOf === "relative" ? "a jog wheel" : "a knob or a fader"} on your controller.`;
+  } : null;
+  if (on) $("learn-text").textContent = "MIDI LEARN: click a control on the decks (a record = its jog), then move one on your controller.";
+  else midi.stopLearning();
+}
+midi.onLearned = (b, device) => {
+  $("learn-text").textContent = `Learned: ${describe(b)} on ${device} → ${labelOf(b.target)}${b.kind === "button" ? (b.mode === "toggle" ? " (toggle button)" : " (push button)") : ""}. Click the next control, or DONE.`;
+};
+$("learn-done").addEventListener("click", () => { setLearn(false); fillControls(); });
+
+function fillControls(): void {
+  const body = $("controls-body");
+  body.replaceChildren();
+  const keys = el("div", "keys");
+  keys.append(el("h3", "", "KEYBOARD"), el("p", "small", "Shift: small steps. ?: this sheet."));
+  const table = el("div", "keytable");
+  for (const k of KEYS) table.append(el("kbd", "", k.label), el("span", "", k.does));
+  keys.append(table);
+  const m = el("div", "midi");
+  m.append(el("h3", "", "MIDI / USB CONTROLLERS"));
+  if (!MidiInput.supported) {
+    m.append(el("p", "small", "This browser has no MIDI (Safari). Chrome, Edge, Firefox and Opera do."));
+  } else if (!midi.connected) {
+    const connect = el("button", "pill", "CONNECT MIDI");
+    connect.addEventListener("click", () => { midi.connect().then(() => fillControls()).catch(failed); });
+    m.append(el("p", "small", "Any MIDI controller, or a USB one that speaks MIDI. The browser asks once."), connect);
+  } else {
+    const devices = midi.devices();
+    m.append(el("p", "small", devices.length ? `Connected: ${devices.join(", ")}` : "No controller connected. Plug one in (it shows up here)."));
+    const learn = el("button", "pill", "LEARN");
+    learn.addEventListener("click", () => { $("controls").hidden = true; setLearn(true); });
+    m.append(learn);
+    for (const [device, list] of Object.entries(midi.allBindings())) {
+      if (!list.length) continue;
+      m.append(el("h4", "", device));
+      for (const b of list) {
+        const row = el("div", "binding");
+        row.append(el("span", "src", describe(b)), el("span", "dst", labelOf(b.target)));
+        if (b.kind === "button") {
+          const mode = el("button", "mini", b.mode === "toggle" ? "TOGGLE" : "PUSH");
+          mode.title = "Push buttons act when pressed; toggle (latching) buttons act on every change.";
+          mode.addEventListener("click", () => midi.setMode(device, b.source, b.mode === "toggle" ? "push" : "toggle"));
+          row.append(mode);
+        }
+        const forget = el("button", "mini", "×");
+        forget.addEventListener("click", () => midi.forget(device, b.source));
+        row.append(forget);
+        m.append(row);
+      }
+    }
+  }
+  body.append(keys, m);
+}
+
+Object.assign((window as unknown as { headliner: object }).headliner, { midi, learn: setLearn });
+
+// The booth's keys work only while the booth is on screen.
+attachKeys(booth, () => title.hidden && chapterScreen.hidden && $("story").hidden && $("bag").hidden && $("credits").hidden,
+  () => { fillControls(); toggle($("controls")); });
 
 if (params.has("autostart")) autostart().catch(failed); // screenshots (the browser allows sound without a click)
 else showTitle();

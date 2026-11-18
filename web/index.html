@@ -43,6 +43,7 @@
 
   <div id="top">
     <button id="jingle-button" class="pill" hidden>JINGLE</button>
+    <button id="controls-button" class="pill">KEYS &amp; MIDI</button>
     <button id="phones-button" class="pill"><svg class="icon" viewBox="0 0 24 24" width="1.2em" height="1.2em" aria-hidden="true"><path d="M4 15v-3a8 8 0 0 1 16 0v3" fill="none" stroke="currentColor" stroke-width="2.4"/><rect x="2.5" y="13.5" width="5" height="8" rx="2" fill="currentColor"/><rect x="16.5" y="13.5" width="5" height="8" rx="2" fill="currentColor"/></svg>PHONES</button>
     <button id="crate-button" class="pill">CRATE</button>
   </div>
@@ -55,12 +56,15 @@
 
   <div id="phones" class="sheet small" hidden>
     <div class="head"><h2>PHONES</h2><button id="phones-close" class="pill">CLOSE</button></div>
-    <p>One stereo output and a splitter cable: the room in the left ear, the next record in the right.</p>
-    <div class="modes">
-      <button data-mode="off" class="pill on">OFF</button>
-      <button data-mode="split" class="pill">SPLIT L/R</button>
-    </div>
+    <div id="phones-body"></div>
   </div>
+
+  <div id="controls" class="sheet" hidden>
+    <div class="head"><h2>KEYS &amp; MIDI</h2><button id="controls-close" class="pill">CLOSE</button></div>
+    <div id="controls-body"></div>
+  </div>
+
+  <div id="learn" hidden><span id="learn-text"></span><button id="learn-done" class="pill">DONE</button></div>
 
   <div id="chapter" class="screen" hidden></div>
   <div id="bag" class="screen" hidden></div>

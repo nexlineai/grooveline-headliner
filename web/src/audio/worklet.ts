@@ -90,7 +90,10 @@ class HeadlinerProcessor extends AudioWorkletProcessor {
       this.spareR = new Float32Array(count);
     }
     const right = out.length > 1 ? out[1] : this.spareR;
+    // Two outputs (a 4-output sound card, or a second sound device): the room on channels 1-2,
+    // the headphones on 3-4. Otherwise channels 3-4 stay silent.
     const v = this.values;
+    const two = v[mixerAt(M.twoOutputs)] !== 0 && out.length >= 4;
 
     // What the page wants.
     for (let d = 0; d < DECKS; d++) {
@@ -118,7 +121,8 @@ class HeadlinerProcessor extends AudioWorkletProcessor {
     mixer.echoDelay = Math.trunc(v[mixerAt(M.echoDelay)]);
     mixer.echoGain = v[mixerAt(M.echoGain)];
 
-    renderMix(this.decks, this.strips, mixer, this.scratch, left, right, null, null, count);
+    renderMix(this.decks, this.strips, mixer, this.scratch, left, right, two ? out[2] : null, two ? out[3] : null, count);
+    if (!two) for (let c = 2; c < out.length; c++) out[c].fill(0);
     if (out.length === 1) for (let i = 0; i < count; i++) left[i] = (left[i] + right[i]) * 0.5;
 
     // Where the needles are now.

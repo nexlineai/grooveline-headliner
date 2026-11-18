@@ -19,13 +19,14 @@ import type { NightInfo } from "../game/content.ts";
 import type { LessonRunner } from "../game/lesson.ts";
 import { PHRASE } from "../game/lesson.ts";
 
-type Kind =
+export type Kind =
+  | { t: "jog"; d: number }
   | { t: "platter"; d: number } | { t: "rim"; d: number } | { t: "pitch"; d: number } | { t: "channel"; d: number }
   | { t: "cross" } | { t: "eq"; d: number; band: number } | { t: "play"; d: number } | { t: "cue"; d: number }
   | { t: "sync"; d: number } | { t: "needle"; d: number } | { t: "wave"; d: number } | { t: "phones"; d: number }
   | { t: "cueMix" } | { t: "filter"; d: number };
 
-const keyOf = (k: Kind): string => `${k.t}:${"d" in k ? k.d : ""}:${"band" in k ? k.band : ""}`;
+export const keyOf = (k: Kind): string => `${k.t}:${"d" in k ? k.d : ""}:${"band" in k ? k.band : ""}`;
 
 interface Grab { kind: Kind; start: Point; startValue: number; angle: number; }
 
@@ -120,6 +121,12 @@ export class Booth {
   partnerFights = 0;
   /** A hand landed on the partner's deck (the page buzzes). */
   onStepOn: () => void = () => {};
+  /** MIDI learn: a click on a control picks it instead of using it. */
+  learnPick: ((k: Kind) => void) | null = null;
+  // Keys and controllers: a nudge held down (-1, 0, 1) and a jog wheel's push, per deck.
+  private keyNudge = [0, 0];
+  private jogSpeed = [0, 0];
+  private nudging = [false, false];
 
   /** Puts a record (by id) on a deck; the page knows where records live. */
   loadRecord: (d: number, id: string) => Promise<void> = async () => {};
@@ -546,6 +553,11 @@ export class Booth {
     const p = this.at(e);
     const kind = this.control(p);
     if (!kind) return;
+    if (this.learnPick) {
+      // Learning: this is the control a MIDI knob, fader or button will move (the record = its jog).
+      this.learnPick(kind.t === "platter" || kind.t === "rim" ? { t: "jog", d: kind.d } : kind);
+      return;
+    }
     if (this.partnerHolds(kind)) { this.stepOn(); return; }
     this.canvas.setPointerCapture(e.pointerId);
     const key = keyOf(kind);
@@ -580,23 +592,11 @@ export class Booth {
         decks[kind.d].lifted = true;
         this.dropAt[kind.d] = this.waveProgress(p, kind.d);
         break;
-      case "play": {
-        const deck = decks[kind.d];
-        if (!deck.motorOn && deck.progress > 0.995) deck.seek(deck.cuePoint);
-        deck.motorOn = !deck.motorOn;
-        break;
-      }
+      case "play":
       case "cue":
-        this.pressCue(kind.d);
-        break;
       case "sync":
-        if (!this.syncAllowed) break; // vinyl has no sync button
-        this.sync[kind.d] = !this.sync[kind.d];
-        if (!this.sync[kind.d]) decks[kind.d].bend = 0;
-        break;
       case "phones":
-        this.phones[kind.d] = !this.phones[kind.d];
-        decks[kind.d].cue = this.phones[kind.d];
+        this.press(kind);
         break;
       case "eq":
         // A double tap puts a knob back at its default: EQ flat, in the middle.
@@ -718,8 +718,83 @@ export class Booth {
     }
   }
 
-  private setPitchFader(d: number, raw: number): void {
-    const v = Math.abs(raw - 0.5) < 0.012 ? 0.5 : raw; // a detent in the middle
+  // MARK: - One way in for touch, keys and controllers
+
+  /** A button: PLAY, CUE, SYNC, PHONES (her deck refuses it in a back to back). */
+  press(k: Kind): void {
+    if (this.partnerHolds(k)) { this.stepOn(); return; }
+    const decks = this.decks;
+    switch (k.t) {
+      case "play": {
+        const deck = decks[k.d];
+        if (!deck.motorOn && deck.progress > 0.995) deck.seek(deck.cuePoint);
+        deck.motorOn = !deck.motorOn;
+        break;
+      }
+      case "cue":
+        this.pressCue(k.d);
+        break;
+      case "sync":
+        if (!this.syncAllowed) break; // vinyl has no sync button
+        this.sync[k.d] = !this.sync[k.d];
+        if (!this.sync[k.d]) decks[k.d].bend = 0;
+        break;
+      case "phones":
+        this.phones[k.d] = !this.phones[k.d];
+        decks[k.d].cue = this.phones[k.d];
+        break;
+      default:
+        break;
+    }
+  }
+
+  /** A fader or a knob to a position, 0...1, with the same rules as a finger. `detents`: the
+   * middle catches it, as for a finger dragging across (off for key steps, which are smaller than
+   * the detent and would never leave the middle). */
+  setValue(k: Kind, v: number, detents = true): void {
+    if (this.partnerHolds(k)) { this.stepOn(); return; }
+    const x = clamp01(v);
+    switch (k.t) {
+      case "pitch": this.setPitchFader(k.d, x, detents); break;
+      case "channel": if (k.d !== this.deadFader) { this.channel[k.d] = x; this.applyMix(); } break;
+      case "cross": this.cross = x; this.applyMix(); break;
+      case "eq": this.setEQ(k.d, k.band, x); break;
+      case "filter": this.setFilter(k.d, x); break;
+      case "cueMix": this.engine.cueMix = x; break;
+      default: break;
+    }
+  }
+
+  /** Where a fader or knob is now, 0...1. */
+  valueOf(k: Kind): number { return this.value(k); }
+
+  /** A nudge held on a key: -1 slower, 1 faster, 0 let go (SYNC does its own pulling). */
+  nudgeKey(d: number, dir: number): void {
+    if (dir !== 0 && this.partnerHolds({ t: "rim", d })) { this.stepOn(); return; }
+    this.keyNudge[d] = dir;
+  }
+
+  /** A jog wheel turned by `ticks` (positive = forwards): a playing record is pushed or held back
+   * like a hand on the rim; a stopped one is moved through (to find a spot). */
+  jog(d: number, ticks: number): void {
+    if (this.partnerHolds({ t: "platter", d })) { this.stepOn(); return; }
+    const deck = this.decks[d];
+    if (!deck.isLoaded || ticks === 0) return;
+    if (deck.motorOn && Math.abs(deck.rate) > 0.3) {
+      this.jogSpeed[d] = Math.max(-0.08, Math.min(0.08, this.jogSpeed[d] + ticks * 0.004));
+    } else {
+      deck.seek(Math.max(deck.grid.firstBeat, Math.min(deck.duration - 0.25, deck.seconds + ticks * 0.025)));
+    }
+  }
+
+  /** Lets go of every key and jog (the window lost the keyboard). */
+  releaseKeys(): void {
+    this.keyNudge = [0, 0];
+    this.jogSpeed = [0, 0];
+  }
+
+  private setPitchFader(d: number, raw: number, detent = true): void {
+    const v = detent && Math.abs(raw - 0.5) < 0.012 ? 0.5 : raw; // a detent in the middle
     this.pitchFader[d] = v;
     if (this.sync[d]) { this.sync[d] = false; this.decks[d].bend = 0; } // touching the pitch takes over from sync
     this.decks[d].pitch = (0.5 - v) * 2 * PITCH_RANGE;
@@ -1118,6 +1193,17 @@ export class Booth {
         this.rimTravel[d] = 0;
         this.rimSpeed[d] = this.rimSpeed[d] * 0.7 + speed * 0.3;
         deck.bend = Math.max(-0.08, Math.min(0.08, this.rimSpeed[d] * 0.06));
+      } else if (!this.sync[d]) {
+        // A key held, or a jog wheel turned: the same push as a hand on the rim.
+        const push = this.keyNudge[d] * 0.04 + this.jogSpeed[d];
+        this.jogSpeed[d] = Math.abs(this.jogSpeed[d]) < 1e-3 ? 0 : this.jogSpeed[d] * Math.exp(-dt * 8);
+        if (push !== 0) {
+          deck.bend = Math.max(-0.08, Math.min(0.08, push));
+          this.nudging[d] = true;
+        } else if (this.nudging[d]) {
+          deck.bend = 0;
+          this.nudging[d] = false;
+        }
       }
     }
   }

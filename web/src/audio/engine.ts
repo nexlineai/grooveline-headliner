@@ -9,8 +9,12 @@ import { firstOnset, overview } from "../core/vinyl.ts";
 import { AUDIO_FIELDS, D, DECKS, M, S, SIZE, deckAt, mixerAt, stripAt } from "./layout.ts";
 import type { FromWorklet, ToWorklet } from "./layout.ts";
 
-/** How the headphones are fed: the room in stereo, or the room left and the headphones right. */
-export type PhonesMode = "off" | "split";
+/** How the headphones are fed: OFF (the room in stereo), SPLIT (one stereo output and a splitter
+ * cable: the room left, the headphones right), CARD (a sound card with four outputs: the room on
+ * 1-2, the headphones on 3-4), SECOND (the room on one sound device, the headphones on another). */
+export type PhonesMode = "off" | "split" | "card" | "second";
+
+export interface OutputDevice { id: string; label: string; }
 
 /** The shared values plus a way to tell the audio thread they changed (when not shared). */
 class Shared {
@@ -245,6 +249,18 @@ export class DeckEngine {
   lastError: string | null = null;
   private _phones: PhonesMode = "off";
   private _echoSeconds = 0;
+  // The routing: the node always has four channels; the mode only rewires what follows it.
+  private splitter: ChannelSplitterNode | null = null;
+  private roomPair: ChannelMergerNode | null = null;
+  private cardQuad: ChannelMergerNode | null = null;
+  private phonesPair: ChannelMergerNode | null = null;
+  private phonesStream: MediaStreamAudioDestinationNode | null = null;
+  private phonesElement: HTMLAudioElement | null = null;
+  /** The sound device for the room ("" = the system's default), and the one for the headphones. */
+  roomDevice = "";
+  phonesDevice = "";
+  /** Something about the outputs changed by itself (a device unplugged): a sentence for the page. */
+  onOutputsChanged: (why: string) => void = () => {};
 
   constructor() {
     this.decks = [new Deck(this.shared, 0), new Deck(this.shared, 1)];
@@ -263,13 +279,23 @@ export class DeckEngine {
       const node = new AudioWorkletNode(context, "headliner", {
         numberOfInputs: 0,
         numberOfOutputs: 1,
-        outputChannelCount: [2],
+        outputChannelCount: [4],
+        channelInterpretation: "discrete",
         processorOptions: { buffer: this.shared.isShared ? this.shared.values.buffer : null },
       });
-      node.connect(context.destination);
+      // Channels 1-2 are the room, 3-4 the headphones (silent unless there are two outputs).
+      const splitter = context.createChannelSplitter(4);
+      node.connect(splitter);
+      const roomPair = context.createChannelMerger(2);
+      splitter.connect(roomPair, 0, 0);
+      splitter.connect(roomPair, 1, 1);
+      roomPair.connect(context.destination);
+      this.splitter = splitter;
+      this.roomPair = roomPair;
       this.shared.attach(node.port);
       this.context = context;
       this.node = node;
+      navigator.mediaDevices?.addEventListener?.("devicechange", () => { this.checkOutputs().catch(() => {}); });
       for (const deck of this.decks) deck.outputRate = context.sampleRate;
       this.echoSeconds = this._echoSeconds;
       if (context.state !== "running") await context.resume();
@@ -306,7 +332,115 @@ export class DeckEngine {
 
   /** How the headphones are fed. */
   get phones(): PhonesMode { return this._phones; }
-  set phones(v: PhonesMode) { this._phones = v; this.shared.set(mixerAt(M.split), v === "split" ? 1 : 0); }
+
+  /** A sound card with four or more outputs is the system's (or the chosen room device's) output. */
+  get cardAvailable(): boolean { return (this.context?.destination.maxChannelCount ?? 0) >= 4; }
+  /** This browser can send the room to a chosen device (Chrome and Edge on desktop). */
+  static get canChooseRoom(): boolean { return typeof AudioContext !== "undefined" && "setSinkId" in AudioContext.prototype; }
+  /** This browser can send the headphones to a second device. */
+  static get canChoosePhones(): boolean { return typeof HTMLMediaElement !== "undefined" && "setSinkId" in HTMLMediaElement.prototype; }
+
+  /** Switches the headphone feed. Only rewires: the records and the decks are not touched. */
+  async setPhones(mode: PhonesMode): Promise<void> {
+    const context = this.context, splitter = this.splitter, roomPair = this.roomPair;
+    if (!context || !splitter || !roomPair) { this._phones = mode; return; }
+    if (mode === "card" && !this.cardAvailable) throw new Error("No sound card with four outputs is connected.");
+    if (mode === "second" && !this.phonesDevice) throw new Error("Choose the sound device for the headphones first.");
+    // The same device for both would put the cue in the room.
+    if (mode === "second" && this.phonesDevice === this.roomDevice) throw new Error("The headphones need a different sound device from the room.");
+    // Undo what the last mode built (silence first, so the cue never reaches the room).
+    this.shared.set(mixerAt(M.twoOutputs), 0);
+    this.shared.set(mixerAt(M.split), 0);
+    if (this.cardQuad) { splitter.disconnect(this.cardQuad); this.cardQuad.disconnect(); this.cardQuad = null; }
+    if (this.phonesPair) { splitter.disconnect(this.phonesPair); this.phonesPair.disconnect(); this.phonesPair = null; }
+    if (this.phonesElement) { this.phonesElement.pause(); this.phonesElement.srcObject = null; this.phonesElement = null; }
+    this.phonesStream = null;
+    try { roomPair.disconnect(); } catch { /* not connected */ }
+    const dest = context.destination;
+    if (mode === "card") {
+      // Four channels straight to the card, in order: room 1-2, headphones 3-4.
+      dest.channelCount = 4;
+      dest.channelCountMode = "explicit";
+      dest.channelInterpretation = "discrete";
+      const quad = context.createChannelMerger(4);
+      for (let c = 0; c < 4; c++) splitter.connect(quad, c, c);
+      quad.connect(dest);
+      this.cardQuad = quad;
+      this.shared.set(mixerAt(M.twoOutputs), 1);
+    } else {
+      dest.channelCount = 2;
+      dest.channelCountMode = "explicit";
+      dest.channelInterpretation = "speakers";
+      roomPair.connect(dest);
+      if (mode === "second") {
+        // The headphones' pair goes to a stream, played by an audio element on the other device.
+        const pair = context.createChannelMerger(2);
+        splitter.connect(pair, 2, 0);
+        splitter.connect(pair, 3, 1);
+        const stream = context.createMediaStreamDestination();
+        pair.connect(stream);
+        const element = new Audio();
+        element.srcObject = stream.stream;
+        await (element as HTMLAudioElement & { setSinkId(id: string): Promise<void> }).setSinkId(this.phonesDevice);
+        await element.play();
+        this.phonesPair = pair;
+        this.phonesStream = stream;
+        this.phonesElement = element;
+        this.shared.set(mixerAt(M.twoOutputs), 1);
+      }
+      if (mode === "split") this.shared.set(mixerAt(M.split), 1);
+    }
+    this._phones = mode;
+  }
+
+  /** Sends the room to a device ("" = the system's default). */
+  async setRoomDevice(id: string): Promise<void> {
+    const context = this.context as (AudioContext & { setSinkId?(id: string): Promise<void> }) | null;
+    if (!context?.setSinkId) throw new Error("This browser cannot choose the output (use Chrome or Edge).");
+    await context.setSinkId(id);
+    this.roomDevice = id;
+    // A different device may have a different number of outputs.
+    if (this._phones === "card" && !this.cardAvailable) {
+      await this.setPhones("off");
+      this.onOutputsChanged("The room's device has no four outputs: headphones OFF.");
+    }
+  }
+
+  async setPhonesDevice(id: string): Promise<void> {
+    this.phonesDevice = id;
+    if (this._phones === "second") await this.setPhones("second");
+  }
+
+  /** The sound outputs the browser knows. Chrome names them only after the microphone was allowed
+   * once (`allowDeviceNames`). */
+  async listOutputs(): Promise<OutputDevice[]> {
+    const all = await navigator.mediaDevices.enumerateDevices();
+    return all.filter((d) => d.kind === "audiooutput" && d.deviceId)
+      .map((d, i) => ({ id: d.deviceId === "default" ? "" : d.deviceId, label: d.label || `Output ${i + 1}` }));
+  }
+
+  /** Asks for the microphone once, only so the browser shows the sound devices' names; the
+   * microphone is switched off at once and nothing is recorded. */
+  async allowDeviceNames(): Promise<void> {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    for (const track of stream.getTracks()) track.stop();
+  }
+
+  /** A device went away: never let the cue fall back to the room's speakers. */
+  private async checkOutputs(): Promise<void> {
+    if (this._phones === "second" && this.phonesDevice) {
+      const outputs = await this.listOutputs();
+      if (!outputs.some((o) => o.id === this.phonesDevice)) {
+        await this.setPhones("off");
+        this.phonesDevice = "";
+        this.onOutputsChanged("The headphones' sound device was unplugged: headphones OFF.");
+      }
+    }
+    if (this._phones === "card" && !this.cardAvailable) {
+      await this.setPhones("off");
+      this.onOutputsChanged("The four-output sound card is gone: headphones OFF.");
+    }
+  }
 
   /** What the headphones hear: 0 = only the cued decks, 1 = only the room. */
   get cueMix(): number { return this.shared.get(mixerAt(M.cueMix)); }

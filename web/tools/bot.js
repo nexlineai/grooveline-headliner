@@ -35,7 +35,7 @@ window.__bot = setInterval(() => {
     case "eq": booth.setEQ(g.deck, g.band, mid(g.range)); break;
     case "filter": booth.setFilter(g.deck, mid(g.range)); break;
     case "syncOn": booth.sync[g.deck] = true; break;
-    case "phonesReady": document.querySelector('[data-mode="split"]').click(); break;
+    case "phonesReady": if (engine.phones === "off") engine.setPhones("split"); break;
     case "phonesCue": if (!booth.phones[g.deck]) { booth.phones[g.deck] = true; d[g.deck].cue = true; } break;
     case "cueMix": engine.cueMix = mid(g.range); break;
     case "pattern": {
