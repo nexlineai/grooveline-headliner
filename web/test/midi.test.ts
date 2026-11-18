@@ -2,7 +2,7 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  SoftTakeover, absoluteValue, buttonActs, buttonMode, decode, relativeMode, relativeTicks, sourceOf,
+  MidiInput, SoftTakeover, absoluteValue, buttonActs, buttonMode, decode, relativeMode, relativeTicks, sourceOf,
 } from "../src/input/midi.ts";
 
 describe("MIDI decoding", () => {
@@ -80,5 +80,51 @@ describe("soft takeover", () => {
     assert.ok(t.feed("cross::", 0.52, 0.5));
     t.reset();
     assert.ok(!t.feed("cross::", 1, 0.5));
+  });
+});
+
+describe("learning and playing a controller", () => {
+  const recorder = () => {
+    const calls: string[] = [];
+    const targets = {
+      kindOf: () => null,
+      press: (t: string) => { calls.push(`press ${t}`); },
+      hold: (t: string, on: boolean) => { calls.push(`hold ${t} ${on}`); },
+      setValue: (t: string, v: number) => { calls.push(`set ${t} ${v.toFixed(2)}`); },
+      valueOf: () => 0.5,
+      jog: (t: string, n: number) => { calls.push(`jog ${t} ${n}`); },
+    };
+    return { calls, midi: new MidiInput(targets) };
+  };
+
+  test("a momentary nudge button pushes while held and lets go on release", () => {
+    const { calls, midi } = recorder();
+    midi.learn("nudge:0:1", "hold");
+    midi.handle("Korg", [0x90, 45, 127]); // a note button: learned at once
+    midi.handle("Korg", [0x90, 45, 127]);
+    midi.handle("Korg", [0x80, 45, 0]);
+    assert.deepEqual(calls, ["hold nudge:0:1 true", "hold nudge:0:1 false"]);
+  });
+
+  test("a momentary CC button learned as a hold: off soon after on means push", () => {
+    const { calls, midi } = recorder();
+    midi.learn("nudge:1:-1", "hold");
+    midi.handle("Korg", [0xb0, 44, 127]);
+    midi.handle("Korg", [0xb0, 44, 0]); // its release, right after: momentary
+    assert.equal(midi.bindingsOf("Korg")[0].mode, "push");
+    midi.handle("Korg", [0xb0, 44, 127]);
+    midi.handle("Korg", [0xb0, 44, 0]);
+    assert.deepEqual(calls, ["hold nudge:1:-1 true", "hold nudge:1:-1 false"]);
+  });
+
+  test("buttons and jogs keep working side by side", () => {
+    const { calls, midi } = recorder();
+    midi.learn("play:0:", "button");
+    midi.handle("Korg", [0x90, 41, 127]);
+    midi.learn("jog:0:", "relative");
+    midi.handle("Korg", [0xb0, 16, 1]);
+    midi.handle("Korg", [0x90, 41, 127]);
+    midi.handle("Korg", [0xb0, 16, 127]);
+    assert.deepEqual(calls, ["press play:0:", "jog jog:0: -1"]);
   });
 });

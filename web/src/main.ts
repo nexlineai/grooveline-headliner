@@ -676,6 +676,7 @@ function targetKind(key: string): TargetKind | null {
   const t = key.split(":")[0];
   if (["play", "cue", "sync", "phones"].includes(t)) return "button";
   if (t === "jog") return "relative";
+  if (t === "nudge") return "hold";
   if (["pitch", "channel", "cross", "eq", "filter", "cueMix"].includes(t)) return "absolute";
   return null;
 }
@@ -687,6 +688,7 @@ function labelOf(key: string): string {
   const names: Record<string, string> = { play: "PLAY", cue: "CUE", sync: "SYNC", phones: "PHONES", pitch: "PITCH", channel: "FADER",
     filter: "FILTER", jog: "JOG (THE RECORD)", cross: "CROSSFADER", cueMix: "CUE MIX" };
   if (t === "eq") return `${side}${["LOW", "MID", "HI"][Number(bs)] ?? "EQ"}`;
+  if (t === "nudge") return `${side}NUDGE ${bs === "-1" ? "BACK" : "FORWARD"} (BUTTON)`;
   return `${side}${names[t] ?? t.toUpperCase()}`;
 }
 
@@ -696,6 +698,8 @@ const midi = new MidiInput({
   setValue: (key, v) => { const k = kindFromKey(key); if (k) booth.setValue(k, v); },
   valueOf: (key) => { const k = kindFromKey(key); return k ? booth.valueOf(k) : 0; },
   jog: (key, ticks) => { const k = kindFromKey(key); if (k && "d" in k) booth.jog(k.d, ticks); },
+  // "nudge:<deck>:<-1 back | 1 forward>": held down, the record is held back or pushed on.
+  hold: (key, on) => { const [, d, dir] = key.split(":"); booth.nudgeKey(Number(d), on ? Number(dir) : 0); },
 });
 midi.onChange = () => { if (!$("controls").hidden) fillControls(); };
 
@@ -708,16 +712,38 @@ const describe = (b: Binding): string => {
 function setLearn(on: boolean): void {
   $("learn").hidden = !on;
   booth.learnPick = on ? (kind) => {
-    const key = keyOf(kind), kindOf = targetKind(key);
-    if (!kindOf) { $("learn-text").textContent = "That one cannot be learned. Click a button, knob, fader or a record."; return; }
-    midi.learn(key, kindOf);
-    $("learn-text").textContent = `${labelOf(key)}: now move ${kindOf === "button" ? "a button" : kindOf === "relative" ? "a jog wheel" : "a knob or a fader"} on your controller.`;
+    if (kind.t === "jog") { chooseRecordControl(kind.d); return; }
+    learnTarget(keyOf(kind));
   } : null;
-  if (on) $("learn-text").textContent = "MIDI LEARN: click a control on the decks (a record = its jog), then move one on your controller.";
-  else midi.stopLearning();
+  if (on) $("learn-text").textContent = "MIDI LEARN: click a control on the decks (a record: its jog wheel or nudge buttons), then move one on your controller.";
+  else { midi.stopLearning(); $("learn-choice").replaceChildren(); }
+}
+
+/** Waits for the controller's move for this control, and says what to move. */
+function learnTarget(key: string): void {
+  const kindOf = targetKind(key);
+  $("learn-choice").replaceChildren();
+  if (!kindOf) { $("learn-text").textContent = "That one cannot be learned. Click a button, knob, fader or a record."; return; }
+  midi.learn(key, kindOf);
+  const what = kindOf === "button" || kindOf === "hold" ? "a button" : kindOf === "relative" ? "a jog wheel" : "a knob or a fader";
+  $("learn-text").textContent = `${labelOf(key)}: now ${kindOf === "button" || kindOf === "hold" ? "press" : "move"} ${what} on your controller.`;
+}
+
+/** A record can be moved by a jog wheel, or by two buttons (one holds it back, one pushes it on). */
+function chooseRecordControl(d: number): void {
+  const side = d === 0 ? "LEFT" : "RIGHT";
+  $("learn-text").textContent = `${side} RECORD: what moves it on your controller?`;
+  const choice = $("learn-choice");
+  choice.replaceChildren();
+  for (const [title, key] of [["JOG WHEEL", `jog:${d}:`], ["NUDGE BACK BUTTON", `nudge:${d}:-1`], ["NUDGE FORWARD BUTTON", `nudge:${d}:1`]]) {
+    const b = el("button", "pill", title);
+    b.addEventListener("click", () => learnTarget(key));
+    choice.append(b);
+  }
 }
 midi.onLearned = (b, device) => {
-  $("learn-text").textContent = `Learned: ${describe(b)} on ${device} → ${labelOf(b.target)}${b.kind === "button" ? (b.mode === "toggle" ? " (toggle button)" : " (push button)") : ""}. Click the next control, or DONE.`;
+  const how = b.kind === "button" || b.kind === "hold" ? (b.mode === "toggle" ? " (toggle button)" : " (push button)") : "";
+  $("learn-text").textContent = `Learned: ${describe(b)} on ${device} → ${labelOf(b.target)}${how}. Click the next control, or DONE.`;
 };
 $("learn-done").addEventListener("click", () => { setLearn(false); fillControls(); });
 
@@ -749,7 +775,7 @@ function fillControls(): void {
       for (const b of list) {
         const row = el("div", "binding");
         row.append(el("span", "src", describe(b)), el("span", "dst", labelOf(b.target)));
-        if (b.kind === "button") {
+        if (b.kind === "button" || b.kind === "hold") {
           const mode = el("button", "mini", b.mode === "toggle" ? "TOGGLE" : "PUSH");
           mode.title = "Push buttons act when pressed; toggle (latching) buttons act on every change.";
           mode.addEventListener("click", () => midi.setMode(device, b.source, b.mode === "toggle" ? "push" : "toggle"));

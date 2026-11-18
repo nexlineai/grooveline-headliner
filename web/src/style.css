@@ -338,3 +338,6 @@ button.quiet[hidden] { display: none; }
 @keyframes gl-swing { from { transform: scaleY(0.3); opacity: 0.45; } to { transform: scaleY(1); opacity: 1; } }
 .gl-name { font: 700 calc(17.6px * var(--k, 1)) "Orbitron", sans-serif; letter-spacing: calc(4px * var(--k, 1)); color: #00d4c8; }
 @media (prefers-reduced-motion: reduce) { .gl-bars i { animation: none; } }
+#learn-choice { display: flex; gap: 8px; flex-wrap: wrap; }
+#learn-choice:empty { display: none; }
+#learn-choice .pill { font-size: 11px; padding: 0.6em 1em; }

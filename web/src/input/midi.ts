@@ -27,7 +27,9 @@ export function decode(data: ArrayLike<number>): MidiEvent | null {
 /** Which physical control sent it: the same knob always gives the same key. */
 export const sourceOf = (e: MidiEvent): string => `${e.type}:${e.ch}:${e.num}`;
 
-export type TargetKind = "button" | "absolute" | "relative";
+/** button: acts once per press (PLAY, CUE). hold: on while pressed, off when let go (a nudge
+ * button). absolute: a knob or fader. relative: a jog wheel. */
+export type TargetKind = "button" | "hold" | "absolute" | "relative";
 /** push: acts when pressed (momentary buttons). toggle: acts on every change (latching buttons,
  * which send "on" at one press and "off" at the next). twos / offset: how a jog counts its steps. */
 export type BindingMode = "push" | "toggle" | "twos" | "offset" | "abs";
@@ -103,6 +105,8 @@ export class SoftTakeover {
 export interface MidiTargets {
   kindOf(target: string): TargetKind | null;
   press(target: string): void;
+  /** A hold target (a nudge button) is pressed (true) or let go (false). */
+  hold(target: string, on: boolean): void;
   setValue(target: string, v: number): void;
   valueOf(target: string): number;
   jog(target: string, ticks: number): void;
@@ -117,6 +121,8 @@ export class MidiInput {
   private bindings: Record<string, Binding[]> = {};
   private learning: Learning = null;
   private readonly takeover = new SoftTakeover();
+  /** Hold targets bound to latching buttons: on or off now. */
+  private held = new Map<string, boolean>();
   private readonly targets: MidiTargets;
   /** Devices or bindings changed (the page redraws its list). */
   onChange: () => void = () => {};
@@ -202,9 +208,9 @@ export class MidiInput {
   /** A learned CC button decides push or toggle once the moment for its "off" has passed. */
   private finishButton(release: { value: number; afterMs: number } | null = null): void {
     const l = this.learning;
-    if (!l || !l.first || l.kind !== "button") return;
+    if (!l || !l.first || (l.kind !== "button" && l.kind !== "hold")) return;
     this.learning = null;
-    this.bind(l.device, { source: l.source, target: l.target, kind: "button", mode: buttonMode(l.first, release) });
+    this.bind(l.device, { source: l.source, target: l.target, kind: l.kind, mode: buttonMode(l.first, release) });
   }
 
   handle(device: string, data: ArrayLike<number>): void {
@@ -219,8 +225,8 @@ export class MidiInput {
         return;
       }
       if (e.type === "note" && !e.on) return; // a release is not a choice
-      if (l.kind === "button") {
-        if (e.type === "note") { this.bind(device, { source, target: l.target, kind: "button", mode: "push" }); this.learning = null; return; }
+      if (l.kind === "button" || l.kind === "hold") {
+        if (e.type === "note") { this.learning = null; this.bind(device, { source, target: l.target, kind: l.kind, mode: "push" }); return; }
         this.learning = { ...l, first: e, at: performance.now(), source, device };
         setTimeout(() => { if (this.learning?.first === e) this.finishButton(null); }, 650);
         return;
@@ -241,6 +247,13 @@ export class MidiInput {
       case "button":
         if (buttonActs(e, b.mode)) this.targets.press(b.target);
         break;
+      case "hold": {
+        // A momentary button: on while pressed. A latching one: every press switches it.
+        const on = b.mode === "toggle" ? !(this.held.get(b.target) ?? false) : (e.type === "note" ? e.on : e.value >= 64);
+        this.held.set(b.target, on);
+        this.targets.hold(b.target, on);
+        break;
+      }
       case "relative":
         if (e.type === "cc") this.targets.jog(b.target, relativeTicks(e.value, b.mode));
         break;

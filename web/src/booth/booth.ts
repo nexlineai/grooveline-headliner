@@ -1193,6 +1193,9 @@ export class Booth {
         this.rimTravel[d] = 0;
         this.rimSpeed[d] = this.rimSpeed[d] * 0.7 + speed * 0.3;
         deck.bend = Math.max(-0.08, Math.min(0.08, this.rimSpeed[d] * 0.06));
+      } else if (this.keyNudge[d] !== 0 && deck.isLoaded && !(deck.motorOn && Math.abs(deck.rate) > 0.3)) {
+        // A nudge held on a stopped record moves through it (twice its speed), like the jog does.
+        deck.seek(Math.max(deck.grid.firstBeat, Math.min(deck.duration - 0.25, deck.seconds + this.keyNudge[d] * dt * 2)));
       } else if (!this.sync[d]) {
         // A key held, or a jog wheel turned: the same push as a hand on the rim.
         const push = this.keyNudge[d] * 0.04 + this.jogSpeed[d];
