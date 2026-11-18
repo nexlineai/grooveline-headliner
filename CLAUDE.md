@@ -155,8 +155,11 @@ Design, story, decisions and the build log are in the vault:
 - Chapters (`Chapter.swift`): PLAY opens the chapter screen (steps with best stars, scenes
   seen, CONTINUE = from the first step not done to the end of the chapter). Progress is saved in
   `UserDefaults` under `progress.v1`, recorded at a result card's CONTINUE (never on the back
-  button, which leaves to the chapter). `Chapters.locked` is false while Zé tests (every step
-  playable); turn it on for the release.
+  button, which leaves to the chapter). `Chapters.locked` (18 Nov) is ON for everyone:
+  a new player goes in order (steps after the first not done are locked; chapters after
+  `Chapters.current` show a lock; a finished chapter offers CHAPTER N+1; PLAY opens the current
+  chapter). Zé's hidden unlock: hold the title's Grooveline logo 3 s (`Game.unlockAll`, default
+  `unlockAll`). `ci-shots.sh` passes `-unlockAll 1` to every shot unless the shot names it.
 - Nights (`Night.swift`, `Nights`, `Screen.night(id)`): no coach; `NightRunner` turns what the
   room hears (`MixJudge` reading: silence / one record / blend quality, bass clash, which deck is
   on air) into crowd energy, a mood 0-3 and short comments from the friends; stars from the
