@@ -5,6 +5,7 @@
 import { BeatGrid } from "../core/beatgrid.ts";
 import type { TrackInfo } from "../core/beatgrid.ts";
 import { eqDecibels } from "../core/mixjudge.ts";
+import { PHONES_UNITY, phonesGainFor } from "./fx.ts";
 import { firstOnset, overview } from "../core/vinyl.ts";
 import { AUDIO_FIELDS, D, DECKS, M, S, SIZE, deckAt, mixerAt, stripAt } from "./layout.ts";
 import type { FromWorklet, ToWorklet } from "./layout.ts";
@@ -316,6 +317,7 @@ export class DeckEngine {
   lastError: string | null = null;
   private _phones: PhonesMode = "off";
   private _echoSeconds = 0;
+  private _phonesLevel = PHONES_UNITY;
   // The routing: the node always has four channels; the mode only rewires what follows it.
   private splitter: ChannelSplitterNode | null = null;
   private roomPair: ChannelMergerNode | null = null;
@@ -344,6 +346,9 @@ export class DeckEngine {
     this.decks = [new Deck(this.shared, 0), new Deck(this.shared, 1)];
     this.shared.set(mixerAt(M.master), 1);
     this.shared.set(mixerAt(M.echoGain), 0.5);
+    let saved = PHONES_UNITY;
+    try { const s = localStorage.getItem("headliner.phonesLevel"); if (s !== null && Number.isFinite(Number(s))) saved = Number(s); } catch { /* private window */ }
+    this.phonesLevel = saved;
   }
 
   get sharedMemory(): boolean { return this.shared.isShared; }
@@ -600,6 +605,14 @@ export class DeckEngine {
       await this.setPhones("off");
       this.onOutputsChanged("The four-output sound card is gone: headphones OFF.");
     }
+  }
+
+  /** The headphones' level, knob 0...1 (PHONES_UNITY = as loud as before the knob). Kept in this browser. */
+  get phonesLevel(): number { return this._phonesLevel; }
+  set phonesLevel(v: number) {
+    this._phonesLevel = Math.max(0, Math.min(1, v));
+    this.shared.set(mixerAt(M.phonesGain), phonesGainFor(this._phonesLevel));
+    try { localStorage.setItem("headliner.phonesLevel", String(this._phonesLevel)); } catch { /* private window */ }
   }
 
   /** What the headphones hear: 0 = only the cued decks, 1 = only the room. */

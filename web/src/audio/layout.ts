@@ -28,12 +28,14 @@ export const D = {
 export const S = { lowDB: 0, midDB: 1, highDB: 2, fader: 3, cue: 4, filter: 5, stride: 6 } as const;
 
 /** The mixer (all written by the page). */
-export const M = { split: 0, cueMix: 1, master: 2, echoDelay: 3, echoGain: 4, twoOutputs: 5 } as const;
+export const M = { split: 0, cueMix: 1, master: 2, echoDelay: 3, echoGain: 4, twoOutputs: 5,
+  /** Web only (audio/fx.ts): the headphones' gain, linear. */
+  phonesGain: 6 } as const;
 
 export const DECK_BASE = 0;
 export const STRIP_BASE = DECK_BASE + DECKS * D.stride;
 export const MIXER_BASE = STRIP_BASE + DECKS * S.stride;
-export const SIZE = MIXER_BASE + 8;
+export const SIZE = MIXER_BASE + 16;
 
 export const deckAt = (d: number, field: number): number => DECK_BASE + d * D.stride + field;
 export const stripAt = (d: number, field: number): number => STRIP_BASE + d * S.stride + field;

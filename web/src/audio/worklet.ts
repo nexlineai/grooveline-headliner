@@ -4,6 +4,7 @@
 
 import { renderMix, ChannelStrip, MixerShared, ECHO_CAPACITY } from "../core/mixer.ts";
 import { newDeckShared } from "../core/vinyl.ts";
+import { MasterSection } from "./fx.ts";
 import type { DeckShared } from "../core/vinyl.ts";
 import { AUDIO_FIELDS, D, DECKS, M, S, SIZE, deckAt, mixerAt, stripAt } from "./layout.ts";
 import type { FromWorklet, ToWorklet } from "./layout.ts";
@@ -14,6 +15,7 @@ class HeadlinerProcessor extends AudioWorkletProcessor {
   private readonly decks: DeckShared[] = [];
   private readonly strips: ChannelStrip[] = [];
   private readonly mixer = new MixerShared();
+  private readonly master = new MasterSection();
   private readonly seekSeen: number[] = [];
   private readonly scratch = { left: new Float32Array(128), right: new Float32Array(128) };
   private spareR = new Float32Array(128);
@@ -127,6 +129,9 @@ class HeadlinerProcessor extends AudioWorkletProcessor {
     mixer.echoGain = v[mixerAt(M.echoGain)];
 
     renderMix(this.decks, this.strips, mixer, this.scratch, left, right, two ? out[2] : null, two ? out[3] : null, count);
+    // The web's master section (headphones level): before the second device's ring is filled.
+    this.master.phonesGain = v[mixerAt(M.phonesGain)];
+    this.master.process(left, right, two ? out[2] : null, two ? out[3] : null, mixer.split, mixer.cueMix, count);
     if (!two) for (let c = 2; c < out.length; c++) out[c].fill(0);
     const ring = this.ring;
     if (two && ring && out.length >= 4) {

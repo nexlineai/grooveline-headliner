@@ -700,6 +700,7 @@ function kindFromKey(key: string): Kind | null {
     case "eq": return { t: "eq", d, band };
     case "cross": return { t: "cross" };
     case "cueMix": return { t: "cueMix" };
+    case "phonesLevel": return { t: "phonesLevel" };
     default: return null;
   }
 }
@@ -709,7 +710,7 @@ function targetKind(key: string): TargetKind | null {
   if (["play", "sync", "phones"].includes(t)) return "button";
   if (t === "jog") return "relative";
   if (t === "nudge" || t === "cue") return "hold"; // held down: a nudge pushes, CUE plays from its mark
-  if (["pitch", "channel", "cross", "eq", "filter", "cueMix"].includes(t)) return "absolute";
+  if (["pitch", "channel", "cross", "eq", "filter", "cueMix", "phonesLevel"].includes(t)) return "absolute";
   return null;
 }
 
@@ -718,7 +719,7 @@ function labelOf(key: string): string {
   const [t, ds, bs] = key.split(":");
   const side = ds === "0" ? "LEFT " : ds === "1" ? "RIGHT " : "";
   const names: Record<string, string> = { play: "PLAY", cue: "CUE", sync: "SYNC", phones: "PHONES", pitch: "PITCH", channel: "FADER",
-    filter: "FILTER", jog: "JOG (THE RECORD)", cross: "CROSSFADER", cueMix: "CUE MIX" };
+    filter: "FILTER", jog: "JOG (THE RECORD)", cross: "CROSSFADER", cueMix: "CUE MIX", phonesLevel: "HEADPHONES LEVEL" };
   if (t === "eq") return `${side}${["LOW", "MID", "HI"][Number(bs)] ?? "EQ"}`;
   if (t === "nudge") return `${side}NUDGE ${bs === "-1" ? "BACK" : "FORWARD"} (BUTTON)`;
   return `${side}${names[t] ?? t.toUpperCase()}`;

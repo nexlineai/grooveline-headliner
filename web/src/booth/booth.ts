@@ -18,13 +18,14 @@ import type { NightRunner } from "../game/night.ts";
 import type { NightInfo } from "../game/content.ts";
 import type { LessonRunner } from "../game/lesson.ts";
 import { PHRASE } from "../game/lesson.ts";
+import { PHONES_UNITY } from "../audio/fx.ts";
 
 export type Kind =
   | { t: "jog"; d: number }
   | { t: "platter"; d: number } | { t: "rim"; d: number } | { t: "pitch"; d: number } | { t: "channel"; d: number }
   | { t: "cross" } | { t: "eq"; d: number; band: number } | { t: "play"; d: number } | { t: "cue"; d: number }
   | { t: "sync"; d: number } | { t: "needle"; d: number } | { t: "wave"; d: number } | { t: "phones"; d: number }
-  | { t: "cueMix" } | { t: "filter"; d: number };
+  | { t: "cueMix" } | { t: "phonesLevel" } | { t: "filter"; d: number };
 
 export const keyOf = (k: Kind): string => `${k.t}:${"d" in k ? k.d : ""}:${"band" in k ? k.band : ""}`;
 
@@ -50,6 +51,8 @@ type PartnerMove =
 const TURN = 2 * Math.PI * (100 / 3) / 60;
 /** The pitch fader covers ±8 %, like a classic turntable. */
 const PITCH_RANGE = 0.08;
+/** The cue mix and headphones level knobs sit this far (in units) either side of the mixer's middle. */
+const KNOB_GAP = 11;
 const MOODS = ["waiting", "nodding", "dancing", "nuts"];
 /** Extra lift of a room's picture, as a part of its height, for rooms whose people stand low. */
 const ROOM_LIFT: Record<string, number> = { field: 0.28, forest: 0.32, festival: 0.2, tent: 0.2, meridian: 0.15 };
@@ -395,7 +398,9 @@ export class Booth {
       first({ t: "channel", d }, centred(channelX[d], channelY, 40 * u, channelTravel + 28 * u));
       first({ t: "phones", d }, centred(channelX[d], phonesY, 44 * u, 24 * u));
     }
-    first({ t: "cueMix" }, centred(mid, phonesY, 30 * u, 26 * u));
+    // The cue mix and the headphones level knobs side by side between the PHONES buttons.
+    first({ t: "cueMix" }, centred(mid - KNOB_GAP * u, phonesY, 22 * u, 26 * u));
+    first({ t: "phonesLevel" }, centred(mid + KNOB_GAP * u, phonesY, 22 * u, 26 * u));
     first({ t: "cross" }, centred(mid, crossY, crossTravel + 36 * u, 40 * u));
     // Filter knobs last, so they win the little overlap with the crossfader's touch area.
     if (this.hasFilter) for (const d of [0, 1]) first({ t: "filter", d }, centred(knobX[d], filterY, 30 * u, 30 * u));
@@ -540,6 +545,7 @@ export class Booth {
       case "eq": return this.eq[k.d][k.band];
       case "filter": return this.filterSetting[k.d];
       case "cueMix": return this.engine.cueMix;
+      case "phonesLevel": return this.engine.phonesLevel;
       default: return 0;
     }
   }
@@ -617,6 +623,10 @@ export class Booth {
       case "filter":
         if (doubleTap) { this.setFilter(kind.d, 0.5); grab.startValue = 0.5; }
         break;
+      case "phonesLevel":
+        // The headphones level's default is unity: as loud as before the knob.
+        if (doubleTap) { this.engine.phonesLevel = PHONES_UNITY; grab.startValue = PHONES_UNITY; }
+        break;
       case "cueMix":
         // The cue mix's default is CUE: only the cued record in the headphones.
         if (doubleTap) { this.engine.cueMix = 0; grab.startValue = 0; }
@@ -680,6 +690,9 @@ export class Booth {
       case "cueMix":
         this.engine.cueMix = clamp01(grab.startValue + (p.y - grab.start.y) / L.knobTravel);
         break;
+      case "phonesLevel":
+        this.engine.phonesLevel = clamp01(grab.startValue + (p.y - grab.start.y) / L.knobTravel);
+        break;
       case "eq":
         this.setEQ(k.d, k.band, clamp01(grab.startValue + (p.y - grab.start.y) / L.knobTravel));
         break;
@@ -729,6 +742,7 @@ export class Booth {
       case "eq": this.setEQ(kind.d, kind.band, clamp01(this.eq[kind.d][kind.band] + step)); break;
       case "filter": this.setFilter(kind.d, clamp01(this.filterSetting[kind.d] + step)); break;
       case "cueMix": this.engine.cueMix = clamp01(this.engine.cueMix + step); break;
+      case "phonesLevel": this.engine.phonesLevel = clamp01(this.engine.phonesLevel + step); break;
       default: break;
     }
   }
@@ -788,6 +802,7 @@ export class Booth {
       case "eq": this.setEQ(k.d, k.band, x); break;
       case "filter": this.setFilter(k.d, x); break;
       case "cueMix": this.engine.cueMix = x; break;
+      case "phonesLevel": this.engine.phonesLevel = x; break;
       default: break;
     }
   }
@@ -999,7 +1014,7 @@ export class Booth {
     if (h === null) return false;
     switch (k.t) {
       case "cross": return this.channel[h] > 0.04;
-      case "phones": case "cueMix": return false;
+      case "phones": case "cueMix": case "phonesLevel": return false;
       default: return "d" in k && k.d === h;
     }
   }
@@ -1464,7 +1479,11 @@ export class Booth {
       if (this.hasFilter) knob(ctx, L.knobX[d], L.filterY, 10 * u, TINTS[d], "FILTER", this.filterSetting[d]);
     }
     // Cue mix, between the PHONES buttons: left = only the cued record, right = only the room.
-    knob(ctx, mid, L.phonesY, 9 * u, Palette.orange, "", this.engine.cueMix);
+    knob(ctx, mid - KNOB_GAP * u, L.phonesY, 7.5 * u, Palette.orange, "", this.engine.cueMix);
+    label(ctx, "MIX", mid - KNOB_GAP * u, L.phonesY - 12.5 * u, { size: 4.6 * u, color: DIM });
+    // The headphones level: unity (as loud as before) at 0.7, a little boost above.
+    knob(ctx, mid + KNOB_GAP * u, L.phonesY, 7.5 * u, Palette.orange, "", this.engine.phonesLevel);
+    label(ctx, "VOL", mid + KNOB_GAP * u, L.phonesY - 12.5 * u, { size: 4.6 * u, color: DIM });
     fader(ctx, mid, L.crossY, { travel: L.crossTravel, vertical: false, capW: 14 * u, capH: 24 * u, tint: Palette.teal, centreMark: true, value: this.cross });
   }
 }
