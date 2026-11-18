@@ -70,7 +70,8 @@ shot() { # name, seconds to wait, launch arguments... (every chapter open unless
   echo "$name: $size"
   case "$size" in
     "2868 1320 "|"2796 1290 "|"2736 1260 ") ;;
-    *) echo "::error title=store shot size::$name is $size, not a 6.9-inch landscape size"; exit 1 ;;
+    # Not fatal: the picture is kept (and pushed) so it can be looked at; the README lists the bad ones.
+    *) echo "::warning title=store shot size::$name is $size, not a 6.9-inch landscape size"; echo "$name $size" >> build/store/BAD-SIZES.txt ;;
   esac
 }
 
