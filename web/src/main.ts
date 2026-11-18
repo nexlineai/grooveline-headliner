@@ -14,6 +14,10 @@ import type { Content, NightInfo } from "./game/content.ts";
 import { LessonRunner } from "./game/lesson.ts";
 import { NightRunner } from "./game/night.ts";
 import { StudioGrid, cutInfo, loadCut, loadLoop, namedPattern } from "./game/studio.ts";
+import { StoryPlayer, loadScenes } from "./game/story.ts";
+import type { StoryScene } from "./game/story.ts";
+import type { Chapter, ChapterStep, Screen } from "./game/content.ts";
+import * as Progress from "./game/progress.ts";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const engine = new DeckEngine();
@@ -23,10 +27,16 @@ const careerSheet = $("career"), careerList = $("career-list");
 const lessonOverlay = $("lesson"), nightOverlay = $("night"), result = $("result");
 const params = new URLSearchParams(location.search);
 // For the screenshot tool's `eval` (tools/shot.ts) and the browser console.
-Object.assign(window, { headliner: { engine, booth } });
+Object.assign(window, { headliner: { engine, booth, play: (chapter: number, step: number) => {
+  const c = content?.career.chapters.find((x) => x.number === chapter);
+  if (c) playStep(c, c.steps[step]);
+} } });
 
 let content: Content | null = null;
 let tracks: TrackInfo[] = [];
+let scenes = new Map<string, StoryScene>();
+const progress = Progress.loadProgress();
+if (params.has("unlockAll")) Progress.setUnlockAll(params.get("unlockAll") !== "0");
 
 // The canvas only uses a web font once it has loaded; ask for it now.
 document.fonts.load(`600 16px "Barlow Condensed"`).catch(() => {});
@@ -34,7 +44,7 @@ document.fonts.load(`600 16px "Barlow Condensed"`).catch(() => {});
 // MARK: - Records
 
 /** Your dubplate: the pattern you cut (none yet: the groove from the lessons). */
-let cutPattern: DrumPattern | null = null;
+let cutPattern: DrumPattern | null = progress.track ? new DrumPattern(progress.track) : null;
 
 const trackFor = (id: string): TrackInfo | null => (id === "your-dubplate" ? cutInfo() : tracks.find((t) => t.id === id) ?? null);
 
@@ -82,6 +92,8 @@ grid.onChange = () => {
 grid.onCut = () => {
   // CUT: the loop becomes a whole record on the left deck, and your dubplate from now on.
   cutPattern = new DrumPattern(grid.pattern.rows.map((r) => r.slice()));
+  progress.track = cutPattern.rows.map((r) => r.slice());
+  Progress.saveProgress(progress);
   loadCut(cutPattern, engine.decks[0]);
   booth.recordChanged(0);
   cuts += 1;
@@ -95,6 +107,7 @@ async function begin(): Promise<void> {
   try {
     await engine.start();
     content = await loadContent();
+    scenes = await loadScenes();
     tracks = content.tracks;
     booth.tracks = tracks;
     fillCareer();
@@ -124,7 +137,7 @@ const newestFirst = (list: TrackInfo[]) =>
   list.map((t, i) => ({ t, i })).sort((x, y) => (y.t.chapter ?? 1) - (x.t.chapter ?? 1) || x.i - y.i).map((x) => x.t);
 const upTo = (chapter: number) => newestFirst(tracks.filter((t) => (t.chapter ?? 1) <= chapter && t.id !== "white-label"));
 
-function showMode(mode: "free" | "lesson" | "night"): void {
+function showMode(mode: "free" | "lesson" | "night" | "story"): void {
   lessonOverlay.hidden = mode !== "lesson";
   nightOverlay.hidden = mode !== "night";
   result.hidden = true;
@@ -132,13 +145,18 @@ function showMode(mode: "free" | "lesson" | "night"): void {
   for (const s of [crate, phonesPanel, careerSheet]) s.hidden = true;
 }
 
-/** Free play: every chapter's records (a preview without progress yet), and your dubplate. */
+/** Free play: the records of the chapters played so far (the white label once it was played at
+ * MERIDIAN), and your dubplate once it is cut. */
 function freePlay(): void {
+  sequence = null;
   booth.clearSession();
   showMode("free");
   $("crate-button").hidden = false;
   $("jingle-button").hidden = true;
-  fillCrate([...upTo(12), ...(cutPattern ? [cutInfo()] : [])]);
+  const open = content ? Progress.recordsOpen(progress, content.career.chapters) : new Set([1]);
+  const meridian = (progress.stars["meridian"] ?? 0) > 0;
+  fillCrate([...newestFirst(tracks.filter((t) => open.has(t.chapter ?? 1) && (t.id !== "white-label" || meridian))),
+             ...(cutPattern ? [cutInfo()] : [])]);
 }
 
 /** The crate: onto the left or the right deck. */
@@ -170,37 +188,83 @@ function fillCrate(list: TrackInfo[]): void {
 
 // MARK: - The career (chapters, their lessons and nights)
 
+/** Every chapter with its steps: stars won, scenes seen, and what is still locked (in order,
+ * as on the iPhone, unless everything is unlocked). */
 function fillCareer(): void {
   if (!content) return;
+  const chapters = content.career.chapters;
   careerList.replaceChildren();
-  for (const c of content.career.chapters) {
+  for (const c of chapters) {
+    const open = Progress.reached(progress, chapters, c.number);
+    const earned = c.steps.reduce((n, s) => n + (progress.stars[s.id] ?? 0), 0);
     const head = document.createElement("div");
-    head.className = "chapter-head";
-    head.innerHTML = `<span class="n"></span><b></b><p></p>`;
+    head.className = `chapter-head${open ? "" : " locked"}`;
+    head.innerHTML = `<span class="n"></span><div><b></b><span class="earned"></span><p></p></div>`;
     head.querySelector(".n")!.textContent = String(c.number);
     head.querySelector("b")!.textContent = c.title;
-    head.querySelector("p")!.textContent = c.line;
+    head.querySelector(".earned")!.textContent = earned ? `★ ${earned}` : "";
+    head.querySelector("p")!.textContent = open ? c.line : "Locked: finish the chapter before it.";
     careerList.append(head);
-    for (const step of c.steps) {
+    if (!open) continue;
+    c.steps.forEach((step, i) => {
       const row = document.createElement("button");
-      row.className = `step-row ${step.kind}`;
-      row.innerHTML = `<span class="k"></span><b></b><span class="c"></span>`;
+      const isDone = Progress.done(progress, step);
+      row.className = `step-row ${step.kind}${isDone ? " done" : ""}`;
+      row.innerHTML = `<span class="k"></span><b></b><span class="c"></span><span class="s"></span>`;
       row.querySelector(".k")!.textContent = step.kind.toUpperCase();
       row.querySelector("b")!.textContent = step.title;
-      let play: (() => Promise<void>) | null = null;
-      for (const sc of step.screens) {
-        if (sc.type === "lesson") { const id = sc.id; play = () => startLesson(id); }
-        if (sc.type === "night") { const id = sc.id; play = () => startNight(id); }
-      }
-      row.querySelector(".c")!.textContent = play ? step.detail : `${step.detail} (story: not on the web yet)`;
-      row.disabled = !play;
-      row.addEventListener("click", () => {
-        careerSheet.hidden = true;
-        play?.().catch((e) => { note.textContent = String(e); });
-      });
+      row.querySelector(".c")!.textContent = step.detail;
+      const stars = progress.stars[step.id] ?? 0;
+      row.querySelector(".s")!.textContent = step.kind === "story" ? (isDone ? "seen" : "") : "★★★".slice(0, stars) + "☆☆☆".slice(stars);
+      row.disabled = !Progress.stepOpen(progress, c, i);
+      row.addEventListener("click", () => { careerSheet.hidden = true; playStep(c, step); });
       careerList.append(row);
-    }
+    });
   }
+}
+
+// MARK: - Playing a step (its screens one after the other)
+
+let sequence: { chapter: Chapter; step: ChapterStep; screens: Screen[]; at: number } | null = null;
+
+function playStep(chapter: Chapter, step: ChapterStep): void {
+  sequence = { chapter, step, screens: step.screens, at: -1 };
+  nextScreen();
+}
+
+function nextScreen(): void {
+  const seq = sequence;
+  if (!seq) return;
+  seq.at += 1;
+  const screen = seq.screens[seq.at];
+  if (!screen) {
+    // The step is over: a story step counts as seen; back to the career.
+    if (seq.step.kind === "story") Progress.markSeen(progress, seq.step.id);
+    sequence = null;
+    freePlay();
+    fillCareer();
+    careerSheet.hidden = false;
+    return;
+  }
+  const failed = (e: unknown) => { note.textContent = String(e); };
+  switch (screen.type) {
+    case "story": playStory(scenes.get(screen.id) ?? card(`(${screen.id})`)); break;
+    case "lesson": startLesson(screen.id).catch(failed); break;
+    case "night": startNight(screen.id).catch(failed); break;
+    case "bag": playStory(card("THE BAG", "Packing your closing set comes to the web soon. MERIDIAN uses the bag as written.")); break;
+    case "credits": playStory(card("THE END", "The credits and zdB's record come to the web soon.")); break;
+    default: nextScreen();
+  }
+}
+
+/** A title card, as a scene of its own. */
+const card = (...lines: string[]): StoryScene => ({ id: "card", shots: [{ lines: lines.map((text) => ({ who: "", text })) }] });
+
+function playStory(scene: StoryScene): void {
+  booth.clearSession();
+  for (const deck of engine.decks) deck.motorOn = false; // the story has the room to itself
+  showMode("story");
+  new StoryPlayer($("story"), scene, () => nextScreen()).start();
 }
 
 // MARK: - Lessons
@@ -329,8 +393,24 @@ $("result-retry").addEventListener("click", () => {
 });
 
 $("result-continue").addEventListener("click", () => {
-  // The chapter screens come next; for now: back to the career list.
+  // The stars count at CONTINUE (never on BACK, which leaves the step).
+  const lesson = booth.lesson, night = booth.night;
+  const missed = !!night?.missed;
+  if (lesson && lesson.stars !== null) Progress.record(progress, lesson.lesson.id, lesson.stars);
+  if (night && night.stars !== null && !missed) Progress.record(progress, night.info.id, night.stars);
+  if (sequence && !missed) { result.hidden = true; nextScreen(); return; }
   freePlay();
+  fillCareer();
+  careerSheet.hidden = false;
+});
+
+// Back: leaves the lesson, night or story (and whatever was lined up after it).
+$("back").addEventListener("click", () => {
+  for (const v of document.querySelectorAll<HTMLVideoElement>("#story video")) v.pause();
+  $("story").hidden = true;
+  $("story").replaceChildren();
+  freePlay();
+  fillCareer();
   careerSheet.hidden = false;
 });
 
@@ -345,7 +425,7 @@ $("crate-button").addEventListener("click", () => toggle(crate));
 $("crate-close").addEventListener("click", () => { crate.hidden = true; });
 $("phones-button").addEventListener("click", () => toggle(phonesPanel));
 $("phones-close").addEventListener("click", () => { phonesPanel.hidden = true; });
-$("career-button").addEventListener("click", () => toggle(careerSheet));
+$("career-button").addEventListener("click", () => { fillCareer(); toggle(careerSheet); });
 $("career-close").addEventListener("click", () => { careerSheet.hidden = true; });
 $("free-play").addEventListener("click", () => freePlay());
 $("jingle-button").addEventListener("click", playJingle);
@@ -354,6 +434,24 @@ for (const b of phonesPanel.querySelectorAll<HTMLButtonElement>("[data-mode]")) 
     engine.phones = b.dataset.mode === "split" ? "split" : "off";
     for (const o of phonesPanel.querySelectorAll("[data-mode]")) o.classList.toggle("on", o === b);
   });
+}
+
+// Zé's hidden unlock, as on the iPhone: hold the Grooveline logo three seconds.
+{
+  const logo = start.querySelector<HTMLElement>(".logo")!;
+  let timer: number | null = null;
+  logo.addEventListener("pointerdown", (e) => {
+    e.stopPropagation();
+    timer = window.setTimeout(() => {
+      Progress.setUnlockAll(!Progress.unlockedAll());
+      start.querySelector("p")!.textContent = Progress.unlockedAll() ? "Everything unlocked · tap to start" : "Locks back on · tap to start";
+      timer = null;
+    }, 3000);
+  });
+  const cancel = () => { if (timer !== null) { clearTimeout(timer); timer = null; } };
+  logo.addEventListener("pointerup", cancel);
+  logo.addEventListener("pointerleave", cancel);
+  logo.addEventListener("click", (e) => e.stopPropagation());
 }
 
 if (params.has("autostart")) begin(); // screenshots (the browser is told to allow sound without a click)
