@@ -62,7 +62,14 @@ struct TitleView: View {
                 }
             }
             .padding(.top, 10)
-            .padding(.bottom, 24)
+            .padding(.bottom, game.unlockAll ? 4 : 24)
+            // Only with Zé's hidden unlock on: which build this is (players never see it).
+            if game.unlockAll {
+                Text("Build \(game.build)")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.45))
+                    .padding(.bottom, 12)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .overlay(alignment: .top) {
