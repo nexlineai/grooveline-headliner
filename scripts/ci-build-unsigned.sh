@@ -16,6 +16,8 @@ scripts/annotate-errors.sh build/xcodebuild.log
 [ "$status" -eq 0 ] || exit "$status"
 
 app="$dd/Build/Products/Release-iphoneos/GroovelineHeadliner.app"
+# The App Store refuses uploads without the privacy manifest: make sure it reached the bundle.
+[ -f "$app/PrivacyInfo.xcprivacy" ] || { echo "::error title=privacy::PrivacyInfo.xcprivacy is not in the app"; exit 1; }
 rm -rf build/ipa
 mkdir -p build/ipa/Payload
 cp -R "$app" build/ipa/Payload/
