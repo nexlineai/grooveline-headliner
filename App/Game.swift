@@ -198,11 +198,13 @@ final class Game: ObservableObject {
     func run(_ screens: [Screen], home: Screen = .title) {
         self.home = home
         queue = screens
-        // THE NIGHT BEFORE plays the bag you packed: with none packed yet, THE BAG comes first
-        // (before the night's own scene), instead of a set of records that are not yours.
+        // THE NIGHT BEFORE and MERIDIAN play the bag you packed: with none packed yet, THE BAG
+        // comes first (before the night's own scenes), instead of a set of records not yours.
         if progress.closingSet?.count != 6, !queue.contains(.bag),
            let at = queue.firstIndex(where: { if case .night(let id) = $0 { return Nights.find(id)?.closingSet == true }; return false }) {
-            let before = at > 0 && queue[at - 1] == .story(Nights.nightBefore.id) ? at - 1 : at
+            // Before the scenes that lead into it (MERIDIAN: the card and Nuno with the bag).
+            var before = at
+            while before > 0, case .story = queue[before - 1] { before -= 1 }
             queue.insert(.bag, at: before)
         }
         next()

@@ -174,7 +174,7 @@ enum Lessons {
                              desk: LessonDesk(crossfader: 0.5, channel: [0.85, 0], sync: [false, false], room: "shop",
                                               syncAllowed: false, records: ["bastidores", "vibrafone"], chapter: 12, cueBar: 16), steps: [
         LessonStep(voice: "skip-01",
-                   text: "Nine years ago a needle skipped on the biggest stage in the country, and you froze. Today you learn what to do. Start the left one.",
+                   text: "On a stage that big, a needle can skip. Most DJs freeze. Today you learn what to do. Start the left one.",
                    task: "PRESS PLAY ON THE LEFT DECK", goal: .startDeck(0), target: .play(0)),
         LessonStep(voice: "skip-02",
                    text: "Same tempo, a hundred and twenty. Start the right one on the one.",
@@ -197,7 +197,7 @@ enum Lessons {
                    text: "There! The needle jumped. The kicks are apart. Push the left record back with the rim. Now.",
                    task: "NUDGE THE LEFT RECORD UNTIL THE KICKS ARE ONE", goal: .phaseHeld(bars: 2), target: .record(0), skip: 0),
         LessonStep(voice: "skip-08",
-                   text: "That's all a skip is. A nudge, and a cool head. Nine years ago you froze. Not any more.",
+                   text: "That's all a skip is. A nudge, and a cool head. If it happens up there, you won't freeze.",
                    task: "THE SKIP", goal: .listen, target: nil),
     ])
 

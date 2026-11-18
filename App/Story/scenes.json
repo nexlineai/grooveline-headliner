@@ -313,5 +313,14 @@
         {"who": "", "text": "PLAY THEM YOUR CLOSING SET. ONCE."}
       ] }
     ]
+  },
+  {
+    "id": "back-to-meridian",
+    "shots": [
+      { "lines": [
+        {"who": "", "text": "THE NEXT NIGHT."},
+        {"who": "", "text": "MERIDIAN. SIDE STAGE."}
+      ] }
+    ]
   }
 ]

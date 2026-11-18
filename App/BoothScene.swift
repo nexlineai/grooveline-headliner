@@ -158,7 +158,7 @@ final class BoothScene: SKScene {
     private var room = "bedroom"
     /// Extra lift of a room's picture, as a part of its height, for rooms whose people stand low
     /// in the picture (chapter 10's open air: at the default only sky and trees showed, build 46).
-    private static let roomLift: [String: CGFloat] = ["field": 0.28, "forest": 0.32, "festival": 0.2, "tent": 0.2]
+    private static let roomLift: [String: CGFloat] = ["field": 0.28, "forest": 0.32, "festival": 0.2, "tent": 0.2, "meridian": 0.15]
     /// False on vinyl: SYNC is dim and does nothing.
     private var syncAllowed = true
     /// Ear training: the tempo readouts, the phase dot and the verdict are hidden.

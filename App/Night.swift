@@ -434,7 +434,28 @@ enum Nights {
                                                "keys": [("fri-keys", "Sour! Those keys fight. Get out of it, or change it.")]],
                                        bag: ["bastidores", "holofote", "meridiano", "ponte", "especiaria", "nove-anos"],
                                        clockStart: 22 * 60, judgeKeys: true, closingSet: true)
-    static let all = [firstParty, garageParty, saturdayShift, emptyTuesday, thursdayShow, caveWarmUp, fridayCave, afterhours, dubplateNight, berlinNight, ibizaNight, burnout, sunsetSlot, threePM, tentRain, forestStage, boatParty, vexB2B, nightBefore]
+    /// Chapter 12, the finale: MERIDIAN's main stage, the closing set. The bag you packed, on
+    /// vinyl, sixty thousand people; the needle skips, and this time you know what to do.
+    /// (The white label after the closer comes with Zé's track.)
+    static let meridian = NightInfo(id: "meridian", title: "MERIDIAN", length: 540, room: "meridian",
+                                    records: ["bastidores", "holofote"], chapter: 12, mixesFor3Stars: 5,
+                                    mishapAt: 0.4, mishap: .needleSkip, syncAllowed: false,
+                                    remarks: [(at: 0.85, moment: "closer")],
+                                    lines: ["wait": [("meridian-wait", "Sixty thousand people. The lights just went down. It's yours.")],
+                                            "start": [("meridian-start", "Here we go. Nine years for this. Easy does it.")],
+                                            "clean": [("meridian-clean", "Smooth. Sixty thousand people, and nobody heard the join."), ("fri-clean-2", "Nobody even blinked. Perfect.")],
+                                            "rough": [("meridian-rough", "Bumpy. Sixty thousand people heard that.")],
+                                            "dead": [("fest-dead", "Silence! On a main stage! Play!")],
+                                            "stale": [("fri-stale", "This one's done. Next.")],
+                                            "wreck": [("fri-wreck", "Ouch. Two kicks fighting.")],
+                                            "clash": [("fri-clash", "Two basslines. Kill a low.")],
+                                            "nuts": [("meridian-nuts", "Look at Mira's lights! All the way to the bridge!")],
+                                            "cable": [("meridian-skip", "It skipped! Up here, in front of everyone. Nudge it. You know how.")],
+                                            "keys": [("fri-keys", "Sour! Those keys fight. Get out of it, or change it.")],
+                                            "closer": [("meridian-closer", "Last one coming. Make it the one they go home with.")]],
+                                    bag: ["bastidores", "holofote", "meridiano", "ponte", "especiaria", "nove-anos"],
+                                    clockStart: 23 * 60 + 30, judgeKeys: true, closingSet: true)
+    static let all = [firstParty, garageParty, saturdayShift, emptyTuesday, thursdayShow, caveWarmUp, fridayCave, afterhours, dubplateNight, berlinNight, ibizaNight, burnout, sunsetSlot, threePM, tentRain, forestStage, boatParty, vexB2B, nightBefore, meridian]
     static func find(_ id: String) -> NightInfo? { all.first { $0.id == id } }
 }
 
