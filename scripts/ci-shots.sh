@@ -58,6 +58,7 @@ shot() { # name, seconds to wait, launch arguments... (every chapter open unless
   xcrun simctl terminate "$udid" "$bundle" || true
 }
 shot title 6
+shot title-new 5 -unlockAll 0
 shot chapter 5 -screen chapter -demoProgress 1 -unlockAll 0
 shot chapter-locked 5 -screen chapter -chapter 1 -unlockAll 0
 shot chapter3 5 -screen chapter -chapter 3
