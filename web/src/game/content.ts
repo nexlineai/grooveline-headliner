@@ -51,9 +51,11 @@ export interface Lesson { id: string; number: number; title: string; coach: stri
 
 export interface Line { voice: string; text: string; }
 
+export interface NightRequest { at: number; record: string; voice: string; text: string; }
+
 export interface NightInfo {
   id: string; title: string; length: number; room: string; records: string[] | null; chapter: number;
-  mixesFor3Stars: number; requests: { at: number; record: string; voice: string; text: string }[];
+  mixesFor3Stars: number; requests: NightRequest[];
   mishapAt: number | null; mishap: string; syncAllowed: boolean; maxMood: number; turnDownAt: number | null;
   remarks: { at: number; moment: string }[]; audience: "room" | "listeners" | "field"; coach: string;
   lines: Record<string, Line[]>; bag: string[] | null; hot: string[]; clockStart: number; judgeKeys: boolean;

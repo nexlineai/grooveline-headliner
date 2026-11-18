@@ -13,7 +13,9 @@ import {
 import type { Point, RGB, Rect } from "./gear.ts";
 import type { LessonDesk, LessonTarget } from "../game/content.ts";
 import type { TrackInfo } from "../core/beatgrid.ts";
-import { compatible } from "../core/harmony.ts";
+import { clash, compatible } from "../core/harmony.ts";
+import type { NightRunner } from "../game/night.ts";
+import type { NightInfo } from "../game/content.ts";
 import type { LessonRunner } from "../game/lesson.ts";
 import { PHRASE } from "../game/lesson.ts";
 
@@ -94,6 +96,12 @@ export class Booth {
 
   /** The lesson being taught here, if any. */
   lesson: LessonRunner | null = null;
+  /** The night being played here, if any: the crowd's energy follows the mixing. */
+  night: NightRunner | null = null;
+  /** A record stuck in one groove (a night's mishap): the deck, and where the groove starts (s). */
+  private stuck: { deck: number; from: number } | null = null;
+  /** A turntable whose belt slips (a night's mishap): its pitch wanders from then on. */
+  private wander: { deck: number; since: number } | null = null;
   private lessonReady = false;
   /** Where a lesson cues every record, in bars past its first beat. */
   private cueBar: number | null = null;
@@ -251,10 +259,40 @@ export class Booth {
     this.L = null; // rebuild (the filter knobs may come or go)
   }
 
+  /** Back to plain free play: no lesson, no night, the music at full level. */
+  clearSession(): void {
+    this.lesson?.stop();
+    this.night?.stop();
+    this.lesson = null;
+    this.night = null;
+    this.stuck = null;
+    this.wander = null;
+    this.partnerDeck = null;
+    this.deadFader = null;
+    this.cueBar = null;
+    this.hideNumbers = false;
+    this.syncAllowed = true;
+    this.engine.masterVolume = 1;
+    this.engine.echoSeconds = 0;
+    this.L = null;
+  }
+
+  /** A night starts like a gig: the first record ready, the second one's fader down. */
+  async startNight(runner: NightRunner, firstTwo: string[]): Promise<void> {
+    this.clearSession();
+    const info: NightInfo = runner.info;
+    await this.setTheDesk({
+      crossfader: 0.5, channel: [0.85, 0], sync: info.syncAllowed ? [false, true] : [false, false], cueMix: null,
+      room: info.room, syncAllowed: info.syncAllowed, records: info.records, crate: true, chapter: info.chapter,
+      hideBPM: false, pitch: null, bag: null, cueBar: null, studio: false, pattern: null, cutter: false,
+      deadFader: info.deadFader, echo: info.echo, partner: info.partner, partnerBag: info.partnerBag, partnerStyle: info.partnerStyle,
+    }, firstTwo);
+    this.night = runner;
+  }
+
   /** Starts a lesson on the desk it is written for. */
   async startLesson(runner: LessonRunner, firstTwo: string[]): Promise<void> {
-    this.lesson?.stop();
-    this.lesson = null;
+    this.clearSession();
     await this.setTheDesk(runner.lesson.desk, firstTwo);
     this.lesson = runner;
     this.lessonReady = false;
@@ -761,6 +799,66 @@ export class Booth {
     requestAnimationFrame((t) => this.frame(t));
   }
 
+  // MARK: - A night
+
+  /** The crowd answers the mixing, things go wrong at their moment, and the room shows its mood. */
+  private playNight(dt: number, reading: MixReading, snapshots: DeckSnapshot[], lead: number): void {
+    const night = this.night!, info = night.info, decks = this.decks;
+    const now = this.lastTime / 1000;
+    const heard = (s: DeckSnapshot) => s.playing && s.gain > 0.03;
+    // The record on air is the one that is heard; with both heard, the louder one.
+    const onAir = heard(snapshots[0]) ? (heard(snapshots[1]) ? lead : 0) : 1;
+    // A scratched record: the needle falls back into the same groove, one turn of the platter
+    // (1.8 s at 33 rpm), until it is picked up and moved on or the deck is stopped.
+    const s = this.stuck;
+    if (s) {
+      const deck = decks[s.deck];
+      if (deck.lifted || !deck.motorOn) this.stuck = null;
+      else if (deck.seconds >= s.from + 1.8 || deck.seconds < s.from - 0.5) deck.seek(s.from);
+    }
+    // A slipping belt: the deck's speed drifts slowly around where its pitch fader says.
+    const w = this.wander;
+    if (w && !this.sync[w.deck]) {
+      const t = now - w.since;
+      const drift = 0.0035 * Math.sin(t * 2 * Math.PI / 23) + 0.002 * Math.sin(t * 2 * Math.PI / 7.3);
+      decks[w.deck].pitch = (0.5 - this.pitchFader[w.deck]) * 2 * PITCH_RANGE + drift;
+    }
+    // Two records heard together in keys that fight (or pitched apart: no key lock).
+    const a = decks[0].info?.camelot, b = decks[1].info?.camelot;
+    const keyClash = info.judgeKeys && reading.state === "blend" && !!a && !!b && clash(a, decks[0].pitch, b, decks[1].pitch);
+    const page = this.pageFacts();
+    night.update({
+      dt, state: reading.state, quality: reading.quality, bassClash: reading.bassClash, lead: onAir,
+      onAirRecord: reading.state === "silence" ? null : decks[onAir].info?.id ?? null, channel: this.channel.slice(),
+      jingles: page.jingles, beat: decks[onAir].beat, stuck: this.stuck ? heard(snapshots[this.stuck.deck]) : false,
+      keyClash, onAirBPM: decks[onAir].bpm, lowOnAir: this.eq[onAir][0], stepOns: this.stepOns,
+      partnerAnswers: this.partnerAnswers, partnerSteals: this.partnerSteals, partnerFights: this.partnerFights,
+    });
+    // Things go wrong: somebody kicks the cable and the record on air stops.
+    if (night.takeMishap()) {
+      switch (info.mishap) {
+        case "needleSkip": { // the needle jumps a groove: the record lands a little ahead of the beat
+          const deck = decks[onAir];
+          deck.seek(deck.seconds + 0.4 * deck.grid.beatLength);
+          break;
+        }
+        case "stuckGroove": this.stuck = { deck: onAir, from: decks[onAir].seconds }; break;
+        case "powerCut": for (const deck of decks) deck.motorOn = false; break; // the power is back a moment later
+        case "pitchWander": this.wander = { deck: onAir, since: now }; break;
+        case "rainRush": break; // the rain only fills the tent; the music plays on
+        case "partnerCrash": // his laptop dies: his deck stops and he leaves; both decks are yours now
+          if (this.partnerDeck !== null) { decks[this.partnerDeck].motorOn = false; this.partnerDeck = null; }
+          break;
+        default: decks[onAir].motorOn = false;
+      }
+    }
+    // The music steps back a little while Tó talks, as in the lessons.
+    const wanted = night.speaking || page.jinglePlaying ? 0.5 : 1;
+    const level = this.engine.masterVolume;
+    if (Math.abs(wanted - level) > 0.002) this.engine.masterVolume = level + (wanted - level) * Math.min(1, dt * 6);
+    this.showRoom(night.mood, dt);
+  }
+
   // MARK: - Back to back
 
   /** Her deck is hers (PHONES aside: cueing her in your headphones is fine); the crossfader is
@@ -1077,7 +1175,9 @@ export class Booth {
       ctx.fillRect(0, L.gearTop, L.W, L.H - L.gearTop);
       ctx.restore();
     }
-    this.showRoom(heard ? 2 : -1, dt);
+    if (this.night) this.playNight(dt, reading, snapshots, lead);
+    // Otherwise the friends dance while there is music and stop where they are when it goes quiet.
+    else this.showRoom(heard ? 2 : -1, dt);
     // The desk the gear stands on hides the lower part of the picture.
     ctx.fillStyle = rgba(Palette.night);
     ctx.fillRect(0, 0, L.W, L.gearTop);

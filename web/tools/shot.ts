@@ -1,5 +1,5 @@
 // Screenshots of the web version from headless Chromium, with its console and errors:
-//   node tools/shot.ts OUT.png [URL] [--size 1600x740] [--wait 6] [--chromium /usr/bin/chromium]
+//   node tools/shot.ts OUT.png [URL] [--size 1600x740] [--wait 6] [--chromium /usr/bin/chromium] [--gpu]
 //                      [--do "click 181 697; wait 2; drag 515 518 515 440; eval engine.decks[0].pitch"]
 // `run FILE` evaluates a script file in the page (a bot that plays a lesson, for instance).
 // `--do` runs after the wait, then the picture is taken: clicks and drags with the mouse (screen
@@ -34,7 +34,10 @@ const browser = spawn(chromium, [
   // Without these, headless Chromium stops animation frames after a few seconds (the page counts
   // as hidden), and everything driven by them (the booth, the lesson) freezes while sound goes on.
   "--disable-renderer-backgrounding", "--disable-background-timer-throttling", "--disable-backgrounding-occluded-windows",
-  `--window-size=${width},${height}`, "about:blank",
+  `--window-size=${width},${height}`,
+  // The machine's GPU instead of software rendering (frame rates like a real browser's).
+  ...(args.includes("--gpu") ? ["--use-angle=gl", "--enable-gpu-rasterization", "--ignore-gpu-blocklist"] : []),
+  "about:blank",
 ], {
   stdio: ["ignore", "ignore", process.env.SHOT_DEBUG ? "inherit" : "ignore"],
   // Chromium puts a socket in TMPDIR; a long TMPDIR makes it fail ("Socket path too long").
