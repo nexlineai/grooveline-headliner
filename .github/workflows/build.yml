@@ -9,6 +9,8 @@ on:
     # The web version has its own workflow (web.yml, Linux): a push that only touches web/ (or only
     # notes like CLAUDE.md) must not start a Mac build, nor cancel one that is running.
     paths-ignore: ['web/**', '.github/workflows/web.yml', '**/*.md']
+    # All ~90 screenshots (about 25 minutes) only on a tag: git tag full-shots-N && git push origin full-shots-N
+    tags: ['full-shots-*']
   workflow_dispatch:
 
 permissions:
@@ -52,6 +54,8 @@ jobs:
         run: scripts/ci-shots.sh
         env:
           BUILD_NUMBER: ${{ github.run_number }}
+          SHOTS_MODE: ${{ startsWith(github.ref, 'refs/tags/full-shots-') && 'full' || 'quick' }}
+          SHOTS_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
       - name: Push the pictures to the shots branch
         env:
           GH_TOKEN: ${{ github.token }}

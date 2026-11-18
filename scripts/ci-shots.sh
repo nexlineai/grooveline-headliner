@@ -46,8 +46,21 @@ xcrun simctl boot "$udid"
 xcrun simctl bootstatus "$udid" -b
 xcrun simctl install "$udid" "$app"
 
+# Which shots run (build 18 Nov, Zé: 91 shots on every push is far too slow):
+#  - SHOTS_MODE=full (a `full-shots-*` tag): all of them;
+#  - otherwise only QUICK, plus any names in a `[shots: name name]` tag of the commit message
+#    (read from the SHOTS_COMMIT_MESSAGE environment variable, never interpolated into a command).
+QUICK=" title chapter-locked chapter3 paywall chapter2 booth lesson lesson-sync shop-night "
+if [[ "${SHOTS_MODE:-quick}" != full ]]; then
+  if [[ "${SHOTS_COMMIT_MESSAGE:-}" =~ \[shots:\ ([a-z0-9\ -]+)\] ]]; then
+    for n in ${BASH_REMATCH[1]}; do QUICK+="$n "; done
+  fi
+  echo "quick shots:$QUICK"
+fi
+
 shot() { # name, seconds to wait, launch arguments... (every chapter open unless -unlockAll is given)
   local name=$1 wait=$2; shift 2
+  if [[ "${SHOTS_MODE:-quick}" != full && "$QUICK" != *" $name "* ]]; then return 0; fi
   if [[ " $* " == *" -unlockAll "* ]]; then
     xcrun simctl launch "$udid" "$bundle" "$@"
   else

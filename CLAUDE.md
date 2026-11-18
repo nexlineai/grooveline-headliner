@@ -31,6 +31,10 @@ Design, story, decisions and the build log are in the vault:
   - On failure, read the annotations without a token:
     `curl -s https://api.github.com/repos/nexlineai/grooveline-headliner/commits/main/check-runs`
     then `.../check-runs/<id>/annotations`.
+- **Screenshots are quick by default** (18 Nov): a push takes only the QUICK set in `ci-shots.sh` (title,
+  chapter screens, paywall, booth, one lesson, one night) plus names in a `[shots: name name]` tag in
+  the commit message. A new screen: add its `shot` line AND name it in the commit message. All ~90:
+  `git tag full-shots-N && git push origin full-shots-N` (about 25 min). Store pictures: tag `store-shots-N`.
 - `project.yml` -> `xcodegen generate` -> `GroovelineHeadliner.xcodeproj` (gitignored).
 - iOS 26.0, iPhone only, landscape only, Swift 5 language mode.
 - Launch arguments for screenshots: `-screen booth`, `-demo 1`, `-screen lesson`, `-screen story -scene <id>`. Add one per new screen and a
