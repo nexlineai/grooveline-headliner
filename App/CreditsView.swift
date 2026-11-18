@@ -95,7 +95,7 @@ struct CreditsView: View {
                 "The record with no name that Lia hands you, and the last one you play at MERIDIAN, is a dubplate produced by zdB in 2007.",
             ])
             section("HOW IT WAS MADE", [
-                "Every record in this game except the white label was written as code and synthesized from nothing: no samples, no commercial music. The pictures, the voices and the moving scenes were made with generative AI from our own descriptions. The decks, the mixer and the crowd are all written in code.",
+                "Every record in this game except the white label was written as code and synthesized from nothing: no samples, no commercial music. The pictures, the voices and the moving scenes were made with generative AI from our own descriptions: the pictures, the voices and the moving rooms with Grok (xAI), the talking scenes with Grok (xAI) and Gemini (Google). The decks, the mixer and the crowd are all written in code.",
             ])
         }
         .frame(maxWidth: 560)
