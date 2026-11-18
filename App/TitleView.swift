@@ -40,16 +40,9 @@ struct TitleView: View {
                     .background(Capsule().fill(Color(Palette.teal)))
             }
             .padding(.top, 16)
-            HStack(spacing: 12) {
-                small("FREE PLAY") { game.run([.booth]) }
-                small("SCENE: THE WHITE LABEL") { game.run([.story("white-label")]) }
-            }
-            .padding(.top, 10)
-            Text("Test build \(game.build)")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.white.opacity(0.45))
-                .padding(.top, 8)
-                .padding(.bottom, 16)
+            small("FREE PLAY") { game.run([.booth]) }
+                .padding(.top, 10)
+                .padding(.bottom, 24)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background {

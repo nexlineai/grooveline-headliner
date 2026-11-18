@@ -9,14 +9,16 @@ struct CreditsView: View {
 
     /// Where the drop is in the white label (seconds into the file, 121 BPM).
     static let dropAt: TimeInterval = 414.5
-    static let rollSeconds: Double = 75
+    /// Points per second the text climbs (about 70 s for the whole roll on an iPhone).
+    static let rollSpeed: Double = 24
     static let liveURL = URL(string: "https://grooveline.org/start-dj")!
 
     @State private var music: AVAudioPlayer?
     @State private var voice: AVAudioPlayer?
     @State private var rolling = false
     @State private var zdb = false
-    @State private var textHeight: CGFloat = 1200
+    @State private var textHeight: CGFloat = 0
+    @State private var screenHeight: CGFloat = 393
 
     var body: some View {
         GeometryReader { geo in
@@ -53,9 +55,18 @@ struct CreditsView: View {
                 .clipped()
                 .ignoresSafeArea()
             credits
-                .background(GeometryReader { g in Color.clear.onAppear { textHeight = g.size.height } })
-                .offset(y: rolling ? -(textHeight / 2 + height / 2 + 20) : (textHeight / 2 + height / 2))
-                .animation(.linear(duration: Self.rollSeconds), value: rolling)
+                .background(GeometryReader { g in
+                    Color.clear.onAppear {
+                        textHeight = g.size.height
+                        screenHeight = height
+                        startRoll()
+                    }
+                })
+                // It starts with the title already on screen (just below the middle), not below the
+                // bottom edge: Zé saw a long empty screen after Lia before anything came up.
+                .offset(y: rolling ? -(textHeight / 2 + height / 2 + 20) : (textHeight / 2 + height * 0.1))
+                .animation(.linear(duration: rollSeconds), value: rolling)
+                .opacity(textHeight > 0 ? 1 : 0)
         }
     }
 
@@ -176,8 +187,16 @@ struct CreditsView: View {
             showZdb()
             return
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { rolling = true }
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.rollSeconds + 1) { if !zdb { showZdb() } }
+        // The roll starts once the text is measured (`startRoll()`).
+    }
+
+    /// How long the climb takes: from the title just below the middle to the last line off the top.
+    private var rollSeconds: Double { Double(textHeight + screenHeight * 0.6 + 20) / Self.rollSpeed }
+
+    private func startRoll() {
+        guard !rolling, !zdb, textHeight > 0 else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { rolling = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2 + rollSeconds + 1) { if !zdb { showZdb() } }
     }
 
     private func showZdb() {
