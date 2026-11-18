@@ -181,6 +181,31 @@ Design, story, decisions and the build log are in the vault:
   full until the middle. Double tap on a knob = back to its default: EQ in the middle (flat),
   the cue mix to CUE (Zé corrected this: the cue mix default is CUE, not the middle).
 
+## Web version (`web/`, started 18 Nov 2026)
+Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
+- Plain TypeScript, **erasable syntax only** (no enums, namespaces, parameter properties), **no npm
+  dependencies**: Node 26 strips the types. Types are imported with `import type` (a stripped
+  plain import of a type fails at run time). `tsc` runs only on CI (`.github/workflows/web.yml`,
+  Linux: `node --test` + `tsc -p web`); `build.yml` ignores `web/**`, so web pushes never start or
+  cancel a Mac build.
+- `web/src/core/` is `HeadlinerCore` line by line; `web/test/core.test.ts` is `CoreTests.swift` case
+  by case. A change to one core is made in the other too, with its test twin.
+- Run it: `cd web && node tools/serve.ts` -> http://localhost:5173 (serves `../App` at `/assets/`,
+  one copy of the content; COOP/COEP headers so the page shares memory with its audio thread;
+  `--lan` to try it on a phone on the same Wi-Fi).
+- Look at it myself: `node tools/shot.ts OUT.png "http://localhost:5173/?autostart&demo" [--do
+  "click X Y; drag X1 Y1 X2 Y2; wait S; eval EXPR"]` = headless, muted Chromium, prints the console
+  and errors; `eval` sees `engine` and `booth`.
+- Audio: `src/audio/worklet.ts` runs `renderMix` in an AudioWorklet; the page and the worklet share
+  one Float64Array (`layout.ts`: the page writes the wanted values, the worklet the needle). Without
+  cross-origin isolation (an Android WebView) the same array is synced by messages. Records are
+  decoded at the output rate; the grid starts at the first kick found in the decoded audio (AAC
+  priming differs per browser). A load message carries the deck's seek count, so a cue right after
+  a load lands on the new record.
+- Booth: `src/booth/booth.ts` draws in SpriteKit's world (y up, CSS pixels), so `BoothScene`'s layout
+  numbers, angles and touch arithmetic port unchanged; the room picture and its clips are DOM
+  layers under the canvas. Labels use Barlow Condensed (OFL, `web/fonts/`), the same on every system.
+
 ## Assets
 - `tools/music/make.mjs ID [ID ...]`: synthesizes the original tracks into `App/Tracks/` (+
   `tracks.json`); `--all` re-renders every one, including the approved ones, so name the ids.

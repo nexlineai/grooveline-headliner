@@ -1,0 +1,846 @@
+// The booth: the room on top, two turntables and a mixer below (port of App/BoothScene.swift,
+// free play for now; lessons and nights follow once the content is exported from the iPhone code).
+// The canvas draws in SpriteKit's world (y up, CSS pixels), so the iPhone's layout numbers,
+// angles and touch arithmetic are used as they are.
+
+import type { Deck, DeckEngine } from "../audio/engine.ts";
+import { crossfade, faderGain, phaseOffset, pitchToPlay, readMix, verdict } from "../core/mixjudge.ts";
+import type { DeckSnapshot, MixReading } from "../core/mixjudge.ts";
+import {
+  DIM, EDGE, Palette, button, centred, circle, contains, fader, knob, label, meter, picture, platterPicture,
+  rgba, roundRect, sheenPicture, tonearm, wavePicture,
+} from "./gear.ts";
+import type { Point, RGB, Rect } from "./gear.ts";
+
+type Kind =
+  | { t: "platter"; d: number } | { t: "rim"; d: number } | { t: "pitch"; d: number } | { t: "channel"; d: number }
+  | { t: "cross" } | { t: "eq"; d: number; band: number } | { t: "play"; d: number } | { t: "cue"; d: number }
+  | { t: "sync"; d: number } | { t: "needle"; d: number } | { t: "wave"; d: number } | { t: "phones"; d: number }
+  | { t: "cueMix" } | { t: "filter"; d: number };
+
+const keyOf = (k: Kind): string => `${k.t}:${"d" in k ? k.d : ""}:${"band" in k ? k.band : ""}`;
+
+interface Grab { kind: Kind; start: Point; startValue: number; angle: number; }
+
+/** Radians per second of a record at 33⅓ rpm. */
+const TURN = 2 * Math.PI * (100 / 3) / 60;
+/** The pitch fader covers ±8 %, like a classic turntable. */
+const PITCH_RANGE = 0.08;
+const MOODS = ["waiting", "nodding", "dancing", "nuts"];
+const TINTS: RGB[] = [Palette.teal, Palette.magenta];
+
+/** Where everything sits, worked out once per screen size (`build`). */
+interface Layout {
+  W: number; H: number; u: number; gearTop: number; left: number;
+  deck: Rect[]; mixer: Rect;
+  outer: number; r: number; centre: Point[];
+  pivot: Point[]; armLength: number; armPivotAngle: number; needleReach: number;
+  rowY: number[]; titleX: number[]; timeX: number[]; dotX: number[][];
+  wave: Rect[];
+  buttonW: number; buttonH: number; buttonX: number[][]; buttonY: number[];
+  pitchX: number[]; pitchY: number[]; pitchTravel: number;
+  bpmX: number[]; topY: number; phaseY: number; phaseWidth: number;
+  knobX: number[]; knobY: number[]; knobTravel: number;
+  channelX: number[]; channelY: number; channelTravel: number;
+  phonesY: number; meterX: number[]; meterY: number;
+  crossY: number; crossTravel: number; filterY: number;
+}
+
+export class Booth {
+  private readonly canvas: HTMLCanvasElement;
+  private readonly ctx: CanvasRenderingContext2D;
+  private readonly roomLayer: HTMLElement;
+  private readonly engine: DeckEngine;
+  private get decks(): Deck[] { return this.engine.decks; }
+
+  // Settings.
+  private pitchFader = [0.5, 0.5]; // 1 = top = slower, as on a turntable
+  private channel = [0.85, 0.85];
+  private cross = 0.5;
+  private eq = [[0.5, 0.5, 0.5], [0.5, 0.5, 0.5]]; // per deck: low, mid, high
+  private sync = [false, false];
+  /** Headphone cue per channel: that record is heard in the headphones, before its fader. */
+  private phones = [false, false];
+  /** The one-knob filter per channel (0.5 = off). */
+  private filterSetting = [0.5, 0.5];
+  private syncAllowed = true;
+  private hideNumbers = false;
+  private hasFilter = true;
+
+  // Hands.
+  private grabs = new Map<number, Grab>();
+  private handTravel = [0, 0];
+  private handSpeed = [0, 0];
+  private rimTravel = [0, 0];
+  private rimSpeed = [0, 0];
+  /** While a needle is in the air: where on the record it will come down, 0...1. */
+  private dropAt: (number | null)[] = [null, null];
+  private lastDown = new Map<string, number>();
+
+  // On screen.
+  private L: Layout | null = null;
+  private hits: { kind: Kind; rect: Rect }[] = [];
+  private dpr = 1;
+  private platterImg: HTMLCanvasElement[] = [];
+  private sheenImg: HTMLCanvasElement | null = null;
+  private waveImg: (HTMLCanvasElement | null)[] = [null, null];
+  private waveFor: string[] = ["", ""];
+  private meterLevel = [0, 0];
+  private roomShade = 0.45;
+  private room = "bedroom";
+  private roomVideos: (HTMLVideoElement | null)[] = [null, null, null, null];
+  private roomMissing = new Set<number>();
+  private roomMood = -1;
+  private lastTime = 0;
+  /** What the room heard this frame. */
+  lastReading: MixReading | null = null;
+
+  constructor(canvas: HTMLCanvasElement, roomLayer: HTMLElement, engine: DeckEngine) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext("2d")!;
+    this.roomLayer = roomLayer;
+    this.engine = engine;
+    for (const d of [0, 1]) this.decks[d].volume = faderGain(this.channel[d]) * (d === 0 ? crossfade(this.cross).a : crossfade(this.cross).b);
+    canvas.addEventListener("pointerdown", (e) => this.down(e));
+    canvas.addEventListener("pointermove", (e) => this.move(e));
+    canvas.addEventListener("pointerup", (e) => this.up(e));
+    canvas.addEventListener("pointercancel", (e) => this.up(e));
+    canvas.addEventListener("wheel", (e) => this.wheel(e), { passive: false });
+    canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+    new ResizeObserver(() => { this.L = null; }).observe(canvas);
+    this.buildRoom();
+    requestAnimationFrame((t) => this.frame(t));
+  }
+
+  /** The screenshot run: both records turning, the second one synced to the first. */
+  demo(): void {
+    const [a, b] = this.decks;
+    if (!a.isLoaded || !b.isLoaded) return;
+    this.sync[1] = true;
+    // Needles some way into the records, so the strips show something.
+    a.seek(a.duration * 0.36);
+    b.seek(b.duration * 0.12);
+    a.motorOn = true;
+    b.motorOn = true;
+  }
+
+  /** A new record was put on deck `d`: its pitch fader goes back to the middle. */
+  recordChanged(d: number): void {
+    this.pitchFader[d] = 0.5;
+    this.decks[d].pitch = 0;
+    this.waveFor[d] = "";
+  }
+
+  // MARK: - Building the gear
+
+  private build(): void {
+    this.releaseAllHands();
+    const W = this.canvas.clientWidth, H = this.canvas.clientHeight;
+    this.dpr = Math.min(3, window.devicePixelRatio || 1);
+    this.canvas.width = Math.round(W * this.dpr);
+    this.canvas.height = Math.round(H * this.dpr);
+    if (W <= 200 || H <= 200) { this.L = null; return; }
+    const left = 10, right = 10, bottom = 8;
+    const gearTop = H * 0.58;
+    const gx0 = left, gy0 = bottom;
+    const gw = W - left - right, gh = gearTop - 6 - bottom;
+    const u = gh / 210;
+    const gap = 8 * u;
+    const mixerW = Math.min(gw * 0.31, 224 * u);
+    const deckW = (gw - mixerW - gap * 2) / 2;
+    const deck: Rect[] = [
+      { x: gx0, y: gy0, w: deckW, h: gh },
+      { x: gx0 + deckW + gap + mixerW + gap, y: gy0, w: deckW, h: gh },
+    ];
+    const mixer: Rect = { x: gx0 + deckW + gap, y: gy0, w: mixerW, h: gh };
+    const hits: { kind: Kind; rect: Rect }[] = [];
+    const first = (kind: Kind, rect: Rect) => hits.unshift({ kind, rect });
+
+    // Decks: platter as big as the panel allows, title and strip above, buttons below.
+    const outer = Math.min((gh - 64 * u) / 2, (deckW - 86 * u) / 2);
+    const r = outer / 1.07;
+    const centre: Point[] = [], pivot: Point[] = [], rowY: number[] = [], titleX: number[] = [], timeX: number[] = [];
+    const dotX: number[][] = [], wave: Rect[] = [], buttonX: number[][] = [], buttonY: number[] = [];
+    const pitchX: number[] = [], pitchY: number[] = [];
+    const buttonW = 46 * u, buttonH = 22 * u;
+    const pitchTravel = gh - 78 * u;
+    let armLength = 100, armPivotAngle = 0;
+    for (const d of [0, 1]) {
+      const rect = deck[d];
+      const c = { x: rect.x + 8 * u + outer, y: rect.y + 34 * u + outer };
+      centre.push(c);
+      hits.push({ kind: { t: "platter", d }, rect: centred(c.x, c.y, outer * 2.16, outer * 2.16) });
+      // Tonearm: pivot behind the platter on the right, needle travelling in as the record plays.
+      const p = { x: c.x + r * 0.98, y: c.y + r * 0.86 };
+      pivot.push(p);
+      armLength = Math.hypot(p.x - c.x, p.y - c.y);
+      armPivotAngle = Math.atan2(c.y - p.y, c.x - p.x);
+      rowY.push(rect.y + rect.h - 8 * u);
+      titleX.push(rect.x + 10 * u);
+      timeX.push(rect.x + rect.w - 88 * u);
+      dotX.push([0, 1, 2, 3].map((i) => rect.x + rect.w - 52 * u - (3 - i) * 9 * u));
+      const w = { x: rect.x + 10 * u, y: rect.y + rect.h - 27 * u, w: rect.w - 58 * u, h: 12 * u };
+      wave.push(w);
+      // Easy to hit with a thumb: the touch area is much taller than the strip, upwards.
+      first({ t: "wave", d }, { x: w.x - 8, y: w.y - 1, w: w.w + 16, h: w.h + 30 });
+      const by = rect.y + 17 * u;
+      buttonY.push(by);
+      const xs = [0, 1, 2].map((i) => rect.x + 10 * u + buttonW / 2 + i * (buttonW + 8 * u));
+      buttonX.push(xs);
+      const kinds: Kind[] = [{ t: "cue", d }, { t: "play", d }, { t: "sync", d }];
+      kinds.forEach((k, i) => first(k, centred(xs[i], by, buttonW + 8, buttonH + 12)));
+      // Pitch fader on the right edge: up is slower.
+      const px = rect.x + rect.w - 24 * u, py = rect.y + rect.h / 2 + 3 * u;
+      pitchX.push(px); pitchY.push(py);
+      first({ t: "pitch", d }, centred(px, py, 48 * u, pitchTravel + 32 * u));
+    }
+
+    // Mixer: tempos and verdict on top, EQ outside, faders inside, meters in the middle.
+    const mx = mixer.x, my = mixer.y, mw = mixer.w, mh = mixer.h, mid = mx + mw / 2;
+    const knobX = [mx + 27 * u, mx + mw - 27 * u];
+    const knobY = [0, 1, 2].map((band) => my + 74 * u + band * 41 * u);
+    const channelX = [mx + 72 * u, mx + mw - 72 * u];
+    const channelY = my + 110 * u, channelTravel = 88 * u;
+    const phonesY = my + 49 * u;
+    const crossTravel = Math.min(112 * u, mw * 0.55);
+    const crossY = my + 24 * u, filterY = my + 27 * u;
+    for (const d of [0, 1]) {
+      for (const band of [0, 1, 2]) first({ t: "eq", d, band }, centred(knobX[d], knobY[band], 42 * u, 40 * u));
+      first({ t: "channel", d }, centred(channelX[d], channelY, 40 * u, channelTravel + 28 * u));
+      first({ t: "phones", d }, centred(channelX[d], phonesY, 44 * u, 24 * u));
+    }
+    first({ t: "cueMix" }, centred(mid, phonesY, 30 * u, 26 * u));
+    first({ t: "cross" }, centred(mid, crossY, crossTravel + 36 * u, 40 * u));
+    // Filter knobs last, so they win the little overlap with the crossfader's touch area.
+    if (this.hasFilter) for (const d of [0, 1]) first({ t: "filter", d }, centred(knobX[d], filterY, 30 * u, 30 * u));
+
+    this.hits = hits;
+    this.L = {
+      W, H, u, gearTop, left, deck, mixer, outer, r, centre, pivot, armLength, armPivotAngle,
+      needleReach: Math.max(20, 20 * u), rowY, titleX, timeX, dotX, wave, buttonW, buttonH, buttonX, buttonY,
+      pitchX, pitchY, pitchTravel, bpmX: [mx + 32 * u, mx + mw - 32 * u], topY: my + mh - 15 * u, phaseY: my + mh - 30 * u,
+      phaseWidth: Math.min(104 * u, mw * 0.5), knobX, knobY, knobTravel: 90 * u, channelX, channelY, channelTravel,
+      phonesY, meterX: [mid - 9 * u, mid + 9 * u], meterY: my + 110 * u, crossY, crossTravel, filterY,
+    };
+    this.platterImg = TINTS.map((t) => platterPicture(r, t, this.dpr));
+    this.sheenImg = sheenPicture(r, this.dpr);
+    this.waveFor = ["", ""];
+    this.placeRoom();
+  }
+
+  // MARK: - The room
+
+  /** The room is the DJ's view over the desk: a picture as wide as the screen, with the people in
+   * its upper part; the gear covers the rest. Looping clips of the same picture play on top. */
+  private buildRoom(): void {
+    this.roomLayer.replaceChildren();
+    const still = document.createElement("img");
+    still.src = `assets/Art/room-${this.room}.jpg`;
+    still.alt = "";
+    this.roomLayer.append(still);
+    this.roomVideos = [null, null, null, null];
+    this.roomMissing.clear();
+    this.roomMood = -1;
+  }
+
+  private placeRoom(): void {
+    const L = this.L;
+    if (!L) return;
+    // Picture and clips are the same crop (1456 x 472), lifted a little so heads and shoulders
+    // sit in the part the gear leaves free.
+    const h = L.W * 472 / 1456;
+    Object.assign(this.roomLayer.style, { top: `${-L.W * 0.026}px`, width: `${L.W}px`, height: `${h}px` });
+  }
+
+  /** The clip of one mood, made the first time it is wanted. A room without a loop for a mood
+   * borrows the nearest one it has. */
+  private roomVideo(mood: number): HTMLVideoElement | null {
+    if (mood < 0 || mood >= MOODS.length) return null;
+    const have = this.roomVideos[mood];
+    if (have) return have;
+    if (this.roomMissing.has(mood)) {
+      for (const m of [1, 2, 0, 3]) if (m !== mood && !this.roomMissing.has(m)) return this.roomVideo(m);
+      return null;
+    }
+    const v = document.createElement("video");
+    v.src = `assets/Art/room-${this.room}-${MOODS[mood]}.mp4`;
+    v.muted = true; v.loop = true; v.playsInline = true; v.preload = "auto";
+    v.style.opacity = "0";
+    v.addEventListener("error", () => { this.roomMissing.add(mood); this.roomVideos[mood] = null; v.remove(); });
+    this.roomLayer.append(v);
+    this.roomVideos[mood] = v;
+    return v;
+  }
+
+  /** Shows the room in `mood` (fading over from the mood before), or with -1 holds it still. */
+  private showRoom(mood: number, dt: number): void {
+    let wanted = mood;
+    if (wanted >= 0 && !this.roomVideo(wanted)) wanted = this.roomVideo(2) ? 2 : -1;
+    if (wanted >= 0) {
+      this.roomMood = wanted;
+      const v = this.roomVideos[wanted];
+      if (v && v.paused) v.play().catch(() => {});
+    }
+    this.roomVideos.forEach((v, m) => {
+      if (!v) return;
+      const target = m === this.roomMood ? 1 : 0;
+      const now = Number(v.style.opacity || 0);
+      const next = now + (target - now) * Math.min(1, dt * 4);
+      v.style.opacity = String(next);
+      const gone = m !== this.roomMood && next < 0.02;
+      if ((gone || wanted < 0) && !v.paused) v.pause();
+    });
+  }
+
+  // MARK: - Hands
+
+  private needleTip(d: number): Point {
+    const L = this.L!;
+    const a = this.armAngle(d);
+    return { x: L.pivot[d].x + Math.cos(a) * L.armLength, y: L.pivot[d].y + Math.sin(a) * L.armLength };
+  }
+
+  private armAngle(d: number): number {
+    const L = this.L!;
+    const needle = L.r * (0.93 - 0.5 * (this.dropAt[d] ?? this.decks[d].progress));
+    return L.armPivotAngle + 2 * Math.asin(Math.min(1, needle / (2 * L.armLength)));
+  }
+
+  /** How far through the record a needle is that sits `distance` from the spindle. */
+  private progressAtNeedle(distance: number): number {
+    const ratio = distance / Math.max(1, this.L!.r);
+    return Math.min(1, Math.max(0, (0.93 - ratio) / 0.5));
+  }
+
+  private control(p: Point): Kind | null {
+    const L = this.L;
+    if (!L) return null;
+    // The headshell first: it lies on the record, and picking it up must not grab the record.
+    for (const d of [0, 1]) {
+      if (!this.decks[d].isLoaded) continue;
+      const tip = this.needleTip(d);
+      if (Math.hypot(p.x - tip.x, p.y - tip.y) <= L.needleReach) return { t: "needle", d };
+    }
+    for (const hit of this.hits) {
+      if (!contains(hit.rect, p)) continue;
+      const k = hit.kind;
+      if (k.t === "wave") {
+        // The top of the platter's rim reaches into the strip's touch area; the rim wins there.
+        const dist = Math.hypot(p.x - L.centre[k.d].x, p.y - L.centre[k.d].y);
+        if (dist <= L.r * 1.13 || !this.decks[k.d].isLoaded) continue;
+        return k;
+      }
+      if (k.t === "platter") {
+        // On the record the hand grabs it; on the dotted rim it only pushes or drags.
+        const dist = Math.hypot(p.x - L.centre[k.d].x, p.y - L.centre[k.d].y);
+        if (dist <= L.r * 0.93) return k;
+        if (dist <= L.r * 1.2) return { t: "rim", d: k.d };
+        continue;
+      }
+      return k;
+    }
+    return null;
+  }
+
+  private value(k: Kind): number {
+    switch (k.t) {
+      case "pitch": return this.pitchFader[k.d];
+      case "channel": return this.channel[k.d];
+      case "cross": return this.cross;
+      case "eq": return this.eq[k.d][k.band];
+      case "filter": return this.filterSetting[k.d];
+      case "cueMix": return this.engine.cueMix;
+      default: return 0;
+    }
+  }
+
+  private angle(p: Point, d: number): number {
+    const c = this.L!.centre[d];
+    return Math.atan2(p.y - c.y, p.x - c.x);
+  }
+
+  private holds(t: Kind["t"], d: number): boolean {
+    for (const g of this.grabs.values()) if (g.kind.t === t && "d" in g.kind && g.kind.d === d) return true;
+    return false;
+  }
+
+  /** Pointer position in the booth's world (y up). */
+  private at(e: PointerEvent | WheelEvent): Point {
+    const box = this.canvas.getBoundingClientRect();
+    return { x: e.clientX - box.left, y: box.height - (e.clientY - box.top) };
+  }
+
+  private down(e: PointerEvent): void {
+    e.preventDefault();
+    const p = this.at(e);
+    const kind = this.control(p);
+    if (!kind) return;
+    this.canvas.setPointerCapture(e.pointerId);
+    const key = keyOf(kind);
+    const doubleTap = e.timeStamp - (this.lastDown.get(key) ?? -1e9) < 350;
+    this.lastDown.set(key, e.timeStamp);
+    const grab: Grab = { kind, start: p, startValue: this.value(kind), angle: 0 };
+    const decks = this.decks;
+    switch (kind.t) {
+      case "platter": {
+        const d = kind.d;
+        grab.angle = this.angle(p, d);
+        this.handTravel[d] = 0;
+        this.handSpeed[d] = decks[d].rate;
+        decks[d].handRate = decks[d].rate;
+        decks[d].held = true;
+        break;
+      }
+      case "rim":
+        grab.angle = this.angle(p, kind.d);
+        this.rimTravel[kind.d] = 0;
+        this.rimSpeed[kind.d] = 0;
+        break;
+      case "needle": {
+        const d = kind.d, pv = this.L!.pivot[d];
+        // Remember where on the headshell the finger sits, so the arm does not jump to it.
+        grab.angle = Math.atan2(p.y - pv.y, p.x - pv.x) - this.armAngle(d);
+        decks[d].lifted = true;
+        this.dropAt[d] = decks[d].progress;
+        break;
+      }
+      case "wave":
+        decks[kind.d].lifted = true;
+        this.dropAt[kind.d] = this.waveProgress(p, kind.d);
+        break;
+      case "play": {
+        const deck = decks[kind.d];
+        if (!deck.motorOn && deck.progress > 0.995) deck.seek(deck.cuePoint);
+        deck.motorOn = !deck.motorOn;
+        break;
+      }
+      case "cue":
+        this.pressCue(kind.d);
+        break;
+      case "sync":
+        if (!this.syncAllowed) break; // vinyl has no sync button
+        this.sync[kind.d] = !this.sync[kind.d];
+        if (!this.sync[kind.d]) decks[kind.d].bend = 0;
+        break;
+      case "phones":
+        this.phones[kind.d] = !this.phones[kind.d];
+        decks[kind.d].cue = this.phones[kind.d];
+        break;
+      case "eq":
+        // A double tap puts a knob back at its default: EQ flat, in the middle.
+        if (doubleTap) { this.setEQ(kind.d, kind.band, 0.5); grab.startValue = 0.5; }
+        break;
+      case "filter":
+        if (doubleTap) { this.setFilter(kind.d, 0.5); grab.startValue = 0.5; }
+        break;
+      case "cueMix":
+        // The cue mix's default is CUE: only the cued record in the headphones.
+        if (doubleTap) { this.engine.cueMix = 0; grab.startValue = 0; }
+        break;
+      default:
+        break;
+    }
+    this.grabs.set(e.pointerId, grab);
+  }
+
+  private move(e: PointerEvent): void {
+    const grab = this.grabs.get(e.pointerId);
+    if (!grab || !this.L) return;
+    const L = this.L;
+    const p = this.at(e);
+    const k = grab.kind;
+    switch (k.t) {
+      case "platter": {
+        const a = this.angle(p, k.d);
+        this.handTravel[k.d] += turned(grab.angle, a);
+        grab.angle = a;
+        break;
+      }
+      case "rim": {
+        const a = this.angle(p, k.d);
+        this.rimTravel[k.d] += turned(grab.angle, a);
+        grab.angle = a;
+        break;
+      }
+      case "needle": {
+        // The arm swings round its pivot after the finger; the needle stays on the grooves.
+        const pv = L.pivot[k.d];
+        let swing = Math.atan2(p.y - pv.y, p.x - pv.x) - grab.angle - L.armPivotAngle;
+        while (swing > Math.PI) swing -= 2 * Math.PI;
+        while (swing < -Math.PI) swing += 2 * Math.PI;
+        this.dropAt[k.d] = this.progressAtNeedle(2 * L.armLength * Math.sin(Math.max(0, swing) / 2));
+        break;
+      }
+      case "wave":
+        this.dropAt[k.d] = this.waveProgress(p, k.d);
+        break;
+      case "pitch": {
+        // Fine mode: with the finger well to the side of the fader it moves four times slower,
+        // step by step from the last position, so switching modes mid-drag does not jump.
+        const fine = Math.abs(p.x - L.pitchX[k.d]) > 60;
+        const raw = clamp01(grab.startValue + (p.y - grab.start.y) / L.pitchTravel * (fine ? 0.25 : 1));
+        grab.startValue = raw;
+        grab.start = p;
+        this.setPitchFader(k.d, raw);
+        break;
+      }
+      case "channel":
+        this.channel[k.d] = clamp01(grab.startValue + (p.y - grab.start.y) / L.channelTravel);
+        this.applyMix();
+        break;
+      case "cross":
+        this.cross = clamp01(grab.startValue + (p.x - grab.start.x) / L.crossTravel);
+        this.applyMix();
+        break;
+      case "cueMix":
+        this.engine.cueMix = clamp01(grab.startValue + (p.y - grab.start.y) / L.knobTravel);
+        break;
+      case "eq":
+        this.setEQ(k.d, k.band, clamp01(grab.startValue + (p.y - grab.start.y) / L.knobTravel));
+        break;
+      case "filter":
+        this.setFilter(k.d, clamp01(grab.startValue + (p.y - grab.start.y) / L.knobTravel));
+        break;
+      default:
+        break;
+    }
+  }
+
+  private up(e: PointerEvent): void {
+    const grab = this.grabs.get(e.pointerId);
+    if (!grab) return;
+    this.grabs.delete(e.pointerId);
+    const k = grab.kind;
+    switch (k.t) {
+      case "platter":
+        if (!this.holds("platter", k.d)) this.decks[k.d].held = false;
+        break;
+      case "rim":
+        if (!this.holds("rim", k.d) && !this.sync[k.d]) this.decks[k.d].bend = 0;
+        break;
+      case "needle":
+      case "wave":
+        if (!this.holds("needle", k.d) && !this.holds("wave", k.d)) this.dropNeedle(k.d);
+        break;
+      default:
+        break;
+    }
+  }
+
+  /** The mouse wheel turns knobs and moves faders (laptops): one notch is a small step. */
+  private wheel(e: WheelEvent): void {
+    const kind = this.control(this.at(e));
+    if (!kind) return;
+    e.preventDefault();
+    const step = -Math.sign(e.deltaY) * (e.shiftKey ? 0.005 : 0.025);
+    switch (kind.t) {
+      case "pitch": this.setPitchFader(kind.d, clamp01(this.pitchFader[kind.d] + step * 0.4)); break;
+      case "channel": this.channel[kind.d] = clamp01(this.channel[kind.d] + step); this.applyMix(); break;
+      case "cross": this.cross = clamp01(this.cross - step); this.applyMix(); break;
+      case "eq": this.setEQ(kind.d, kind.band, clamp01(this.eq[kind.d][kind.band] + step)); break;
+      case "filter": this.setFilter(kind.d, clamp01(this.filterSetting[kind.d] + step)); break;
+      case "cueMix": this.engine.cueMix = clamp01(this.engine.cueMix + step); break;
+      default: break;
+    }
+  }
+
+  private setPitchFader(d: number, raw: number): void {
+    const v = Math.abs(raw - 0.5) < 0.012 ? 0.5 : raw; // a detent in the middle
+    this.pitchFader[d] = v;
+    if (this.sync[d]) { this.sync[d] = false; this.decks[d].bend = 0; } // touching the pitch takes over from sync
+    this.decks[d].pitch = (0.5 - v) * 2 * PITCH_RANGE;
+  }
+
+  private setEQ(d: number, band: number, raw: number): void {
+    const v = Math.abs(raw - 0.5) < 0.03 ? 0.5 : raw;
+    this.eq[d][band] = v;
+    this.decks[d].setEQ(band, v);
+  }
+
+  private setFilter(d: number, raw: number): void {
+    const v = Math.abs(raw - 0.5) < 0.03 ? 0.5 : raw;
+    this.filterSetting[d] = v;
+    this.decks[d].setFilter(v);
+  }
+
+  private waveProgress(p: Point, d: number): number {
+    const r = this.L!.wave[d];
+    return r.w > 0 ? clamp01((p.x - r.x) / r.w) : 0;
+  }
+
+  /** The needle comes down where it was carried to. The record never stopped turning. */
+  private dropNeedle(d: number): void {
+    const deck = this.decks[d];
+    const at = this.dropAt[d];
+    if (at !== null) {
+      // Not past the last groove; and at the very start, on the first beat.
+      deck.seek(Math.min(Math.max(deck.grid.firstBeat, at * deck.duration), Math.max(0, deck.duration - 0.25)));
+    }
+    this.dropAt[d] = null;
+    deck.lifted = false;
+  }
+
+  private releaseAllHands(): void {
+    this.grabs.clear();
+    for (const d of [0, 1]) {
+      this.decks[d].held = false;
+      if (!this.sync[d]) this.decks[d].bend = 0;
+      // A needle left in the air goes back where it was.
+      this.dropAt[d] = null;
+      this.decks[d].lifted = false;
+    }
+  }
+
+  /** CUE as on a club deck: stopped, it marks this spot; playing, it goes back to the mark and stops. */
+  private pressCue(d: number): void {
+    const deck = this.decks[d];
+    if (deck.motorOn) {
+      deck.motorOn = false;
+      deck.seek(deck.cuePoint);
+    } else {
+      deck.cuePoint = deck.seconds;
+    }
+  }
+
+  private applyMix(): void {
+    const x = crossfade(this.cross);
+    this.decks[0].volume = faderGain(this.channel[0]) * x.a;
+    this.decks[1].volume = faderGain(this.channel[1]) * x.b;
+    for (const d of [0, 1]) this.decks[d].cue = this.phones[d];
+  }
+
+  // MARK: - Every frame
+
+  private frame(time: number): void {
+    const dt = this.lastTime > 0 ? Math.min(0.05, Math.max(0.001, (time - this.lastTime) / 1000)) : 1 / 60;
+    this.lastTime = time;
+    if (!this.L) this.build();
+    if (this.L) {
+      this.moveHands(dt);
+      this.runSync();
+      this.draw(dt);
+    }
+    requestAnimationFrame((t) => this.frame(t));
+  }
+
+  private moveHands(dt: number): void {
+    for (const d of [0, 1]) {
+      const deck = this.decks[d];
+      if (deck.held) {
+        // Clockwise on screen is forwards, and angles grow anticlockwise, hence the minus.
+        const speed = -this.handTravel[d] / dt / TURN;
+        this.handTravel[d] = 0;
+        this.handSpeed[d] = this.handSpeed[d] * 0.35 + speed * 0.65;
+        deck.handRate = this.handSpeed[d];
+      }
+      if (this.holds("rim", d) && !this.sync[d]) {
+        const speed = -this.rimTravel[d] / dt / TURN;
+        this.rimTravel[d] = 0;
+        this.rimSpeed[d] = this.rimSpeed[d] * 0.7 + speed * 0.3;
+        deck.bend = Math.max(-0.08, Math.min(0.08, this.rimSpeed[d] * 0.06));
+      }
+    }
+  }
+
+  /** SYNC: copy the other deck's tempo, then lean on the record until the beats line up. */
+  private runSync(): void {
+    for (const d of [0, 1]) {
+      if (!this.sync[d]) continue;
+      const other = this.decks[1 - d], deck = this.decks[d];
+      if (!deck.isLoaded || !other.isLoaded) continue;
+      const p = Math.max(-PITCH_RANGE, Math.min(PITCH_RANGE, pitchToPlay(deck.grid.bpm, other.bpm)));
+      if (Math.abs(p - deck.pitch) > 1e-7) {
+        deck.pitch = p;
+        this.pitchFader[d] = 0.5 - p / (2 * PITCH_RANGE);
+      }
+      if (deck.motorOn && !deck.held && !deck.lifted && deck.rate > 0.5 && other.rate > 0.5) {
+        const behind = phaseOffset(other.beat, deck.beat);
+        deck.bend = Math.max(-0.06, Math.min(0.06, behind * 0.8));
+      } else if (deck.bend !== 0) {
+        deck.bend = 0;
+      }
+    }
+  }
+
+  private draw(dt: number): void {
+    const L = this.L!, ctx = this.ctx, u = L.u;
+    ctx.setTransform(this.dpr, 0, 0, -this.dpr, 0, L.H * this.dpr); // y up, as in SpriteKit
+    ctx.clearRect(0, 0, L.W, L.H);
+
+    // What the room hears.
+    const snapshots: DeckSnapshot[] = [];
+    const fade = crossfade(this.cross);
+    for (const d of [0, 1]) {
+      const deck = this.decks[d];
+      const heardGain = deck.lifted ? 0 : faderGain(this.channel[d]) * (d === 0 ? fade.a : fade.b);
+      snapshots.push({ playing: Math.abs(deck.rate) > 0.3, gain: heardGain, bpm: deck.bpm, beat: deck.beat, low: this.eq[d][0] });
+    }
+    const reading = readMix(snapshots[0], snapshots[1]);
+    this.lastReading = reading;
+
+    // The room: darker when nothing plays, a warm pulse on every beat of the loudest deck.
+    const lead = snapshots[0].gain >= snapshots[1].gain ? 0 : 1;
+    const heard = snapshots[lead].playing && snapshots[lead].gain > 0.03;
+    this.roomShade += ((heard ? 0.06 : 0.45) - this.roomShade) * Math.min(1, dt * 3);
+    ctx.fillStyle = `rgba(0,0,0,${this.roomShade})`;
+    ctx.fillRect(0, L.gearTop, L.W, L.H - L.gearTop);
+    if (heard) {
+      const leadDeck = this.decks[lead];
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.fillStyle = rgba(Palette.orange, 0.12 * Math.exp(-leadDeck.grid.phase(leadDeck.seconds) * 5));
+      ctx.fillRect(0, L.gearTop, L.W, L.H - L.gearTop);
+      ctx.restore();
+    }
+    this.showRoom(heard ? 2 : -1, dt);
+    // The desk the gear stands on hides the lower part of the picture.
+    ctx.fillStyle = rgba(Palette.night);
+    ctx.fillRect(0, 0, L.W, L.gearTop);
+    ctx.fillStyle = rgba(Palette.teal, 0.5);
+    ctx.fillRect(0, L.gearTop - 0.5, L.W, 1);
+
+    for (const d of [0, 1]) this.drawDeck(d, dt);
+    this.drawMixer(reading, snapshots);
+
+    if (!this.engine.running) {
+      label(ctx, `AUDIO OFF  ${this.engine.lastError ?? ""}`, L.left + 44, L.H - 14, { size: 10 * u, color: rgba(Palette.red), align: "left" });
+    }
+  }
+
+  private drawDeck(d: number, dt: number): void {
+    const L = this.L!, ctx = this.ctx, u = L.u, deck = this.decks[d], tint = TINTS[d];
+    const rect = L.deck[d];
+    roundRect(ctx, rect, 10 * u, rgba(Palette.panel), EDGE);
+    const seconds = deck.seconds;
+
+    // Platter and record (it turns with the needle's position), the light on the grooves, the arm.
+    const c = L.centre[d];
+    picture(ctx, this.platterImg[d], c.x, c.y, L.outer * 2, L.outer * 2, -seconds * TURN);
+    if (this.sheenImg) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      picture(ctx, this.sheenImg, c.x, c.y, L.r * 2, L.r * 2);
+      ctx.restore();
+    }
+    tonearm(ctx, L.pivot[d].x, L.pivot[d].y, L.armLength, u, this.armAngle(d), deck.lifted ? 1.05 : 1);
+
+    // Top row: title, time left, four lamps that count the bar.
+    const info = deck.info;
+    const titleRoom = L.timeX[d] - 34 * u - L.titleX[d];
+    label(ctx, info ? `${info.artist.toUpperCase()}  ·  ${info.title.toUpperCase()}` : "NO RECORD", L.titleX[d], L.rowY[d],
+          { size: 8.5 * u, color: rgba(Palette.ink), align: "left", maxWidth: titleRoom });
+    const drop = this.dropAt[d];
+    const timeText = drop !== null ? clock(drop * deck.duration) : deck.isLoaded ? "-" + clock(Math.max(0, deck.duration - seconds)) : "";
+    label(ctx, timeText, L.timeX[d], L.rowY[d], { size: 8.5 * u, color: drop !== null ? rgba(Palette.ink) : DIM, mono: true, align: "right" });
+    const moving = Math.abs(deck.rate) > 0.3;
+    const beatNow = deck.grid.beatInBar(seconds);
+    const flash = 1 - deck.grid.phase(seconds);
+    for (let i = 0; i < 4; i++) {
+      circle(ctx, L.dotX[d][i], L.rowY[d], 2.6 * u, rgba(tint, moving && i === beatNow ? 0.35 + 0.65 * flash : 0.15));
+    }
+
+    this.drawWave(d);
+
+    // Buttons.
+    const cueLit = !deck.motorOn && Math.abs(seconds - deck.cuePoint) < 0.02;
+    button(ctx, L.buttonX[d][0], L.buttonY[d], L.buttonW, L.buttonH, "CUE", Palette.orange, cueLit);
+    button(ctx, L.buttonX[d][1], L.buttonY[d], L.buttonW, L.buttonH, "PLAY", tint, deck.motorOn);
+    button(ctx, L.buttonX[d][2], L.buttonY[d], L.buttonW, L.buttonH, "SYNC", Palette.ink, this.sync[d], this.syncAllowed ? 1 : 0.25);
+
+    // Pitch fader: up is slower.
+    fader(ctx, L.pitchX[d], L.pitchY[d], { travel: L.pitchTravel, vertical: true, capW: 26 * u, capH: 13 * u, tint, centreMark: true, value: this.pitchFader[d] });
+    label(ctx, "−", L.pitchX[d], L.pitchY[d] + L.pitchTravel / 2 + 20 * u, { size: 12 * u });
+    const pct = deck.pitch * 100;
+    label(ctx, `${pct >= 0 ? "+" : "-"}${Math.abs(pct).toFixed(1)}%`, L.pitchX[d] - 6 * u, rect.y + 13 * u, { size: 10 * u, color: rgba(tint), mono: true });
+
+    this.meterLevel[d] = Math.max(deck.takePeak(), this.meterLevel[d] - dt * 1.6);
+  }
+
+  /** The record at a glance: loud and quiet stretches, a line where the needle is, an orange mark
+   * at the cue point, and where a lifted needle will land. */
+  private drawWave(d: number): void {
+    const L = this.L!, ctx = this.ctx, deck = this.decks[d], r = L.wave[d];
+    roundRect(ctx, { x: r.x - 2, y: r.y - 2, w: r.w + 4, h: r.h + 4 }, 3, rgba(Palette.slot), EDGE);
+    const id = `${deck.info?.id ?? ""}:${deck.duration}:${r.w}`;
+    if (this.waveFor[d] !== id) {
+      this.waveFor[d] = id;
+      const ticks: number[] = [];
+      if (deck.duration > 0) {
+        for (let beat = 0; ; beat += 64) { // sixteen bars
+          const at = deck.grid.secondsAtBeat(beat) / deck.duration;
+          if (at >= 1) break;
+          ticks.push(at);
+        }
+      }
+      this.waveImg[d] = wavePicture(deck.overview, r.w, r.h, TINTS[d], ticks, this.dpr);
+    }
+    const img = this.waveImg[d];
+    if (img) picture(ctx, img, r.x + r.w / 2, r.y + r.h / 2, r.w, r.h);
+    const at = r.x + r.w * deck.progress;
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.fillRect(r.x, r.y, Math.max(0.5, at - r.x), r.h);
+    if (deck.isLoaded) {
+      ctx.fillStyle = rgba(Palette.orange);
+      ctx.fillRect(r.x + r.w * (deck.duration > 0 ? deck.cuePoint / deck.duration : 0) - 0.75, r.y, 1.5, r.h);
+    }
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(at - 0.75, r.y - 2, 1.5, r.h + 4);
+    const drop = this.dropAt[d];
+    if (drop !== null) {
+      ctx.fillStyle = rgba(TINTS[d]);
+      ctx.fillRect(r.x + r.w * drop - 1.25, r.y - 3, 2.5, r.h + 6);
+    }
+  }
+
+  private drawMixer(reading: MixReading, snapshots: DeckSnapshot[]): void {
+    const L = this.L!, ctx = this.ctx, u = L.u, rect = L.mixer, mid = rect.x + rect.w / 2;
+    roundRect(ctx, rect, 10 * u, rgba(Palette.panel), EDGE);
+
+    // Top: both tempos, the verdict, and how far apart the beats are.
+    if (!this.hideNumbers) {
+      for (const d of [0, 1]) {
+        label(ctx, this.decks[d].isLoaded ? this.decks[d].bpm.toFixed(1) : "---.-", L.bpmX[d], L.topY, { size: 14 * u, color: rgba(TINTS[d]), mono: true });
+      }
+      const colour = reading.state === "blend"
+        ? (reading.quality > 0.85 ? rgba(Palette.teal) : reading.quality > 0.3 ? rgba(Palette.orange) : rgba(Palette.red))
+        : DIM;
+      label(ctx, verdict(reading), mid, L.topY + 2 * u, { size: 11.5 * u, color: colour });
+      roundRect(ctx, centred(mid, L.phaseY, L.phaseWidth, 3 * u), 1.5 * u, rgba(Palette.slot), EDGE);
+      ctx.fillStyle = DIM;
+      ctx.fillRect(mid - 0.75, L.phaseY - 5 * u, 1.5, 10 * u);
+      // The dot shows where deck B's beat falls against deck A's, whenever both records turn.
+      const bothTurn = snapshots[0].playing && snapshots[1].playing;
+      const offset = bothTurn ? phaseOffset(snapshots[0].beat, snapshots[1].beat) : 0;
+      circle(ctx, mid - offset * L.phaseWidth, L.phaseY, 4 * u,
+             bothTurn ? (Math.abs(offset) < 0.03 ? rgba(Palette.teal) : rgba(Palette.orange)) : DIM);
+    }
+
+    // Channel strips: EQ knobs on the outside, fader inside, meters in the middle.
+    const names = ["LOW", "MID", "HI"];
+    for (const d of [0, 1]) {
+      for (const band of [0, 1, 2]) knob(ctx, L.knobX[d], L.knobY[band], 13 * u, TINTS[d], names[band], this.eq[d][band]);
+      fader(ctx, L.channelX[d], L.channelY, { travel: L.channelTravel, vertical: true, capW: 24 * u, capH: 13 * u, tint: TINTS[d], value: this.channel[d] });
+      button(ctx, L.channelX[d], L.phonesY, 36 * u, 15 * u, "PHONES", Palette.orange, this.phones[d]);
+      meter(ctx, L.meterX[d], L.meterY, 7 * u, 96 * u, Math.min(1, this.meterLevel[d] * 1.15));
+      if (this.hasFilter) knob(ctx, L.knobX[d], L.filterY, 10 * u, TINTS[d], "FILTER", this.filterSetting[d]);
+    }
+    // Cue mix, between the PHONES buttons: left = only the cued record, right = only the room.
+    knob(ctx, mid, L.phonesY, 9 * u, Palette.orange, "", this.engine.cueMix);
+    fader(ctx, mid, L.crossY, { travel: L.crossTravel, vertical: false, capW: 14 * u, capH: 24 * u, tint: Palette.teal, centreMark: true, value: this.cross });
+  }
+}
+
+/** The shortest turn from angle `a` to angle `b`. */
+function turned(a: number, b: number): number {
+  let d = b - a;
+  if (d > Math.PI) d -= 2 * Math.PI;
+  if (d < -Math.PI) d += 2 * Math.PI;
+  return d;
+}
+
+const clamp01 = (x: number): number => Math.min(1, Math.max(0, x));
+
+function clock(seconds: number): string {
+  const whole = Math.trunc(Math.max(0, seconds));
+  return `${Math.trunc(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
+}
