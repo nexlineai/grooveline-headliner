@@ -127,6 +127,10 @@ export class Booth {
   private keyNudge = [0, 0];
   private jogSpeed = [0, 0];
   private nudging = [false, false];
+  // CUE: the button is down, and whether this hold is playing the record (a preview that goes back
+  // to the mark when CUE is let go).
+  private cueDown = [false, false];
+  private previewing = [false, false];
 
   /** Puts a record (by id) on a deck; the page knows where records live. */
   loadRecord: (d: number, id: string) => Promise<void> = async () => {};
@@ -235,6 +239,8 @@ export class Booth {
     await Promise.all([0, 1].map((d) => wanted[d] && this.decks[d].info?.id !== wanted[d] ? this.loadRecord(d, wanted[d]) : Promise.resolve()));
     if (desk.cueMix !== null) this.engine.cueMix = desk.cueMix;
     this.phones = [false, false];
+    this.cueDown = [false, false];
+    this.previewing = [false, false];
     for (const d of [0, 1]) {
       const deck = this.decks[d];
       deck.motorOn = false;
@@ -695,6 +701,9 @@ export class Booth {
       case "wave":
         if (!this.holds("needle", k.d) && !this.holds("wave", k.d)) this.dropNeedle(k.d);
         break;
+      case "cue":
+        if (!this.holds("cue", k.d)) this.release(k);
+        break;
       default:
         break;
     }
@@ -727,6 +736,13 @@ export class Booth {
     switch (k.t) {
       case "play": {
         const deck = decks[k.d];
+        deck.finishPark();
+        if (this.previewing[k.d]) {
+          // PLAY while CUE is held: the record goes on playing when CUE is let go.
+          this.previewing[k.d] = false;
+          deck.latch();
+          break;
+        }
         if (!deck.motorOn && deck.progress > 0.995) deck.seek(deck.cuePoint);
         deck.motorOn = !deck.motorOn;
         break;
@@ -746,6 +762,11 @@ export class Booth {
       default:
         break;
     }
+  }
+
+  /** A button let go. Only CUE cares: it was playing the record while held. */
+  release(k: Kind): void {
+    if (k.t === "cue") this.releaseCue(k.d);
   }
 
   /** A fader or a knob to a position, 0...1, with the same rules as a finger. `detents`: the
@@ -791,6 +812,7 @@ export class Booth {
   releaseKeys(): void {
     this.keyNudge = [0, 0];
     this.jogSpeed = [0, 0];
+    this.endCueHolds();
   }
 
   private setPitchFader(d: number, raw: number, detent = true): void {
@@ -831,6 +853,7 @@ export class Booth {
 
   private releaseAllHands(): void {
     this.grabs.clear();
+    this.endCueHolds();
     for (const d of [0, 1]) {
       this.decks[d].held = false;
       if (!this.sync[d]) this.decks[d].bend = 0;
@@ -840,14 +863,41 @@ export class Booth {
     }
   }
 
-  /** CUE as on a club deck: stopped, it marks this spot; playing, it goes back to the mark and stops. */
+  /** CUE as on a club deck. Playing: back to the mark, stopped. Stopped: the needle's spot becomes
+   * the mark (unless it is already on it) and the record plays from there for as long as CUE is
+   * held; let go, and it stops and goes back to the mark. PLAY pressed during the hold keeps it
+   * playing. */
   private pressCue(d: number): void {
     const deck = this.decks[d];
-    if (deck.motorOn) {
-      deck.motorOn = false;
-      deck.seek(deck.cuePoint);
-    } else {
-      deck.cuePoint = deck.seconds;
+    if (this.cueDown[d] || !deck.isLoaded || deck.lifted) return;
+    // A return still settling (a quick double tap): the needle is about to be on the mark.
+    const parked = deck.finishPark();
+    this.cueDown[d] = true;
+    if (deck.motorOn) { deck.park(deck.cuePoint); return; }
+    if (!parked) {
+      if (deck.progress > 0.995) deck.seek(deck.cuePoint);
+      else if (Math.abs(deck.seconds - deck.cuePoint) > 0.02) deck.cuePoint = deck.seconds;
+    }
+    this.previewing[d] = true;
+    deck.preview();
+  }
+
+  private releaseCue(d: number): void {
+    if (!this.cueDown[d]) return;
+    this.cueDown[d] = false;
+    if (!this.previewing[d]) return;
+    this.previewing[d] = false;
+    this.decks[d].park(this.decks[d].cuePoint);
+  }
+
+  /** Every CUE let go (the window lost the keyboard, the booth was rebuilt): a preview that is
+   * playing stops and goes back to its mark. */
+  private endCueHolds(): void {
+    for (const d of [0, 1]) {
+      this.cueDown[d] = false;
+      if (!this.previewing[d]) continue;
+      this.previewing[d] = false;
+      this.decks[d].park(this.decks[d].cuePoint);
     }
   }
 
@@ -1134,8 +1184,9 @@ export class Booth {
     });
     const page = this.pageFacts();
     lesson.update({
-      motorOn: decks.map((x) => x.motorOn),
-      turning: decks.map((x) => x.rate > 0.5),
+      // A CUE preview is not a start: it ends when CUE is let go (PLAY pressed during it makes it one).
+      motorOn: decks.map((x, i) => x.motorOn && !this.previewing[i]),
+      turning: decks.map((x, i) => x.rate > 0.5 && !this.previewing[i]),
       beat: decks.map((x) => x.beat),
       cross: this.cross,
       channel: this.channel.slice(),
@@ -1316,9 +1367,9 @@ export class Booth {
     this.drawWave(d);
 
     // Buttons.
-    const cueLit = !deck.motorOn && Math.abs(seconds - deck.cuePoint) < 0.02;
+    const cueLit = this.cueDown[d] || (!deck.motorOn && Math.abs(seconds - deck.cuePoint) < 0.02);
     button(ctx, L.buttonX[d][0], L.buttonY[d], L.buttonW, L.buttonH, "CUE", Palette.orange, cueLit);
-    button(ctx, L.buttonX[d][1], L.buttonY[d], L.buttonW, L.buttonH, "PLAY", tint, deck.motorOn);
+    button(ctx, L.buttonX[d][1], L.buttonY[d], L.buttonW, L.buttonH, "PLAY", tint, deck.motorOn && !this.previewing[d]);
     button(ctx, L.buttonX[d][2], L.buttonY[d], L.buttonW, L.buttonH, "SYNC", Palette.ink, this.sync[d], this.syncAllowed ? 1 : 0.25);
 
     // Pitch fader: up is slower.
@@ -1354,8 +1405,16 @@ export class Booth {
     ctx.fillStyle = "rgba(0,0,0,0.55)";
     ctx.fillRect(r.x, r.y, Math.max(0.5, at - r.x), r.h);
     if (deck.isLoaded) {
+      // The cue mark: a line, and a flag at the top so it can be found at a glance.
+      const mx = r.x + r.w * (deck.duration > 0 ? deck.cuePoint / deck.duration : 0), flag = Math.min(7, r.h * 0.4);
       ctx.fillStyle = rgba(Palette.orange);
-      ctx.fillRect(r.x + r.w * (deck.duration > 0 ? deck.cuePoint / deck.duration : 0) - 0.75, r.y, 1.5, r.h);
+      ctx.fillRect(mx - 1, r.y, 2, r.h);
+      ctx.beginPath();
+      ctx.moveTo(mx - flag * 0.7, r.y + r.h);
+      ctx.lineTo(mx + flag * 0.7, r.y + r.h);
+      ctx.lineTo(mx, r.y + r.h - flag);
+      ctx.closePath();
+      ctx.fill();
     }
     ctx.fillStyle = "#fff";
     ctx.fillRect(at - 0.75, r.y - 2, 1.5, r.h + 4);

@@ -28,7 +28,7 @@ const A = deck(0), B = deck(1);
 
 /** The map, and the words for the KEYS sheet (QWERTY labels). */
 export const KEYS: { code: string; label: string; does: string; action: Action }[] = [
-  { code: "KeyA", label: "A", does: "Left CUE", action: A.cue },
+  { code: "KeyA", label: "A", does: "Left CUE (hold: plays from the mark)", action: A.cue },
   { code: "KeyS", label: "S", does: "Left PLAY", action: A.play },
   { code: "KeyD", label: "D", does: "Left SYNC", action: A.sync },
   { code: "KeyF", label: "F", does: "Left PHONES", action: A.phones },
@@ -40,7 +40,7 @@ export const KEYS: { code: string; label: string; does: string; action: Action }
   { code: "KeyX", label: "X", does: "Left fader up", action: A.faderUp },
   { code: "KeyE", label: "E", does: "Left LOW down", action: A.lowDown },
   { code: "KeyR", label: "R", does: "Left LOW up", action: A.lowUp },
-  { code: "KeyJ", label: "J", does: "Right CUE", action: B.cue },
+  { code: "KeyJ", label: "J", does: "Right CUE (hold: plays from the mark)", action: B.cue },
   { code: "KeyK", label: "K", does: "Right PLAY", action: B.play },
   { code: "KeyL", label: "L", does: "Right SYNC", action: B.sync },
   { code: "KeyH", label: "H", does: "Right PHONES", action: B.phones },
@@ -76,7 +76,9 @@ export function attachKeys(booth: Booth, active: () => boolean, help: () => void
   });
   window.addEventListener("keyup", (e) => {
     const a = byCode.get(e.code);
-    if (a && "nudge" in a) booth.nudgeKey(a.nudge, 0);
+    if (!a) return;
+    if ("nudge" in a) booth.nudgeKey(a.nudge, 0);
+    else if ("press" in a && a.press.t === "cue") booth.release(a.press); // CUE plays while it is held
   });
   // The window lost the keyboard: nothing stays held down (a nudge would stay bent).
   window.addEventListener("blur", () => booth.releaseKeys());

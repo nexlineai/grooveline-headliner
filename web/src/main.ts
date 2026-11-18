@@ -695,9 +695,9 @@ function kindFromKey(key: string): Kind | null {
 
 function targetKind(key: string): TargetKind | null {
   const t = key.split(":")[0];
-  if (["play", "cue", "sync", "phones"].includes(t)) return "button";
+  if (["play", "sync", "phones"].includes(t)) return "button";
   if (t === "jog") return "relative";
-  if (t === "nudge") return "hold";
+  if (t === "nudge" || t === "cue") return "hold"; // held down: a nudge pushes, CUE plays from its mark
   if (["pitch", "channel", "cross", "eq", "filter", "cueMix"].includes(t)) return "absolute";
   return null;
 }
@@ -720,7 +720,12 @@ const midi = new MidiInput({
   valueOf: (key) => { const k = kindFromKey(key); return k ? booth.valueOf(k) : 0; },
   jog: (key, ticks) => { const k = kindFromKey(key); if (k && "d" in k) booth.jog(k.d, ticks); },
   // "nudge:<deck>:<-1 back | 1 forward>": held down, the record is held back or pushed on.
-  hold: (key, on) => { const [, d, dir] = key.split(":"); booth.nudgeKey(Number(d), on ? Number(dir) : 0); },
+  // "cue:<deck>:": held down, the record plays from the cue mark; let go, it goes back to it.
+  hold: (key, on) => {
+    const [t, d, dir] = key.split(":");
+    if (t === "cue") { if (on) booth.press({ t: "cue", d: Number(d) }); else booth.release({ t: "cue", d: Number(d) }); return; }
+    booth.nudgeKey(Number(d), on ? Number(dir) : 0);
+  },
 });
 midi.onChange = () => { if (!$("controls").hidden) fillControls(); };
 
@@ -772,7 +777,7 @@ function fillControls(): void {
   const body = $("controls-body");
   body.replaceChildren();
   const keys = el("div", "keys");
-  keys.append(el("h3", "", "KEYBOARD"), el("p", "small", "Shift: small steps. ?: this sheet."));
+  keys.append(el("h3", "", "KEYBOARD"), el("p", "small", "Shift: small steps. ?: this sheet. CUE: stopped, it marks the spot and plays while you hold it, then goes back to the mark. Playing, it stops at the mark. PLAY during the hold keeps it playing."));
   const table = el("div", "keytable");
   for (const k of KEYS) table.append(el("kbd", "", k.label), el("span", "", k.does));
   keys.append(table);

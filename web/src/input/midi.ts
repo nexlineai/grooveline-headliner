@@ -242,14 +242,20 @@ export class MidiInput {
       return;
     }
     const b = (this.bindings[device] ?? []).find((x) => x.source === source);
-    if (!b || !this.active()) return;
-    switch (b.kind) {
+    if (!b) return;
+    // What the target is now, not what it was when learned (CUE was a push button, now it is held).
+    const kind = this.targets.kindOf(b.target) ?? b.kind;
+    const live = this.active();
+    if (!live && kind !== "hold") return;
+    switch (kind) {
       case "button":
         if (buttonActs(e, b.mode)) this.targets.press(b.target);
         break;
       case "hold": {
         // A momentary button: on while pressed. A latching one: every press switches it.
         const on = b.mode === "toggle" ? !(this.held.get(b.target) ?? false) : (e.type === "note" ? e.on : e.value >= 64);
+        // Out of the booth (a scene, a menu) a press does nothing, but a let-go must still arrive.
+        if (!live && on) break;
         this.held.set(b.target, on);
         this.targets.hold(b.target, on);
         break;

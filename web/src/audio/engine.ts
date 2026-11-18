@@ -91,6 +91,15 @@ export class Deck {
   private _cue = false;
   private _lifted = false;
   private seekSeq = 0;
+  /** CUE's own transport: the record starts and stops within a few milliseconds, like the cue of a
+   * club deck, instead of the motor's run-up and run-down. PLAY (the motor setter) ends it. */
+  private _quick = false;
+  /** A CUE return waiting for the record to stop: where the needle will drop, and its timer. */
+  private parkSpot: number | null = null;
+  private parkTimer: ReturnType<typeof setTimeout> | null = null;
+  /** A CUE preview starts with the quick glide only: this ends it a moment later, so pitch, nudges
+   * and SYNC move the playing record as smoothly as with PLAY. */
+  private settleTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(shared: Shared, index: number) {
     this.shared = shared;
@@ -107,7 +116,7 @@ export class Deck {
   set outputRate(v: number) { this._outputRate = v; this.apply(); }
   /** The platter motor (the START/STOP button). */
   get motorOn(): boolean { return this._motorOn; }
-  set motorOn(v: boolean) { this._motorOn = v; this.apply(); }
+  set motorOn(v: boolean) { this.cancelPark(); this.endSettle(); this._quick = false; this._motorOn = v; this.apply(); }
   /** Pitch fader, as a fraction: 0.02 is +2 %. */
   get pitch(): number { return this._pitch; }
   set pitch(v: number) { this._pitch = v; this.apply(); }
@@ -135,9 +144,9 @@ export class Deck {
     if (this._held) {
       target = this._handRate; seconds = 0.006;
     } else if (this._motorOn) {
-      target = 1 + this._pitch + this._bend; seconds = 0.05;
+      target = 1 + this._pitch + this._bend; seconds = this._quick ? 0.004 : 0.05;
     } else {
-      target = 0; seconds = 0.12;
+      target = 0; seconds = this._quick ? 0.005 : 0.12;
     }
     const s = this.shared, i = this.index;
     s.set(deckAt(i, D.targetRate), target);
@@ -163,6 +172,9 @@ export class Deck {
     this.overview = overview(left, frames, 240);
     this.info = track;
     this.frames = frames;
+    this.cancelPark();
+    this.endSettle();
+    this._quick = false;
     this._motorOn = false;
     this._lifted = false;
     this._pitch = 0; this._bend = 0;
@@ -186,6 +198,9 @@ export class Deck {
     this.overview = overview(left, frames, 240);
     this.info = track;
     if (!swapInPlace) {
+      this.cancelPark();
+      this.endSettle();
+      this._quick = false;
       this._motorOn = false;
       this.fileRate = sampleRate;
       this.duration = frames / sampleRate;
@@ -215,8 +230,60 @@ export class Deck {
 
   /** Lifts the needle and drops it at `seconds`. */
   seek(seconds: number): void {
+    this.cancelPark();
     this.shared.set(deckAt(this.index, D.seekTo), Math.max(1, Math.min(this.duration, seconds) * this.fileRate));
     this.shared.set(deckAt(this.index, D.seekSeq), ++this.seekSeq);
+  }
+
+  /** CUE held on a stopped record: it plays from where the needle is, at once (no motor run-up). */
+  preview(): void {
+    this.cancelPark();
+    this.endSettle();
+    this._quick = true;
+    this._motorOn = true;
+    this.apply();
+    this.settleTimer = setTimeout(() => { this.settleTimer = null; this._quick = false; this.apply(); }, 40);
+  }
+
+  /** PLAY pressed while CUE is held: the record goes on playing when CUE is let go. */
+  latch(): void {
+    this.endSettle();
+    this._quick = false;
+    this.apply();
+  }
+
+  /** CUE going back to its mark: the record stops almost at once (a few milliseconds, not the
+   * motor's slow run-down), then the needle drops on the mark with nothing playing, so neither
+   * a tape-stop tail nor a click is heard. */
+  park(seconds: number): void {
+    this.cancelPark();
+    this.endSettle();
+    this._quick = true;
+    this._motorOn = false;
+    this.apply();
+    this.parkSpot = seconds;
+    this.parkTimer = setTimeout(() => { this.parkTimer = null; this.finishPark(); }, 30);
+  }
+
+  /** Drops the needle on a pending CUE return now. Returns whether there was one (the needle
+   * position the page reads is still the old one for a moment, so the caller must not trust it). */
+  finishPark(): boolean {
+    const at = this.parkSpot;
+    if (at === null) return false;
+    this.cancelPark();
+    this.seek(at);
+    return true;
+  }
+
+  private endSettle(): void {
+    if (this.settleTimer !== null) clearTimeout(this.settleTimer);
+    this.settleTimer = null;
+  }
+
+  private cancelPark(): void {
+    if (this.parkTimer !== null) clearTimeout(this.parkTimer);
+    this.parkTimer = null;
+    this.parkSpot = null;
   }
 
   /** Loudest sample off the record since the last call, before EQ and fader (for the channel meters). */

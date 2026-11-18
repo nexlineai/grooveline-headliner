@@ -230,6 +230,15 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
   detents hold everywhere (keys skip the pitch detent: steps are smaller than it). MIDI: generic
   learn for any controller, push/toggle buttons, both jog encodings, soft takeover; pure rules
   tested in `test/midi.test.ts` (no MIDI device in headless).
+- **CUE (web, 18 Nov):** as on a club deck. Stopped: the needle's spot becomes the mark (unless within
+  20 ms of it) and the record plays from there while CUE is held; let go, it stops and goes back to
+  the mark. Playing: CUE = back to the mark and stop (no preview). PLAY during the hold keeps it
+  playing (`Deck.latch`). `Deck.preview/park` use a 4-5 ms "quick" glide (not the motor's 50/120 ms) and
+  `park` drops the needle on the mark ~30 ms later, once the record is silent, so there is neither a
+  tape-stop tail nor a click. Every way in sends `press` and `release` (touch up, key up, MIDI target
+  kind `hold`; `MidiInput` asks `kindOf(target)`, so CUEs learned as push buttons before still work).
+  A preview is hidden from lesson facts (`motorOn`/`turning`) so it never counts as a start; any
+  rebuild, blur or desk reset ends it (`endCueHolds`). The iPhone's CUE is still the old one (mark / back).
 - **Outputs (PHONES):** the worklet always renders 4 channels (room 1-2, headphones 3-4); modes only
   rewire a splitter/merger: OFF, SPLIT, SOUND CARD (destination 4 ch, discrete), TWO DEVICES (the
   headphones' pair -> MediaStream -> `<audio>.setSinkId`; the room via `AudioContext.setSinkId`).
