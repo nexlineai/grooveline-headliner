@@ -1,6 +1,7 @@
 // Screenshots of the web version from headless Chromium, with its console and errors:
 //   node tools/shot.ts OUT.png [URL] [--size 1600x740] [--wait 6] [--chromium /usr/bin/chromium]
 //                      [--do "click 181 697; wait 2; drag 515 518 515 440; eval engine.decks[0].pitch"]
+// `run FILE` evaluates a script file in the page (a bot that plays a lesson, for instance).
 // `--do` runs after the wait, then the picture is taken: clicks and drags with the mouse (screen
 // pixels, y down), pauses, and `eval` prints what an expression in the page gives (the page puts
 // its parts on `window.headliner`, so `eval` sees `engine` and `booth`).
@@ -8,7 +9,7 @@
 // a click (--autoplay-policy), so `?autostart&demo` shows both records turning.
 
 import { spawn } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -30,6 +31,9 @@ const profile = await mkdtemp(path.join(process.env.TMPDIR ?? tmpdir(), "headlin
 const browser = spawn(chromium, [
   "--headless=new", `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, "--mute-audio",
   "--autoplay-policy=no-user-gesture-required", "--no-first-run", "--hide-scrollbars",
+  // Without these, headless Chromium stops animation frames after a few seconds (the page counts
+  // as hidden), and everything driven by them (the booth, the lesson) freezes while sound goes on.
+  "--disable-renderer-backgrounding", "--disable-background-timer-throttling", "--disable-backgrounding-occluded-windows",
   `--window-size=${width},${height}`, "about:blank",
 ], {
   stdio: ["ignore", "ignore", process.env.SHOT_DEBUG ? "inherit" : "ignore"],
@@ -75,6 +79,10 @@ try {
   await send("Log.enable");
   await send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
   await send("Page.enable");
+  // Keep the page in front and focused: otherwise headless Chromium hides it after some seconds
+  // (visibilityState "hidden") and stops its animation frames.
+  await send("Page.bringToFront");
+  await send("Emulation.setFocusEmulationEnabled", { enabled: true });
   await send("Page.navigate", { url });
   await sleep(wait);
   const mouse = (type: string, x: number, y: number, buttons = 1) =>
@@ -94,6 +102,11 @@ try {
       await mouse("mouseReleased", n[2], n[3], 0);
     } else if (verb === "wait") {
       await sleep(n[0]);
+    } else if (verb === "run") {
+      // A script file evaluated in the page (as is: newlines and semicolons survive).
+      const code = await readFile(rest[0], "utf8");
+      const r = await send("Runtime.evaluate", { expression: `with (window.headliner ?? {}) { ${code}\n }`, returnByValue: true });
+      if (r?.exceptionDetails) console.log(`run ${rest[0]}:`, r.exceptionDetails.exception?.description ?? r.exceptionDetails.text);
     } else if (verb === "eval") {
       const expr = rest.join(" ");
       const r = await send("Runtime.evaluate", { expression: `with (window.headliner ?? {}) { JSON.stringify(${expr}) }`, returnByValue: true });

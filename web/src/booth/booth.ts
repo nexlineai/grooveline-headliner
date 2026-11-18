@@ -11,6 +11,8 @@ import {
   rgba, roundRect, sheenPicture, tonearm, wavePicture,
 } from "./gear.ts";
 import type { Point, RGB, Rect } from "./gear.ts";
+import type { LessonDesk, LessonTarget } from "../game/content.ts";
+import type { LessonRunner } from "../game/lesson.ts";
 
 type Kind =
   | { t: "platter"; d: number } | { t: "rim"; d: number } | { t: "pitch"; d: number } | { t: "channel"; d: number }
@@ -27,6 +29,8 @@ const TURN = 2 * Math.PI * (100 / 3) / 60;
 /** The pitch fader covers ±8 %, like a classic turntable. */
 const PITCH_RANGE = 0.08;
 const MOODS = ["waiting", "nodding", "dancing", "nuts"];
+/** Extra lift of a room's picture, as a part of its height, for rooms whose people stand low. */
+const ROOM_LIFT: Record<string, number> = { field: 0.28, forest: 0.32, festival: 0.2, tent: 0.2, meridian: 0.15 };
 const TINTS: RGB[] = [Palette.teal, Palette.magenta];
 
 /** Where everything sits, worked out once per screen size (`build`). */
@@ -66,6 +70,16 @@ export class Booth {
   private syncAllowed = true;
   private hideNumbers = false;
   private hasFilter = true;
+  /** A channel fader that is broken in this booth (stuck where the desk sets it). */
+  private deadFader: number | null = null;
+
+  /** The lesson being taught here, if any. */
+  lesson: LessonRunner | null = null;
+  private lessonReady = false;
+  /** Where a lesson cues every record, in bars past its first beat. */
+  private cueBar: number | null = null;
+  /** Puts a record (by id) on a deck; the page knows where records live. */
+  loadRecord: (d: number, id: string) => Promise<void> = async () => {};
 
   // Hands.
   private grabs = new Map<number, Grab>();
@@ -128,7 +142,68 @@ export class Booth {
   recordChanged(d: number): void {
     this.pitchFader[d] = 0.5;
     this.decks[d].pitch = 0;
+    this.dropAt[d] = null;
     this.waveFor[d] = "";
+    // A lesson that cues its records past the intro cues the new one there too.
+    if (this.cueBar !== null) {
+      const deck = this.decks[d];
+      deck.cuePoint = this.cueAt(this.cueBar, d);
+      deck.seek(deck.cuePoint);
+    }
+  }
+
+  /** Where a record is cued: `bar` bars after its first beat (when the record is that long),
+   * otherwise on the first beat. */
+  private cueAt(bar: number | null, d: number): number {
+    const deck = this.decks[d];
+    if (bar === null) return deck.grid.firstBeat;
+    const at = deck.grid.secondsAtBeat(bar * 4);
+    return at < deck.duration - 20 ? at : deck.grid.firstBeat;
+  }
+
+  /** A lesson (or a night) starts from a known desk: both records at their first beat and
+   * stopped, pitch and EQ in the middle, and the faders and SYNC as the lesson wants them. */
+  async setTheDesk(desk: LessonDesk, firstTwo: string[]): Promise<void> {
+    this.cross = desk.crossfader;
+    this.channel = desk.channel.slice();
+    this.pitchFader = desk.pitch ? desk.pitch.slice() : [0.5, 0.5];
+    this.hideNumbers = desk.hideBPM;
+    this.eq = [[0.5, 0.5, 0.5], [0.5, 0.5, 0.5]];
+    this.filterSetting = [0.5, 0.5];
+    this.hasFilter = desk.chapter >= 7;
+    this.deadFader = desk.deadFader;
+    this.engine.echoSeconds = desk.echo;
+    this.sync = desk.sync.slice();
+    this.syncAllowed = desk.syncAllowed;
+    this.cueBar = desk.cueBar;
+    if (desk.room !== this.room) { this.room = desk.room; this.buildRoom(); this.placeRoom(); }
+    // The records this lesson is written for (default: the first two, 122 and 124 BPM).
+    const wanted = desk.records ?? firstTwo;
+    await Promise.all([0, 1].map((d) => wanted[d] && this.decks[d].info?.id !== wanted[d] ? this.loadRecord(d, wanted[d]) : Promise.resolve()));
+    if (desk.cueMix !== null) this.engine.cueMix = desk.cueMix;
+    this.phones = [false, false];
+    for (const d of [0, 1]) {
+      const deck = this.decks[d];
+      deck.motorOn = false;
+      deck.pitch = (0.5 - this.pitchFader[d]) * 2 * PITCH_RANGE;
+      deck.bend = 0;
+      deck.cuePoint = this.cueAt(desk.cueBar, d);
+      deck.seek(deck.cuePoint);
+      for (const band of [0, 1, 2]) deck.setEQ(band, 0.5);
+      deck.setFilter(0.5);
+      deck.cue = false;
+    }
+    this.applyMix();
+    this.L = null; // rebuild (the filter knobs may come or go)
+  }
+
+  /** Starts a lesson on the desk it is written for. */
+  async startLesson(runner: LessonRunner, firstTwo: string[]): Promise<void> {
+    this.lesson?.stop();
+    this.lesson = null;
+    await this.setTheDesk(runner.lesson.desk, firstTwo);
+    this.lesson = runner;
+    this.lessonReady = false;
   }
 
   // MARK: - Building the gear
@@ -249,7 +324,11 @@ export class Booth {
     // Picture and clips are the same crop (1456 x 472), lifted a little so heads and shoulders
     // sit in the part the gear leaves free.
     const h = L.W * 472 / 1456;
-    Object.assign(this.roomLayer.style, { top: `${-L.W * 0.026}px`, width: `${L.W}px`, height: `${h}px` });
+    // Open-air rooms have their people lower in the picture: lifted further, never so far that
+    // the picture's bottom edge comes above the gear.
+    const maxLift = Math.max(0, L.gearTop + h - L.H - L.W * 0.026);
+    const lift = Math.min((ROOM_LIFT[this.room] ?? 0) * h, maxLift);
+    Object.assign(this.roomLayer.style, { top: `${-(L.W * 0.026 + lift)}px`, width: `${L.W}px`, height: `${h}px` });
   }
 
   /** The clip of one mood, made the first time it is wanted. A room without a loop for a mood
@@ -485,6 +564,7 @@ export class Booth {
         break;
       }
       case "channel":
+        if (k.d === this.deadFader) break; // a broken fader: stuck where it is
         this.channel[k.d] = clamp01(grab.startValue + (p.y - grab.start.y) / L.channelTravel);
         this.applyMix();
         break;
@@ -535,7 +615,7 @@ export class Booth {
     const step = -Math.sign(e.deltaY) * (e.shiftKey ? 0.005 : 0.025);
     switch (kind.t) {
       case "pitch": this.setPitchFader(kind.d, clamp01(this.pitchFader[kind.d] + step * 0.4)); break;
-      case "channel": this.channel[kind.d] = clamp01(this.channel[kind.d] + step); this.applyMix(); break;
+      case "channel": if (kind.d !== this.deadFader) { this.channel[kind.d] = clamp01(this.channel[kind.d] + step); this.applyMix(); } break;
       case "cross": this.cross = clamp01(this.cross - step); this.applyMix(); break;
       case "eq": this.setEQ(kind.d, kind.band, clamp01(this.eq[kind.d][kind.band] + step)); break;
       case "filter": this.setFilter(kind.d, clamp01(this.filterSetting[kind.d] + step)); break;
@@ -619,8 +699,65 @@ export class Booth {
       this.moveHands(dt);
       this.runSync();
       this.draw(dt);
+      this.teach(dt, time / 1000);
     }
     requestAnimationFrame((t) => this.frame(t));
+  }
+
+  /** Feeds the lesson what the decks are doing, points at the control it names, and turns the
+   * music down a little while the coach talks. */
+  private teach(dt: number, time: number): void {
+    const lesson = this.lesson;
+    if (!lesson) return;
+    if (!this.lessonReady) { this.lessonReady = true; lesson.begin(); }
+    const decks = this.decks;
+    // In a lesson a record that runs out starts again, so nobody gets stuck waiting.
+    decks.forEach((deck) => {
+      if (deck.motorOn && deck.progress > 0.985) deck.seek(deck.cuePoint < deck.duration * 0.9 ? deck.cuePoint : deck.grid.firstBeat);
+    });
+    lesson.update({
+      motorOn: decks.map((x) => x.motorOn),
+      turning: decks.map((x) => x.rate > 0.5),
+      beat: decks.map((x) => x.beat),
+      cross: this.cross,
+      channel: this.channel.slice(),
+      eq: this.eq.map((x) => x.slice()),
+      phonesOn: this.engine.phones !== "off",
+      phones: this.phones.slice(),
+      cueMix: this.engine.cueMix,
+      bpm: decks.map((x) => x.bpm),
+      phase: phaseOffset(decks[0].beat, decks[1].beat),
+      records: decks.map((x) => x.info?.id ?? null),
+      sync: this.sync.slice(),
+      blend: this.lastReading?.state === "blend",
+      bassClash: this.lastReading?.bassClash ?? false,
+      jingles: 0,
+      time,
+      filter: this.filterSetting.slice(),
+      pattern: [],
+      page: 0,
+      cuts: 0,
+      stepOns: 0,
+    });
+    // A step that makes the needle skip: it lands 0.4 beat on, the kicks fall apart.
+    const skip = lesson.takeSkip();
+    if (skip !== null && decks[skip]?.isLoaded) decks[skip].seek(decks[skip].seconds + 0.4 * decks[skip].grid.beatLength);
+    const wanted = lesson.speaking ? 0.5 : 1;
+    const now = this.engine.masterVolume;
+    if (Math.abs(wanted - now) > 0.002) this.engine.masterVolume = now + (wanted - now) * Math.min(1, dt * 6);
+    // The ring round the control the coach means.
+    const target = lesson.target;
+    const kind = target ? kindFor(target) : null;
+    const hit = kind ? this.hits.find((h) => keyOf(h.kind) === keyOf(kind)) : null;
+    if (hit) {
+      const ctx = this.ctx;
+      ctx.save();
+      ctx.globalAlpha = 0.55 + 0.45 * Math.sin(time * 6);
+      ctx.shadowColor = rgba(Palette.orange);
+      ctx.shadowBlur = 8;
+      roundRect(ctx, { x: hit.rect.x - 2, y: hit.rect.y - 2, w: hit.rect.w + 4, h: hit.rect.h + 4 }, 9, null, rgba(Palette.orange), 2.5);
+      ctx.restore();
+    }
   }
 
   private moveHands(dt: number): void {
@@ -819,7 +956,7 @@ export class Booth {
     const names = ["LOW", "MID", "HI"];
     for (const d of [0, 1]) {
       for (const band of [0, 1, 2]) knob(ctx, L.knobX[d], L.knobY[band], 13 * u, TINTS[d], names[band], this.eq[d][band]);
-      fader(ctx, L.channelX[d], L.channelY, { travel: L.channelTravel, vertical: true, capW: 24 * u, capH: 13 * u, tint: TINTS[d], value: this.channel[d] });
+      fader(ctx, L.channelX[d], L.channelY, { travel: L.channelTravel, vertical: true, capW: 24 * u, capH: 13 * u, tint: TINTS[d], value: this.channel[d], alpha: d === this.deadFader ? 0.4 : 1 });
       button(ctx, L.channelX[d], L.phonesY, 36 * u, 15 * u, "PHONES", Palette.orange, this.phones[d]);
       meter(ctx, L.meterX[d], L.meterY, 7 * u, 96 * u, Math.min(1, this.meterLevel[d] * 1.15));
       if (this.hasFilter) knob(ctx, L.knobX[d], L.filterY, 10 * u, TINTS[d], "FILTER", this.filterSetting[d]);
@@ -827,6 +964,18 @@ export class Booth {
     // Cue mix, between the PHONES buttons: left = only the cued record, right = only the room.
     knob(ctx, mid, L.phonesY, 9 * u, Palette.orange, "", this.engine.cueMix);
     fader(ctx, mid, L.crossY, { travel: L.crossTravel, vertical: false, capW: 14 * u, capH: 24 * u, tint: Palette.teal, centreMark: true, value: this.cross });
+  }
+}
+
+/** The control a lesson's target names (the crate and the jingle are page buttons: no ring). */
+function kindFor(t: LessonTarget): Kind | null {
+  switch (t.type) {
+    case "play": case "cue": case "channel": case "phones": case "filter": case "pitch": case "sync": return { t: t.type, d: t.deck };
+    case "record": return { t: "platter", d: t.deck };
+    case "eq": return { t: "eq", d: t.deck, band: t.band };
+    case "crossfader": return { t: "cross" };
+    case "cueMixKnob": return { t: "cueMix" };
+    default: return null;
   }
 }
 

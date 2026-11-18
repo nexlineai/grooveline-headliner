@@ -447,7 +447,7 @@ function resolve(pathParts: string[], at: string, ns: string | null = null): Jso
     resolved.set(key, convert(s.node, s.type ?? inferType(s.node), owner, key));
     resolving.delete(key);
   }
-  let v = resolved.get(key)!;
+  let v: Json = resolved.get(key) ?? null;
   for (const f of rest.slice(1)) {
     if (v === null || typeof v !== "object" || Array.isArray(v) || !(f in v)) throw new Error(`${at}: ${pathParts.join(".")}: no "${f}"`);
     v = (v as Record<string, Json>)[f];

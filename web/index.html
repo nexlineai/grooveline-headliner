@@ -13,7 +13,24 @@
   <div id="room"></div>
   <canvas id="booth"></canvas>
 
+  <div id="lesson" hidden>
+    <div id="lesson-top">
+      <div id="lesson-chip"><span class="mark"></span><span id="lesson-task"></span></div>
+      <div id="lesson-progress" hidden></div>
+    </div>
+    <div id="lesson-words"><b id="lesson-coach"></b><p id="lesson-caption"></p></div>
+  </div>
+
+  <div id="lesson-result" hidden>
+    <div id="result-number"></div>
+    <h2 id="result-title"></h2>
+    <div id="result-stars"></div>
+    <p id="result-verdict"></p>
+    <button id="result-continue">CONTINUE</button>
+  </div>
+
   <div id="top">
+    <button id="lessons-button" class="pill">LESSONS</button>
     <button id="phones-button" class="pill"><svg class="icon" viewBox="0 0 24 24" width="1.2em" height="1.2em" aria-hidden="true"><path d="M4 15v-3a8 8 0 0 1 16 0v3" fill="none" stroke="currentColor" stroke-width="2.4"/><rect x="2.5" y="13.5" width="5" height="8" rx="2" fill="currentColor"/><rect x="16.5" y="13.5" width="5" height="8" rx="2" fill="currentColor"/></svg>PHONES</button>
     <button id="crate-button" class="pill">CRATE</button>
   </div>
@@ -22,6 +39,11 @@
   <div id="crate" class="sheet" hidden>
     <div class="head"><h2>CRATE</h2><button id="crate-close" class="pill">CLOSE</button></div>
     <div id="crate-list"></div>
+  </div>
+
+  <div id="lessons" class="sheet" hidden>
+    <div class="head"><h2>LESSONS</h2><span><button id="free-play" class="pill">FREE PLAY</button> <button id="lessons-close" class="pill">CLOSE</button></span></div>
+    <div id="lessons-list"></div>
   </div>
 
   <div id="phones" class="sheet small" hidden>
