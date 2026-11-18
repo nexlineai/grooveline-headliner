@@ -10,6 +10,7 @@ import { Booth } from "./booth/booth.ts";
 import { loadContent } from "./game/content.ts";
 import type { Content, Lesson } from "./game/content.ts";
 import { LessonRunner } from "./game/lesson.ts";
+import { StudioGrid, loadCut, loadLoop, namedPattern } from "./game/studio.ts";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const engine = new DeckEngine();
@@ -23,6 +24,31 @@ Object.assign(window, { headliner: { engine, booth } });
 
 let content: Content | null = null;
 let tracks: TrackInfo[] = [];
+
+// The radio studio's station ID (played outside the mixer, as on the iPhone), and the studio's grid.
+let jingles = 0;
+let jingle: HTMLAudioElement | null = null;
+const jinglePlaying = () => !!jingle && !jingle.paused && !jingle.ended;
+function playJingle(): void {
+  if (jinglePlaying()) return;
+  jingle = new Audio("assets/Lessons/jingle.m4a");
+  jingle.play().catch(() => {});
+  jingles += 1;
+}
+const grid = new StudioGrid($("studio"));
+let cuts = 0;
+booth.pageFacts = () => ({ jingles, jinglePlaying: jinglePlaying(), pattern: grid.pattern.rows, page: grid.page, cuts });
+grid.onChange = () => {
+  // The left deck plays the new version from where it is (not once the dubplate is cut).
+  if (booth.lesson?.lesson.desk.studio && engine.decks[0].info?.id !== "your-dubplate") loadLoop(grid.pattern, engine.decks[0], true);
+};
+grid.onCut = () => {
+  // CUT: the loop becomes a whole record on the left deck (kept with the progress, later).
+  loadCut(grid.pattern, engine.decks[0]);
+  booth.recordChanged(0);
+  cuts += 1;
+};
+(function follow() { grid.follow(engine.decks[0]); requestAnimationFrame(follow); })();
 
 // The canvas only uses a web font once it has loaded; ask for it now.
 document.fonts.load(`600 16px "Barlow Condensed"`).catch(() => {});
@@ -79,7 +105,9 @@ function freePlay(): void {
   booth.lesson = null;
   overlay.hidden = true;
   result.hidden = true;
+  grid.hide();
   $("crate-button").hidden = false;
+  $("jingle-button").hidden = true;
   fillCrate(null, 12);
 }
 
@@ -124,8 +152,7 @@ function fillLessons(): void {
     row.querySelector(".n")!.textContent = String(l.number);
     row.querySelector("b")!.textContent = l.title;
     // Lessons that need a part of the booth the web does not have yet are shown, not offered.
-    const missing = l.desk.studio ? "the studio" : l.desk.partner !== null ? "the partner's deck"
-      : l.steps.some((s) => s.goal.type === "jinglePlayed" || s.target?.type === "jingle") ? "the jingle button" : null;
+    const missing = l.desk.partner !== null ? "the partner's deck" : null;
     row.querySelector(".c")!.textContent = `chapter ${chapterOf.get(l.id) ?? "?"} · ${l.coach}${missing ? ` · needs ${missing}, not on the web yet` : ""}`;
     row.disabled = missing !== null;
     row.addEventListener("click", () => { lessonsSheet.hidden = true; startLesson(l.id).catch((e) => { note.textContent = String(e); }); });
@@ -142,6 +169,17 @@ async function startLesson(id: string, step = 0): Promise<void> {
   note.textContent = `Lesson ${lesson.number}…`;
   await booth.startLesson(runner, [tracks[0].id, tracks[1].id]);
   note.textContent = "";
+  grid.hide();
+  if (lesson.desk.studio) {
+    // A studio lesson starts from its own pattern, or an empty one; the dubplate lesson cuts what
+    // you made (or the groove from the lessons).
+    grid.pattern = lesson.desk.cutter && grid.pattern.rows.some((r) => r.some(Boolean)) ? grid.pattern : namedPattern(lesson.desk.pattern);
+    grid.page = 0;
+    loadLoop(grid.pattern, engine.decks[0], false);
+    grid.show(lesson.desk.cutter);
+  }
+  $("lesson-words").hidden = lesson.desk.studio; // the grid takes the room; the coach is heard
+  $("jingle-button").hidden = lesson.desk.room !== "studio";
   $("crate-button").hidden = !lesson.desk.crate;
   if (lesson.desk.crate) fillCrate(lesson.desk.bag, lesson.desk.chapter);
   overlay.hidden = false;
@@ -166,6 +204,9 @@ function showLesson(): void {
       $("lesson-progress").textContent = r.progress;
       $("lesson-progress").hidden = !r.progress;
       $("lesson-caption").textContent = r.caption;
+      // The page's buttons pulse when the coach points at them.
+      $("crate-button").classList.toggle("pointed", r.target?.type === "crate");
+      $("jingle-button").classList.toggle("pointed", r.target?.type === "jingle");
     }
   }
   requestAnimationFrame(showLesson);
@@ -203,6 +244,7 @@ $("crate-close").addEventListener("click", () => { crate.hidden = true; });
 $("phones-button").addEventListener("click", () => toggle(phonesPanel));
 $("phones-close").addEventListener("click", () => { phonesPanel.hidden = true; });
 $("lessons-button").addEventListener("click", () => toggle(lessonsSheet));
+$("jingle-button").addEventListener("click", playJingle);
 $("lessons-close").addEventListener("click", () => { lessonsSheet.hidden = true; });
 $("free-play").addEventListener("click", () => { lessonsSheet.hidden = true; freePlay(); });
 for (const b of phonesPanel.querySelectorAll<HTMLButtonElement>("[data-mode]")) {

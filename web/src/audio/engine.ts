@@ -174,8 +174,8 @@ export class Deck {
 
   /** Puts a record made in the game (the studio's pattern) on the platter; its grid starts at
    * sample 0. With `keepPlace`, a deck that holds a record of the same length keeps turning
-   * where it is: an edit is heard as the needle reaches it. (The studio resamples to the output
-   * rate before calling this.) */
+   * where it is: an edit is heard as the needle reaches it. Any sample rate: the deck reads it
+   * at file rate / output rate, as on the iPhone. */
   loadMade(track: TrackInfo, left: Float32Array, right: Float32Array, sampleRate: number, keepPlace = false): void {
     const frames = Math.min(left.length, right.length);
     const swapInPlace = keepPlace && this.isLoaded && this.frames === frames && this.fileRate === sampleRate;

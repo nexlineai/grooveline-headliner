@@ -144,3 +144,26 @@ html, body {
 .lesson-row .n { width: 2ch; color: var(--teal); font: 700 15px "Orbitron", sans-serif; text-align: right; }
 .lesson-row b { flex: 1; font-size: 18px; letter-spacing: 0.04em; }
 .lesson-row .c { color: var(--dim); font-size: 14px; }
+
+.pill[hidden] { display: none; }
+.pill.pointed { border: 2.5px solid var(--orange); animation: pulse 1.2s ease-in-out infinite alternate; }
+@keyframes pulse { from { box-shadow: 0 0 2px rgba(255, 153, 61, 0.2); } to { box-shadow: 0 0 14px rgba(255, 153, 61, 0.9); } }
+
+/* The studio's step grid, over the room just above the gear. */
+#studio { position: fixed; z-index: 2; left: 50%; transform: translateX(-50%); bottom: calc(58vh + 6px); bottom: calc(58dvh + 6px);
+  display: flex; gap: 8px; align-items: center; padding: 8px 12px; border-radius: 14px;
+  background: rgba(0, 0, 0, 0.72); border: 1px solid rgba(255, 255, 255, 0.12); }
+#studio[hidden] { display: none; }
+#studio .tabs { display: flex; flex-direction: column; gap: 4px; }
+#studio .tabs button { width: 62px; height: 30px; border: 0; border-radius: 8px; cursor: pointer; background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85); font: 800 11px system-ui, sans-serif; letter-spacing: 0.12em; }
+#studio .tabs button.on { background: var(--teal); color: #000; }
+#studio .tabs button.cut { background: var(--orange); color: #000; }
+#studio .rows { display: flex; flex-direction: column; gap: 4px; }
+#studio .row { display: flex; align-items: center; gap: 3px; }
+#studio .row span { width: 54px; font: 800 11px system-ui, sans-serif; letter-spacing: 0.12em; }
+#studio .cell { width: clamp(18px, 2.2vw, 30px); height: clamp(18px, 2.6vh, 28px); border-radius: 5px; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.15); background: rgba(255, 255, 255, 0.08); padding: 0; }
+#studio .cell.beat { background: rgba(255, 255, 255, 0.16); }
+#studio .cell.gap { margin-left: 5px; }
+#studio .cell.now { border: 2px solid #fff; }

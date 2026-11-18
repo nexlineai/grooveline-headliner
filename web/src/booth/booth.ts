@@ -80,6 +80,9 @@ export class Booth {
   private cueBar: number | null = null;
   /** Puts a record (by id) on a deck; the page knows where records live. */
   loadRecord: (d: number, id: string) => Promise<void> = async () => {};
+  /** What the page knows for the lesson: jingles fired, the studio's grid, dubplates cut. */
+  pageFacts: () => { jingles: number; jinglePlaying: boolean; pattern: boolean[][]; page: number; cuts: number } =
+    () => ({ jingles: 0, jinglePlaying: false, pattern: [], page: 0, cuts: 0 });
 
   // Hands.
   private grabs = new Map<number, Grab>();
@@ -715,6 +718,7 @@ export class Booth {
     decks.forEach((deck) => {
       if (deck.motorOn && deck.progress > 0.985) deck.seek(deck.cuePoint < deck.duration * 0.9 ? deck.cuePoint : deck.grid.firstBeat);
     });
+    const page = this.pageFacts();
     lesson.update({
       motorOn: decks.map((x) => x.motorOn),
       turning: decks.map((x) => x.rate > 0.5),
@@ -731,18 +735,18 @@ export class Booth {
       sync: this.sync.slice(),
       blend: this.lastReading?.state === "blend",
       bassClash: this.lastReading?.bassClash ?? false,
-      jingles: 0,
+      jingles: page.jingles,
       time,
       filter: this.filterSetting.slice(),
-      pattern: [],
-      page: 0,
-      cuts: 0,
+      pattern: page.pattern,
+      page: page.page,
+      cuts: page.cuts,
       stepOns: 0,
     });
     // A step that makes the needle skip: it lands 0.4 beat on, the kicks fall apart.
     const skip = lesson.takeSkip();
     if (skip !== null && decks[skip]?.isLoaded) decks[skip].seek(decks[skip].seconds + 0.4 * decks[skip].grid.beatLength);
-    const wanted = lesson.speaking ? 0.5 : 1;
+    const wanted = lesson.speaking || page.jinglePlaying ? 0.5 : 1;
     const now = this.engine.masterVolume;
     if (Math.abs(wanted - now) > 0.002) this.engine.masterVolume = now + (wanted - now) * Math.min(1, dt * 6);
     // The ring round the control the coach means.
