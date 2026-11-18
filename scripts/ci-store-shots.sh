@@ -49,18 +49,13 @@ shot() { # name, seconds to wait, launch arguments... (every chapter open unless
   local name=$1 wait=$2; shift 2
   xcrun simctl launch "$udid" "$bundle" -unlockAll 1 "$@"
   sleep "$wait"
-  # The app is landscape-only but the first frames can still be portrait (store-shots-1: 1320x2868):
-  # take the picture again until it is wider than tall.
-  local try
-  for try in 1 2 3 4 5 6; do
-    xcrun simctl io "$udid" screenshot "build/store/$name.png"
-    local w h
-    w=$(sips -g pixelWidth "build/store/$name.png" | awk '/pixel/{print $2}')
-    h=$(sips -g pixelHeight "build/store/$name.png" | awk '/pixel/{print $2}')
-    [ "$w" -gt "$h" ] && break
-    echo "$name: $w x $h is portrait, trying again ($try)"
-    sleep 3
-  done
+  # The Pro Max simulator saves a portrait frame (1320x2868) with the landscape game turned 90 degrees
+  # clockwise inside it (store-shots-3, seen 18 Nov): turn it back, counter-clockwise.
+  xcrun simctl io "$udid" screenshot "build/store/$name.png"
+  local w h
+  w=$(sips -g pixelWidth "build/store/$name.png" | awk '/pixel/{print $2}')
+  h=$(sips -g pixelHeight "build/store/$name.png" | awk '/pixel/{print $2}')
+  if [ "$h" -gt "$w" ]; then sips -r 270 "build/store/$name.png" >/dev/null; fi
   xcrun simctl terminate "$udid" "$bundle" || true
   # JPEG: no alpha channel, which App Store Connect refuses.
   sips -s format jpeg -s formatOptions 92 "build/store/$name.png" --out "build/store/$name.jpg" >/dev/null
