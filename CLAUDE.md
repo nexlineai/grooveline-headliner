@@ -203,6 +203,13 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
   decoded at the output rate; the grid starts at the first kick found in the decoded audio (AAC
   priming differs per browser). A load message carries the deck's seek count, so a cue right after
   a load lands on the new record.
+- **Content:** `web/content/career.json` (chapters, lessons, nights, night lines) is GENERATED from
+  `App/Lesson.swift`, `Night.swift`, `Chapter.swift` by `node web/tools/content.ts` (a parser for
+  that literal subset of Swift; defaults come from the Swift declarations; it fails on anything it
+  does not understand and checks every voice file, record, scene and room). Swift stays the one
+  source until the iPhone release. **After any change to those files, run the tool and commit
+  career.json**: web.yml runs `--check` and fails otherwise. A new unlabeled enum value needs a
+  name in its `POSITIONAL` table.
 - Booth: `src/booth/booth.ts` draws in SpriteKit's world (y up, CSS pixels), so `BoothScene`'s layout
   numbers, angles and touch arithmetic port unchanged; the room picture and its clips are DOM
   layers under the canvas. Labels use Barlow Condensed (OFL, `web/fonts/`), the same on every system.

@@ -6,7 +6,9 @@ name: web
 on:
   push:
     branches: [main]
-    paths: ['web/**', '.github/workflows/web.yml']
+    # Also when the iPhone's content changes: career.json must follow it (tools/content.ts).
+    paths: ['web/**', '.github/workflows/web.yml', 'App/Lesson.swift', 'App/Night.swift', 'App/Chapter.swift',
+            'App/Game.swift', 'App/Tracks/tracks.json', 'App/Story/scenes.json']
   workflow_dispatch:
 
 permissions:
@@ -26,13 +28,21 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-          # Only the web code: the records and clips (~380 MB) are not needed to test the core.
-          sparse-checkout: web
+          # The web code and the iPhone's content sources, not the records and clips (~380 MB).
+          # The content check finds the media with `git ls-files` (the index lists every file).
+          sparse-checkout: |
+            /web/
+            /App/*.swift
+            /App/Tracks/tracks.json
+            /App/Story/scenes.json
+          sparse-checkout-cone-mode: false
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '26.12.1'
       - name: Core tests (the twins of the Swift CoreTests)
         run: node --test test/*.test.ts
+      - name: The content is what the iPhone's Swift says (career.json)
+        run: node tools/content.ts --check
       - name: Type check
         run: |
           npm install --no-save --no-package-lock --ignore-scripts typescript@5.9.3 @types/node@26.6.6
