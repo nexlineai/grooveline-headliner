@@ -19,6 +19,8 @@ import { StoryPlayer, loadScenes } from "./game/story.ts";
 import type { StoryScene } from "./game/story.ts";
 import * as Progress from "./game/progress.ts";
 import { showChapter } from "./menus.ts";
+import { BagScreen } from "./game/bag.ts";
+import { Credits } from "./game/credits.ts";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const engine = new DeckEngine();
@@ -34,7 +36,7 @@ const progress = Progress.loadProgress();
 if (params.has("unlockAll")) Progress.setUnlockAll(params.get("unlockAll") !== "0");
 
 // For the screenshot tool's `eval` (tools/shot.ts) and the browser console.
-Object.assign(window, { headliner: { engine, booth, progress, play: (chapter: number, step: number) => {
+Object.assign(window, { headliner: { engine, booth, progress, credits: () => openCredits(), play: (chapter: number, step: number) => {
   const c = content?.career.chapters.find((x) => x.number === chapter);
   if (c) playSteps(c, [c.steps[step]]);
 } } });
@@ -277,7 +279,7 @@ let sequence: { chapter: Chapter | null; steps: ChapterStep[]; screens: Screen[]
 
 function playSteps(chapter: Chapter, steps: ChapterStep[]): void {
   if (steps.length === 0) return;
-  sequence = { chapter, steps, screens: steps[0].screens, at: -1 };
+  sequence = { chapter, steps, screens: withBag(steps[0].screens), at: -1 };
   nextScreen();
 }
 
@@ -285,6 +287,17 @@ function playSteps(chapter: Chapter, steps: ChapterStep[]): void {
 function playScreens(screens: Screen[]): void {
   sequence = { chapter: null, steps: [], screens, at: -1 };
   nextScreen();
+}
+
+/** THE NIGHT BEFORE and MERIDIAN play the bag you packed: with none packed yet, THE BAG comes
+ * first (before the scenes that lead into the night), instead of a set of records not yours. */
+function withBag(screens: Screen[]): Screen[] {
+  if (progress.closingSet?.length === 6 || screens.some((s) => s.type === "bag")) return screens;
+  const at = screens.findIndex((s) => s.type === "night" && content?.career.nights.find((n) => n.id === s.id)?.closingSet);
+  if (at < 0) return screens;
+  let before = at;
+  while (before > 0 && screens[before - 1].type === "story") before -= 1;
+  return [...screens.slice(0, before), { type: "bag" }, ...screens.slice(before)];
 }
 
 function nextScreen(): void {
@@ -298,7 +311,7 @@ function nextScreen(): void {
     if (step?.kind === "story") Progress.markSeen(progress, step.id);
     seq.steps = seq.steps.slice(1);
     if (seq.steps.length > 0) {
-      seq.screens = seq.steps[0].screens;
+      seq.screens = withBag(seq.steps[0].screens);
       seq.at = -1;
       nextScreen();
       return;
@@ -310,14 +323,11 @@ function nextScreen(): void {
     return;
   }
   switch (screen.type) {
-    case "story":
-      if (screen.id === "meridian-end") Progress.markSeen(progress, "meridian-end");
-      playStory(scenes.get(screen.id) ?? card(`(${screen.id})`));
-      break;
+    case "story": playStory(scenes.get(screen.id) ?? card(`(${screen.id})`)); break;
     case "lesson": startLesson(screen.id).catch(failed); break;
     case "night": startNight(screen.id).catch(failed); break;
-    case "bag": playStory(card("THE BAG", "Packing your closing set comes to the web soon. MERIDIAN uses the bag as written.")); break;
-    case "credits": playStory(card("THE END", "The credits and zdB's record come to the web soon.")); break;
+    case "bag": openBag(); break;
+    case "credits": openCredits(); break;
     default: nextScreen();
   }
 }
@@ -325,11 +335,45 @@ function nextScreen(): void {
 /** A title card, as a scene of its own. */
 const card = (...lines: string[]): StoryScene => ({ id: "card", shots: [{ lines: lines.map((text) => ({ who: "", text })) }] });
 
-function playStory(scene: StoryScene): void {
+function quietBooth(): void {
   booth.clearSession();
-  for (const deck of engine.decks) deck.motorOn = false; // the story has the room to itself
+  for (const deck of engine.decks) deck.motorOn = false; // the screen has the room to itself
+}
+
+function playStory(scene: StoryScene): void {
+  quietBooth();
   showMode("story");
-  new StoryPlayer($("story"), scene, () => nextScreen()).start();
+  // A scene watched to the end counts as seen (the ending's scene opens THE ENDING on the title).
+  new StoryPlayer($("story"), scene, () => { Progress.markSeen(progress, scene.id); nextScreen(); }).start();
+}
+
+let bag: BagScreen | null = null;
+function openBag(): void {
+  quietBooth();
+  showMode("story");
+  // Your records: every record of the career (no white label) and your dubplate.
+  const records = [...upTo(12), ...(cutPattern ? [cutInfo()] : [])];
+  bag = new BagScreen($("bag"), records, (id) => (id ? trackFor(id) : null), progress.closingSet, (ids) => {
+    bag = null;
+    progress.closingSet = ids;
+    Progress.saveProgress(progress);
+    Progress.markSeen(progress, "the-bag");
+    nextScreen();
+  }, () => { bag = null; leave(); });
+  bag.show();
+}
+
+let credits: Credits | null = null;
+function openCredits(): void {
+  quietBooth();
+  showMode("story");
+  credits = new Credits($("credits"), () => {
+    // The game is over: back to the title, nothing lined up.
+    credits = null;
+    sequence = null;
+    showTitle();
+  });
+  credits.start();
 }
 
 // MARK: - Lessons
@@ -398,8 +442,13 @@ function nightCrate(info: NightInfo): TrackInfo[] {
 }
 
 async function startNight(id: string, length: number | null = null): Promise<void> {
-  const info = content?.career.nights.find((n) => n.id === id);
-  if (!info || !content) throw new Error(`no night "${id}"`);
+  const written = content?.career.nights.find((n) => n.id === id);
+  if (!written || !content) throw new Error(`no night "${id}"`);
+  // THE NIGHT BEFORE and MERIDIAN play the bag you packed: its first two records on the decks,
+  // its six in the crate (your dubplate keeps its place).
+  const packed = written.closingSet && progress.closingSet?.length === 6
+    ? progress.closingSet.filter((x) => x === "your-dubplate" || tracks.some((t) => t.id === x)) : null;
+  const info: NightInfo = packed && packed.length >= 2 ? { ...written, records: packed.slice(0, 2), bag: packed } : written;
   const runner = new NightRunner(info, length ?? info.length, content.career.nightLines, content.career.handsOff);
   showMode("night");
   nightOverlay.hidden = true;
@@ -474,6 +523,10 @@ $("result-continue").addEventListener("click", () => {
 
 /** Back: leaves the lesson, night or story (and whatever was lined up after it). */
 function leave(): void {
+  bag?.close();
+  bag = null;
+  credits?.stop();
+  credits = null;
   for (const v of document.querySelectorAll<HTMLVideoElement>("#story video")) v.pause();
   $("story").hidden = true;
   $("story").replaceChildren();
