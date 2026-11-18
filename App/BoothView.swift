@@ -180,7 +180,10 @@ struct BoothView: View {
     private var crateRecords: [TrackInfo] {
         if lessonID == nil && nightID == nil {
             let open = Chapters.recordsOpen(game.progress)
-            return game.tracks.filter { open.contains($0.chapter ?? 1) } + (game.progress.track != nil ? [Studio.cutInfo()] : [])
+            // The white label is yours once you have played it at MERIDIAN.
+            let played = (game.progress.stars[Nights.meridian.id] ?? 0) > 0
+            return game.tracks.filter { open.contains($0.chapter ?? 1) && ($0.id != WhiteLabel.id || played) }
+                + (game.progress.track != nil ? [Studio.cutInfo()] : [])
         }
         var chapter = Int.max
         var bag: [String]?
@@ -190,6 +193,8 @@ struct BoothView: View {
             bag = info.bag
             // THE NIGHT BEFORE: the bag you packed in THE BAG.
             if info.closingSet, let packed = game.progress.closingSet, packed.count == 6 { bag = packed }
+            // MERIDIAN: the white label after the bag.
+            if let last = info.lastRecord, var list = bag, !list.contains(last) { list.append(last); bag = list }
         }
         // In the bag's own order (a packed closing set reads opener first), the dubplate in its place.
         if let bag { return bag.compactMap { id in id == "your-dubplate" ? Studio.cutInfo() : game.tracks.first { $0.id == id } } }

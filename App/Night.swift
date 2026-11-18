@@ -72,6 +72,8 @@ struct NightInfo {
     /// The bag is the one packed in THE BAG (chapter 12): its records are the crate, and the
     /// first two are on the decks. Without a packed bag, `records` and `bag` as written.
     var closingSet = false
+    /// A record that is always in this night's crate after the bag (MERIDIAN: the white label).
+    var lastRecord: String? = nil
 }
 
 /// What goes wrong in a night: the cable is kicked (the record stops), the needle jumps a groove,
@@ -92,6 +94,12 @@ struct NightRequest {
     var record: String
     var voice: String
     var text: String
+}
+
+/// Lia's record with no name (chapter 2), played last at MERIDIAN. Zé's own track from 2011.
+/// Kept out of THE BAG and out of free play until MERIDIAN has a star.
+enum WhiteLabel {
+    static let id = "white-label"
 }
 
 enum Nights {
@@ -436,11 +444,11 @@ enum Nights {
                                        clockStart: 22 * 60, judgeKeys: true, closingSet: true)
     /// Chapter 12, the finale: MERIDIAN's main stage, the closing set. The bag you packed, on
     /// vinyl, sixty thousand people; the needle skips, and this time you know what to do.
-    /// (The white label after the closer comes with Zé's track.)
+    /// After the closer, the white label (Zé's own record, 2011): three stars need it on air at the end.
     static let meridian = NightInfo(id: "meridian", title: "MERIDIAN", length: 540, room: "meridian",
                                     records: ["bastidores", "holofote"], chapter: 12, mixesFor3Stars: 5,
                                     mishapAt: 0.4, mishap: .needleSkip, syncAllowed: false,
-                                    remarks: [(at: 0.85, moment: "closer")],
+                                    remarks: [(at: 0.8, moment: "closer")],
                                     lines: ["wait": [("meridian-wait", "Sixty thousand people. The lights just went down. It's yours.")],
                                             "start": [("meridian-start", "Here we go. Nine years for this. Easy does it.")],
                                             "clean": [("meridian-clean", "Smooth. Sixty thousand people, and nobody heard the join."), ("fri-clean-2", "Nobody even blinked. Perfect.")],
@@ -452,9 +460,10 @@ enum Nights {
                                             "nuts": [("meridian-nuts", "Look at Mira's lights! All the way to the bridge!")],
                                             "cable": [("meridian-skip", "It skipped! Up here, in front of everyone. Nudge it. You know how.")],
                                             "keys": [("fri-keys", "Sour! Those keys fight. Get out of it, or change it.")],
-                                            "closer": [("meridian-closer", "Last one coming. Make it the one they go home with.")]],
+                                            "closer": [("meridian-closer", "Now the one with no name. Lia's record. You know why.")]],
                                     bag: ["bastidores", "holofote", "meridiano", "ponte", "especiaria", "nove-anos"],
-                                    clockStart: 23 * 60 + 30, judgeKeys: true, closingSet: true)
+                                    clockStart: 23 * 60 + 30, judgeKeys: true, encoreWith: [WhiteLabel.id], closingSet: true,
+                                    lastRecord: WhiteLabel.id)
     static let all = [firstParty, garageParty, saturdayShift, emptyTuesday, thursdayShow, caveWarmUp, fridayCave, afterhours, dubplateNight, berlinNight, ibizaNight, burnout, sunsetSlot, threePM, tentRain, forestStage, boatParty, vexB2B, nightBefore, meridian]
     static func find(_ id: String) -> NightInfo? { all.first { $0.id == id } }
 }
@@ -901,7 +910,9 @@ final class NightRunner: ObservableObject {
         if !info.hot.isEmpty { summary += hotPlayed ? "   ·   too hot, too early" : "   ·   kept it warm" }
         if info.judgeKeys { summary += sourTime < 1 ? "   ·   in key" : "   ·   sour \(Int(sourTime.rounded())) s" }
         if info.endBPM != nil || info.climbTo != nil { summary += "   ·   ended at \(Int(lastBPM.rounded())) BPM" }
-        if !info.encoreWith.isEmpty { summary += encored ? "   ·   encore!" : "   ·   no encore" }
+        if info.encoreWith == [WhiteLabel.id] {
+            summary += encored ? "   ·   ended on the white label" : "   ·   no white label"
+        } else if !info.encoreWith.isEmpty { summary += encored ? "   ·   encore!" : "   ·   no encore" }
         if info.partnerStyle == .vex {
             summary += fightsSeen == 0 ? "   ·   kept your cool" : "   ·   fought him \(fightsSeen)×"
         } else if info.partner != nil {

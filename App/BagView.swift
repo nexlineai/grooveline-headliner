@@ -22,7 +22,7 @@ struct BagView: View {
     /// Not `Chapters.recordsOpen`: chapter 12 only opens once THE NIGHT BEFORE has a star, which
     /// comes after this, so its own records would be missing.
     private var records: [TrackInfo] {
-        var list = game.tracks.filter { ($0.chapter ?? 1) <= 12 }
+        var list = game.tracks.filter { ($0.chapter ?? 1) <= 12 && $0.id != WhiteLabel.id }
         if game.progress.track != nil { list.append(Studio.cutInfo()) }
         return list
     }

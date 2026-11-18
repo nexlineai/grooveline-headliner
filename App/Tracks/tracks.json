@@ -1000,5 +1000,19 @@
     "seconds": 152.4,
     "file": "nove-anos.m4a",
     "chapter": 12
+  },
+  {
+    "id": "white-label",
+    "title": "White Label",
+    "artist": "No artist",
+    "label": "No label",
+    "genre": "Techno",
+    "bpm": 121,
+    "key": "F major",
+    "camelot": "7B",
+    "bars": 289,
+    "seconds": 573.22,
+    "file": "white-label.m4a",
+    "chapter": 12
   }
 ]
