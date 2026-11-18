@@ -122,6 +122,9 @@ export class MidiInput {
   onChange: () => void = () => {};
   /** A binding was learned: what was bound, in words. */
   onLearned: (b: Binding, device: string) => void = () => {};
+  /** Whether the booth is on screen: a controller does nothing during a scene, a menu or a
+   * result card (a bumped button must not start a deck under the dialogue). Learning still works. */
+  active: () => boolean = () => true;
 
   constructor(targets: MidiTargets) {
     this.targets = targets;
@@ -233,7 +236,7 @@ export class MidiInput {
       return;
     }
     const b = (this.bindings[device] ?? []).find((x) => x.source === source);
-    if (!b) return;
+    if (!b || !this.active()) return;
     switch (b.kind) {
       case "button":
         if (buttonActs(e, b.mode)) this.targets.press(b.target);

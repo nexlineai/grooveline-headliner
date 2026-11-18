@@ -737,9 +737,11 @@ function fillControls(): void {
 
 Object.assign((window as unknown as { headliner: object }).headliner, { midi, learn: setLearn });
 
-// The booth's keys work only while the booth is on screen.
-attachKeys(booth, () => title.hidden && chapterScreen.hidden && $("story").hidden && $("bag").hidden && $("credits").hidden,
-  () => { fillControls(); toggle($("controls")); });
+// Keys and controllers work only while the booth is on screen (not a menu, a scene, the bag, the
+// credits or a result card).
+const boothActive = () => title.hidden && chapterScreen.hidden && $("story").hidden && $("bag").hidden && $("credits").hidden && result.hidden;
+midi.active = boothActive;
+attachKeys(booth, boothActive, () => { fillControls(); toggle($("controls")); });
 
 if (params.has("autostart")) autostart().catch(failed); // screenshots (the browser allows sound without a click)
 else showTitle();
