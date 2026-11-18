@@ -172,7 +172,7 @@ enum Nights {
     /// records in the bag; the room may dance but should not go nuts yet; a scratched record
     /// sticks; the headliner is late.
     static let caveWarmUp = NightInfo(id: "cave-warm-up", title: "MIDNIGHT AT CAVE", length: 360, room: "cave",
-                                      records: ["porta", "estatica"], chapter: 6, mixesFor3Stars: 2,
+                                      records: ["porta", "fila"], chapter: 6, mixesFor3Stars: 2,
                                       mishapAt: 0.4, mishap: .stuckGroove, syncAllowed: false,
                                       maxMood: 2, remarks: [(at: 0.62, moment: "late")],
                                       lines: ["wait": [("cave-wait", "Thirty people and a smoke machine. Play something.")],
@@ -232,7 +232,7 @@ enum Nights {
     /// Chapter 8: your dubplate at CAVE, one in the morning. The room asks for it; on the big
     /// system its bass booms until its low comes down.
     static let dubplateNight = NightInfo(id: "dubplate-night", title: "DUBPLATE", length: 360, room: "cavepeak",
-                                         records: ["onda-media", "estatica"], chapter: 8, mixesFor3Stars: 2,
+                                         records: ["sala-de-mistura", "sintetizador"], chapter: 8, mixesFor3Stars: 2,
                                          requests: [NightRequest(at: 0.2, record: "your-dubplate", voice: "dub-req", text: "Now. Play your record. It's in the crate.")],
                                          lines: ["wait": [("dub-wait", "Saturday at CAVE. Your record's in the bag. Play something.")],
                                                  "start": [("fri-start", "Here we go. Peak time.")],
@@ -248,12 +248,12 @@ enum Nights {
                                                  "boom": [("dub-boom", "Your bass is huge on this system. Bring its low down a bit.")],
                                                  "boomOk": [("dub-boom-ok", "Better. Now it sounds like a club record.")],
                                                  "boomNo": [("dub-boom-no", "It's booming. The sound guy is waving at you.")]],
-                                         bag: ["onda-media", "estatica", "your-dubplate", "sinal", "antena", "sem-lista"],
+                                         bag: ["sala-de-mistura", "sintetizador", "your-dubplate", "corte", "rejeitado", "primeira-demo"],
                                          clockStart: 60, mixdownCheck: true)
     /// Chapter 9: Joli's club in Berlin, three in the morning. Vinyl, the left fader is dead, and
     /// a turntable's belt starts slipping: its pitch wanders for the rest of the night.
     static let berlinNight = NightInfo(id: "berlin-night", title: "BERLIN", length: 360, room: "berlin",
-                                       records: ["berlim", "cave"], chapter: 9, mixesFor3Stars: 2,
+                                       records: ["berlim", "canal"], chapter: 9, mixesFor3Stars: 2,
                                        mishapAt: 0.35, mishap: .pitchWander, syncAllowed: false,
                                        remarks: [(at: 0.6, moment: "joli")],
                                        lines: ["wait": [("ber-wait", "Berlin, three in the morning. Two hundred people in the dark. Play something.")],
@@ -268,12 +268,12 @@ enum Nights {
                                                "nuts": [("ber-nuts", "Berlin's going off!")],
                                                "cable": [("ber-wander", "This turntable's belt is slipping. It'll wander all night. Ride the pitch.")],
                                                "joli": [("ber-joli", "Joli's dancing. Joli never dances.")]],
-                                       bag: ["berlim", "cave", "luz-vermelha", "seguranca", "canal", "oito-milhas", "residente", "porta"],
+                                       bag: ["berlim", "canal", "oito-milhas", "corte", "residente", "portao", "seguranca", "luz-vermelha"],
                                        clockStart: 3 * 60, deadFader: 0)
     /// Chapter 9: a sunset terrace in Ibiza with Joli's records (the airline lost yours). Keys are
     /// judged; the chains that fit are Praia - Sal - Regresso and Tambor - Fita Gasta - Flauta.
     static let ibizaNight = NightInfo(id: "ibiza-night", title: "IBIZA SUNSET", length: 360, room: "ibiza",
-                                      records: ["sal", "praia"], chapter: 9, mixesFor3Stars: 2,
+                                      records: ["sal", "regresso"], chapter: 9, mixesFor3Stars: 2,
                                       remarks: [(at: 0.15, moment: "bag")],
                                       lines: ["wait": [("ibz-wait", "Ibiza, sunset. A hundred and fifty people and the sea. Play something.")],
                                               "start": [("cave-start", "Here we go. Easy does it.")],
@@ -287,7 +287,7 @@ enum Nights {
                                               "nuts": [("ibz-nuts", "The whole terrace is jumping!")],
                                               "keys": [("ibz-keys", "Sour! Those two don't fit. Cut on the phrase.")],
                                               "bag": [("ibz-bag", "Joli's records. Read the sleeves: the keys are on them.")]],
-                                      bag: ["sal", "praia", "regresso", "tambor", "fita-gasta", "flauta", "terraco", "varanda"],
+                                      bag: ["sal", "regresso", "corte", "sintetizador", "sala-de-mistura", "rejeitado", "primeira-demo", "fita-gasta"],
                                       clockStart: 20 * 60, judgeKeys: true)
     /// Chapter 9: the burnout. The fortieth night in forty days, vinyl, a belt that wanders, and
     /// Tó stops it halfway (one star, whatever happens: the night the career has to pause).
@@ -329,7 +329,7 @@ enum Nights {
                                               "nuts": [("fest-nuts", "Look at them! Hands in the air, all the way to the back!")],
                                               "cable": [("fest-generator", "The generator! Hold on... it's back! Go, go!")],
                                               "climb": [("fest-climb", "Sunset slot. Start slow, end at a hundred and twenty six. Take them up.")]],
-                                      bag: ["por-do-sol", "chuva", "floresta", "tenda", "encore", "palco-principal", "onda-media", "fila"],
+                                      bag: ["por-do-sol", "chuva", "floresta", "tenda", "encore", "palco-principal", "canal", "regresso"],
                                       clockStart: 19 * 60, echo: 0.12, climbTo: 126)
     /// Chapter 10: a 3 pm slot, two hundred people on a field made for twenty thousand. The meter
     /// counts people: good mixing brings them over from the other stages.
@@ -345,12 +345,12 @@ enum Nights {
                                            "wreck": [("fri-wreck", "Ouch. Two kicks fighting.")],
                                            "clash": [("fri-clash", "Two basslines. Kill a low.")],
                                            "nuts": [("pm-nuts", "Look! The whole field is coming over!")]],
-                                   bag: ["floresta", "tenda", "por-do-sol", "chuva", "encore", "palco-principal", "fila", "onda-media"],
+                                   bag: ["floresta", "tenda", "por-do-sol", "chuva", "encore", "palco-principal", "sal", "regresso"],
                                    clockStart: 15 * 60)
     /// Chapter 10: a tent at night; at a third of the set the sky opens and everyone outside
     /// runs in (the room gets a big lift).
     static let tentRain = NightInfo(id: "tent-rain", title: "THE TENT", length: 360, room: "tent",
-                                    records: ["chuva", "por-do-sol"], chapter: 10, mixesFor3Stars: 2,
+                                    records: ["tenda", "chuva"], chapter: 10, mixesFor3Stars: 2,
                                     mishapAt: 0.35, mishap: .rainRush,
                                     lines: ["wait": [("tent-wait", "A tent, a festival, and the sky is turning black. Play something.")],
                                             "start": [("cave-start", "Here we go. Easy does it.")],
@@ -363,12 +363,12 @@ enum Nights {
                                             "clash": [("fri-clash", "Two basslines. Kill a low.")],
                                             "nuts": [("tent-nuts", "The tent is shaking!")],
                                             "cable": [("tent-rain", "It's pouring! Everyone's running into the tent!")]],
-                                    bag: ["chuva", "por-do-sol", "floresta", "tenda", "encore", "palco-principal", "residente", "portao"],
+                                    bag: ["chuva", "por-do-sol", "floresta", "tenda", "encore", "palco-principal", "oito-milhas", "berlim"],
                                     clockStart: 22 * 60)
     /// Chapter 10's last night: the forest stage. Late in the set the crowd calls for an encore,
     /// and the night has to end on a big record (Encore or Palco Principal) for three stars.
     static let forestStage = NightInfo(id: "forest-stage", title: "FOREST STAGE", length: 360, room: "forest",
-                                       records: ["floresta", "por-do-sol"], chapter: 10, mixesFor3Stars: 3,
+                                       records: ["floresta", "palco-principal"], chapter: 10, mixesFor3Stars: 3,
                                        remarks: [(at: 0.85, moment: "encore")],
                                        lines: ["wait": [("forest-wait", "The forest stage. Lasers in the trees. Play something.")],
                                                "start": [("cave-start", "Here we go. Easy does it.")],
@@ -381,7 +381,7 @@ enum Nights {
                                                "clash": [("fri-clash", "Two basslines. Kill a low.")],
                                                "nuts": [("fest-nuts", "Look at them! Hands in the air, all the way to the back!")],
                                                "encore": [("forest-encore", "Listen to them! They want an encore. Finish on your biggest record.")]],
-                                       bag: ["floresta", "por-do-sol", "tenda", "chuva", "encore", "palco-principal", "coro", "residente"],
+                                       bag: ["floresta", "por-do-sol", "tenda", "chuva", "encore", "palco-principal", "berlim", "canal"],
                                        clockStart: 23 * 60, echo: 0.1, encoreWith: ["encore", "palco-principal"])
     /// Chapter 11: back to back with Helena on a party boat on the river at sunset. The left deck
     /// is hers and she plays it herself: answer her record (keys count), bring yours in, and when
@@ -402,9 +402,9 @@ enum Nights {
                                              "clash": [("fri-clash", "Two basslines. Kill a low.")],
                                              "keys": [("fri-keys", "Sour! Those keys fight. Get out of it, or change it.")],
                                              "nuts": [("boat-nuts", "The whole boat is jumping! Hold on to something!")]],
-                                     bag: ["tambor", "garage-door", "terraco", "chuva", "primeira-demo", "dubplate", "saturday-job", "tabla"],
+                                     bag: ["tambor", "canal", "por-do-sol", "vibrafone", "tabla", "acordeao", "floresta", "tenda"],
                                      clockStart: 19 * 60 + 30, judgeKeys: true,
-                                     partner: 0, partnerBag: ["barco", "fita-gasta", "telhado", "neon-pluck", "manha", "regresso"])
+                                     partner: 0, partnerBag: ["barco", "fita-gasta", "telhado", "neon-pluck", "manha", "regresso", "saturday-job", "estatica", "primeira-demo"])
     /// Chapter 11's last night: VEX B2B at CAVE. Dani has the left deck and his planned set: his
     /// records in their own order (out of your key), in whenever he likes, half a phrase off, and
     /// he pulls your fader down when he is in. Pushing it back up is a fight the room sees (no
@@ -427,7 +427,7 @@ enum Nights {
                                           "clash": [("fri-clash", "Two basslines. Kill a low.")],
                                           "keys": [("vex-keys", "Sour! His set doesn't care about your key. Keep it short, cut on the phrase.")],
                                           "nuts": [("vex-nuts", "Listen to them! They're chanting your name, not his!")]],
-                                  bag: ["tabla", "low-tide", "sala-de-mistura", "acordeao", "onda-media", "mexe", "vibrafone", "cravo"],
+                                  bag: ["tabla", "acordeao", "vibrafone", "cravo", "sala-de-mistura", "canal", "floresta", "tenda"],
                                   clockStart: 2 * 60, judgeKeys: true,
                                   partner: 0, partnerBag: ["palco-principal", "coro", "residente", "oito-milhas", "encore", "portao"],
                                   partnerStyle: .vex)

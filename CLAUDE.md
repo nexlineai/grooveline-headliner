@@ -139,6 +139,12 @@ Design, story, decisions and the build log are in the vault:
   dies): his deck stops and `partnerDeck = nil` (both decks are yours).
   Mishap switch in `BoothScene`: anything not listed falls to `default` = the record on air
   STOPS. `.rainRush` was missing there until build 50 (THE TENT went silent at 35 %).
+- **Records move forward (Zé, 18 Nov):** each night starts on and carries its own and recent
+  chapters' records, crates list the newest chapter first (`BoothView.newestFirst`; never reorder
+  `tracks.json`, lessons rely on `tracks[0..1]`). After changing a night's `records`/`bag`/
+  `partnerBag`, run `python3 tools/check-nights.py`: it fails on future-chapter records, missing
+  rule records (requests, hot, encore) and unreachable climbTo/endBPM, and warns on records with no
+  key neighbour (judgeKeys) or no Helena answer; a change must not add warnings.
 - **Room lift:** `BoothScene.roomLift` raises a room's picture by a part of its height when its
   people stand low (the booth shows only ~8-67 % of the picture's height); clamped so the bottom
   edge never comes above the gear.

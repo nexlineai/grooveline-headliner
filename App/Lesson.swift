@@ -335,7 +335,7 @@ enum Lessons {
     /// full, outro), kept with the progress and put in the crate.
     static let dubplate = Lesson(id: "dubplate", number: 17, title: "DUBPLATE", coach: "LIA",
                                  desk: LessonDesk(crossfader: 0.5, channel: [0.85, 0], sync: [false, false], room: "bedroom",
-                                                  chapter: 8, studio: true, pattern: .track, cutter: true), steps: [
+                                                  records: ["primeira-demo", "sala-de-mistura"], chapter: 8, studio: true, pattern: .track, cutter: true), steps: [
         LessonStep(voice: "plate-01",
                    text: "This is your loop. One bar, over and over. A record needs more than that: an intro, a build, a break. Press play.",
                    task: "PRESS PLAY ON THE LEFT DECK", goal: .startDeck(0), target: .play(0)),
@@ -357,7 +357,7 @@ enum Lessons {
     /// goes where the kick is not; one on the kick shows why; chord stabs just before the clap.
     static let synth = Lesson(id: "synth", number: 16, title: "BASS AND CHORDS", coach: "LIA",
                               desk: LessonDesk(crossfader: 0.5, channel: [0.85, 0], sync: [false, false], room: "bedroom",
-                                               chapter: 8, studio: true, pattern: .house), steps: [
+                                               records: ["primeira-demo", "sala-de-mistura"], chapter: 8, studio: true, pattern: .house), steps: [
         LessonStep(voice: "synth-01",
                    text: "Your drums are still here. Press play.",
                    task: "PRESS PLAY ON THE LEFT DECK", goal: .startDeck(0), target: .play(0)),
@@ -386,7 +386,7 @@ enum Lessons {
     /// hats in between.
     static let drums = Lesson(id: "drums", number: 15, title: "DRUMS", coach: "LIA",
                               desk: LessonDesk(crossfader: 0.5, channel: [0.85, 0], sync: [false, false], room: "bedroom",
-                                               chapter: 8, studio: true), steps: [
+                                               records: ["primeira-demo", "sala-de-mistura"], chapter: 8, studio: true), steps: [
         LessonStep(voice: "drums-01",
                    text: "Playing other people's records is half of it. Now make your own. This is a drum machine: three rows, sixteen steps, one bar. Press play on the left deck.",
                    task: "PRESS PLAY ON THE LEFT DECK", goal: .startDeck(0), target: .play(0)),
