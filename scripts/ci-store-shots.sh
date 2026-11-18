@@ -49,7 +49,18 @@ shot() { # name, seconds to wait, launch arguments... (every chapter open unless
   local name=$1 wait=$2; shift 2
   xcrun simctl launch "$udid" "$bundle" -unlockAll 1 "$@"
   sleep "$wait"
-  xcrun simctl io "$udid" screenshot "build/store/$name.png"
+  # The app is landscape-only but the first frames can still be portrait (store-shots-1: 1320x2868):
+  # take the picture again until it is wider than tall.
+  local try
+  for try in 1 2 3 4 5 6; do
+    xcrun simctl io "$udid" screenshot "build/store/$name.png"
+    local w h
+    w=$(sips -g pixelWidth "build/store/$name.png" | awk '/pixel/{print $2}')
+    h=$(sips -g pixelHeight "build/store/$name.png" | awk '/pixel/{print $2}')
+    [ "$w" -gt "$h" ] && break
+    echo "$name: $w x $h is portrait, trying again ($try)"
+    sleep 3
+  done
   xcrun simctl terminate "$udid" "$bundle" || true
   # JPEG: no alpha channel, which App Store Connect refuses.
   sips -s format jpeg -s formatOptions 92 "build/store/$name.png" --out "build/store/$name.jpg" >/dev/null
@@ -62,6 +73,11 @@ shot() { # name, seconds to wait, launch arguments... (every chapter open unless
     *) echo "::error title=store shot size::$name is $size, not a 6.9-inch landscape size"; exit 1 ;;
   esac
 }
+
+# Warm-up: the first launch on a fresh simulator is slow and starts in portrait.
+xcrun simctl launch "$udid" "$bundle" -unlockAll 1 -screen booth
+sleep 8
+xcrun simctl terminate "$udid" "$bundle" || true
 
 shot 01-cold-open 6 -screen story -scene cold-open
 shot 02-booth 9 -screen booth -demo 1
