@@ -43,7 +43,11 @@ struct BoothView: View {
                         .frame(height: max(60, roomHeight - 4), alignment: .bottom)
                 }
                 if let nightRunner {
-                    NightOverlay(runner: nightRunner, roomHeight: roomHeight) {
+                    NightOverlay(runner: nightRunner, roomHeight: roomHeight, onRetry: {
+                        if let id = nightID { game.retry(night: id) }
+                    }, onLeave: {
+                        game.closeBooth(leaving: true)
+                    }) {
                         if let stars = nightRunner.stars, let id = nightID { game.record(stars, for: id) }
                         game.closeBooth()
                     }

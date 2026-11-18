@@ -31,7 +31,7 @@ struct RootView: View {
                 }
             case .booth: BoothView(lessonID: nil, nightID: nil)
             case .lesson(let id): BoothView(lessonID: id, nightID: nil).id(id)
-            case .night(let id): BoothView(lessonID: nil, nightID: id).id(id)
+            case .night(let id): BoothView(lessonID: nil, nightID: id).id("\(id)#\(game.attempt)")
             case .bag: BagView()
             case .credits: CreditsView()
             case .story(let id):

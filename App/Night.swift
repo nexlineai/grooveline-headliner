@@ -76,6 +76,9 @@ struct NightInfo {
     var lastRecord: String? = nil
     /// After the bag, every other record of the career, newest first (MERIDIAN: your whole collection).
     var wholeCollection = false
+    /// The night only counts if it ends on an `encoreWith` record (MERIDIAN: the white label);
+    /// otherwise no stars, nothing saved, and the card offers TRY AGAIN (Zé, 18 Nov).
+    var mustEnd = false
 }
 
 /// What goes wrong in a night: the cable is kicked (the record stops), the needle jumps a groove,
@@ -465,7 +468,7 @@ enum Nights {
                                             "closer": [("meridian-closer", "Now the one with no name. Lia's record. You know why.")]],
                                     bag: ["bastidores", "holofote", "meridiano", "ponte", "especiaria", "nove-anos"],
                                     clockStart: 23 * 60 + 30, judgeKeys: true, encoreWith: [WhiteLabel.id], closingSet: true,
-                                    lastRecord: WhiteLabel.id, wholeCollection: true)
+                                    lastRecord: WhiteLabel.id, wholeCollection: true, mustEnd: true)
     static let all = [firstParty, garageParty, saturdayShift, emptyTuesday, thursdayShow, caveWarmUp, fridayCave, afterhours, dubplateNight, berlinNight, ibizaNight, burnout, sunsetSlot, threePM, tentRain, forestStage, boatParty, vexB2B, nightBefore, meridian]
     static func find(_ id: String) -> NightInfo? { all.first { $0.id == id } }
 }
@@ -524,6 +527,8 @@ final class NightRunner: ObservableObject {
     @Published private(set) var commentBy = ""
     /// Set when the night is over: 1 to 3.
     @Published private(set) var stars: Int?
+    /// Set when a `mustEnd` night did not end on its record: why it does not count.
+    @Published private(set) var missed: String?
     private(set) var summary = ""
 
     private var energy = 0.3
@@ -921,6 +926,13 @@ final class NightRunner: ObservableObject {
             summary += stepOnsSeen == 0 ? "   ·   hands off her deck" : "   ·   on her deck \(stepOnsSeen)×"
         }
         comment = ""
+        if info.mustEnd && !encored {
+            missed = info.encoreWith == [WhiteLabel.id]
+                ? "The set has to end on the white label. Lia's record, last."
+                : "The night has to end on the right record."
+            stars = 0
+            return
+        }
         stars = earned
     }
 }
@@ -930,6 +942,9 @@ final class NightRunner: ObservableObject {
 struct NightOverlay: View {
     @ObservedObject var runner: NightRunner
     let roomHeight: CGFloat
+    /// A night that must end on its record and did not: play it again, or back to the chapter.
+    var onRetry: () -> Void = {}
+    var onLeave: () -> Void = {}
     let onContinue: () -> Void
 
     var body: some View {
@@ -1013,16 +1028,43 @@ struct NightOverlay: View {
             Text(runner.summary)
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(.white.opacity(0.75))
-            Button(action: onContinue) {
-                Text("CONTINUE")
-                    .font(.system(size: 15, weight: .heavy))
-                    .tracking(5)
-                    .foregroundStyle(.black)
-                    .padding(.horizontal, 40)
-                    .padding(.vertical, 12)
-                    .background(Capsule().fill(GroovelineLogo.teal))
+            if let missed = runner.missed {
+                Text(missed)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Color(Palette.orange))
+                HStack(spacing: 14) {
+                    Button(action: onRetry) {
+                        Text("TRY AGAIN")
+                            .font(.system(size: 15, weight: .heavy))
+                            .tracking(5)
+                            .foregroundStyle(.black)
+                            .padding(.horizontal, 40)
+                            .padding(.vertical, 12)
+                            .background(Capsule().fill(GroovelineLogo.teal))
+                    }
+                    Button(action: onLeave) {
+                        Text("BACK")
+                            .font(.system(size: 13, weight: .heavy))
+                            .tracking(3)
+                            .foregroundStyle(.white.opacity(0.85))
+                            .padding(.horizontal, 22)
+                            .padding(.vertical, 11)
+                            .background(Capsule().stroke(.white.opacity(0.45), lineWidth: 1))
+                    }
+                }
+                .padding(.top, 8)
+            } else {
+                Button(action: onContinue) {
+                    Text("CONTINUE")
+                        .font(.system(size: 15, weight: .heavy))
+                        .tracking(5)
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 40)
+                        .padding(.vertical, 12)
+                        .background(Capsule().fill(GroovelineLogo.teal))
+                }
+                .padding(.top, 8)
             }
-            .padding(.top, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.black.opacity(0.72).ignoresSafeArea())

@@ -131,6 +131,7 @@ shot packed-night 8 -screen night -night night-before -demo 1 -demoClosingSet yo
 shot packed-crate 6 -screen night -night night-before -crate 1 -demoClosingSet your-dubplate,meridiano,saturday-job,ponte,telhado,nove-anos
 shot story-back-to-meridian 4 -screen story -scene back-to-meridian
 shot meridian-night 10 -screen night -night meridian -demo 1
+shot meridian-missed 27 -screen night -night meridian -demo 1
 shot meridian-packed 6 -screen night -night meridian -crate 1 -demoClosingSet ponte,saturday-job,meridiano,telhado,nove-anos,bastidores
 shot story-meridian-end 4 -screen story -scene meridian-end
 shot credits 25 -screen credits

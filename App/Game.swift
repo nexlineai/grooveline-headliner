@@ -53,6 +53,8 @@ final class Game: ObservableObject {
     @Published var studioPage = 0
     /// Dubplates cut so far in this session (a lesson counts new ones).
     @Published private(set) var cuts = 0
+    /// Bumped when a night is played again straight away, so its booth is built fresh.
+    @Published private(set) var attempt = 0
 
     /// The studio cut a dubplate: its pattern is kept with the progress.
     func cut(_ pattern: DrumPattern) {
@@ -162,6 +164,16 @@ final class Game: ObservableObject {
         engine.masterVolume = 1
         engine.echoSeconds = 0
         if leaving { leave() } else { next() }
+    }
+
+    /// The same night again from the start (MERIDIAN without the white label); what was lined up
+    /// after it (the ending) stays lined up.
+    func retry(night id: String) {
+        for deck in engine.decks { deck.motorOn = false }
+        engine.masterVolume = 1
+        engine.echoSeconds = 0
+        attempt += 1
+        openBooth(night: id)
     }
 
     /// Stops whatever was lined up and goes home (the chapter, or the title).
