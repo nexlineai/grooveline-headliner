@@ -12,7 +12,10 @@ import {
 } from "./gear.ts";
 import type { Point, RGB, Rect } from "./gear.ts";
 import type { LessonDesk, LessonTarget } from "../game/content.ts";
+import type { TrackInfo } from "../core/beatgrid.ts";
+import { compatible } from "../core/harmony.ts";
 import type { LessonRunner } from "../game/lesson.ts";
+import { PHRASE } from "../game/lesson.ts";
 
 type Kind =
   | { t: "platter"; d: number } | { t: "rim"; d: number } | { t: "pitch"; d: number } | { t: "channel"; d: number }
@@ -23,6 +26,22 @@ type Kind =
 const keyOf = (k: Kind): string => `${k.t}:${"d" in k ? k.d : ""}:${"band" in k ? k.band : ""}`;
 
 interface Grab { kind: Kind; start: Point; startValue: number; angle: number; }
+
+/** What the DJ on the other deck is doing (back to back, chapter 11). Ramps are counted in beats
+ * of her own record (`from`, `since`), or of yours where the iPhone says so. */
+type PartnerMove =
+  | { t: "on"; armed: boolean }              // her record on air; once your fader was down, yours coming up is your answer
+  | { t: "waiting"; phrase: number }         // your record is up: at the end of her phrase she takes her low out
+  | { t: "cutting"; from: number }           // her low goes down over two beats
+  | { t: "swapped"; since: number }          // her low is out; she waits for yours (or two bars)
+  | { t: "fading"; from: number; level: number } // her fader comes down (four bars; VEX one), then she stops
+  | { t: "out"; since: number }              // her record is out; yours has been on alone since (s)
+  | { t: "loading" }                         // her answer is being fetched (the web loads records in the background)
+  | { t: "ready"; phrase: number }           // her answer turns at your tempo, fader down
+  | { t: "rising"; from: number }            // her fader comes up over a phrase of yours (VEX: a bar)
+  | { t: "bassing"; from: number }           // her low comes back in over two beats
+  | { t: "stealing"; from: number; level: number } // VEX pulls your fader down over a beat
+  | { t: "holding"; until: number; fought: boolean }; // your fader is his until then
 
 /** Radians per second of a record at 33⅓ rpm. */
 const TURN = 2 * Math.PI * (100 / 3) / 60;
@@ -78,6 +97,22 @@ export class Booth {
   private lessonReady = false;
   /** Where a lesson cues every record, in bars past its first beat. */
   private cueBar: number | null = null;
+  /** Every record (for the partner's answers). */
+  tracks: TrackInfo[] = [];
+  // Back to back: the deck the other DJ plays herself, what she is doing, hands put on her deck.
+  private partnerDeck: number | null = null;
+  private partnerMove: PartnerMove = { t: "on", armed: true };
+  stepOns = 0;
+  private partnerBag: string[] = [];
+  private partnerPlayed = new Set<string>();
+  partnerAnswers = 0;
+  private partnerTrimAt = 0;
+  private partnerStyle: "helena" | "vex" = "helena";
+  partnerSteals = 0;
+  partnerFights = 0;
+  /** A hand landed on the partner's deck (the page buzzes). */
+  onStepOn: () => void = () => {};
+
   /** Puts a record (by id) on a deck; the page knows where records live. */
   loadRecord: (d: number, id: string) => Promise<void> = async () => {};
   /** What the page knows for the lesson: jingles fired, the studio's grid, dubplates cut. */
@@ -195,6 +230,22 @@ export class Booth {
       for (const band of [0, 1, 2]) deck.setEQ(band, 0.5);
       deck.setFilter(0.5);
       deck.cue = false;
+    }
+    // Back to back: her record is already on air when the lesson starts.
+    this.partnerDeck = desk.partner;
+    this.partnerMove = { t: "on", armed: true };
+    this.stepOns = 0;
+    this.partnerBag = desk.partnerBag.slice();
+    this.partnerStyle = desk.partnerStyle;
+    this.partnerSteals = 0;
+    this.partnerFights = 0;
+    this.partnerAnswers = 0;
+    this.partnerPlayed = new Set();
+    const h = desk.partner;
+    if (h !== null && this.decks[h].isLoaded) {
+      this.decks[h].motorOn = true;
+      const id = this.decks[h].info?.id;
+      if (id) this.partnerPlayed.add(id);
     }
     this.applyMix();
     this.L = null; // rebuild (the filter knobs may come or go)
@@ -457,6 +508,7 @@ export class Booth {
     const p = this.at(e);
     const kind = this.control(p);
     if (!kind) return;
+    if (this.partnerHolds(kind)) { this.stepOn(); return; }
     this.canvas.setPointerCapture(e.pointerId);
     const key = keyOf(kind);
     const doubleTap = e.timeStamp - (this.lastDown.get(key) ?? -1e9) < 350;
@@ -615,6 +667,7 @@ export class Booth {
     const kind = this.control(this.at(e));
     if (!kind) return;
     e.preventDefault();
+    if (this.partnerHolds(kind)) { this.stepOn(); return; }
     const step = -Math.sign(e.deltaY) * (e.shiftKey ? 0.005 : 0.025);
     switch (kind.t) {
       case "pitch": this.setPitchFader(kind.d, clamp01(this.pitchFader[kind.d] + step * 0.4)); break;
@@ -701,10 +754,196 @@ export class Booth {
     if (this.L) {
       this.moveHands(dt);
       this.runSync();
+      this.drivePartner(time / 1000);
       this.draw(dt);
       this.teach(dt, time / 1000);
     }
     requestAnimationFrame((t) => this.frame(t));
+  }
+
+  // MARK: - Back to back
+
+  /** Her deck is hers (PHONES aside: cueing her in your headphones is fine); the crossfader is
+   * hers too while her record is on. */
+  private partnerHolds(k: Kind): boolean {
+    const h = this.partnerDeck;
+    if (h === null) return false;
+    switch (k.t) {
+      case "cross": return this.channel[h] > 0.04;
+      case "phones": case "cueMix": return false;
+      default: return "d" in k && k.d === h;
+    }
+  }
+
+  /** A hand on the other DJ's deck: refused and counted (the lesson says so). */
+  private stepOn(): void {
+    this.stepOns += 1;
+    this.onStepOn();
+  }
+
+  /** The crate asks before putting a record on a deck: never on hers (that counts as a step-on). */
+  refuseLoad(d: number): boolean {
+    if (d !== this.partnerDeck) return false;
+    this.stepOn();
+    return true;
+  }
+
+  /** She plays her own deck (port of BoothScene.drivePartner). Your answer: once your record is up
+   * she takes her low out at her next phrase, waits for yours, fades hers out and stops it. Her
+   * answer (a night, records in her bag): after yours has been on alone a while she puts on one
+   * that fits, at your tempo, on your beat and phrase, fader down, then brings it up. */
+  private drivePartner(time: number): void {
+    const h = this.partnerDeck;
+    if (h === null) return;
+    const decks = this.decks, her = decks[h], you = 1 - h;
+    const beat = her.beat, yours = decks[you].beat;
+    const vex = this.partnerStyle === "vex";
+    const m = this.partnerMove;
+    switch (m.t) {
+      case "on":
+        if (!m.armed) {
+          if (this.channel[you] <= 0.04) this.partnerMove = { t: "on", armed: true };
+        } else if (her.rate > 0.5 && decks[you].rate > 0.5 && this.channel[you] >= 0.8) {
+          // Helena waits for her phrase and swaps the bass; VEX just pulls his fader.
+          this.partnerMove = vex ? { t: "fading", from: beat, level: this.channel[h] } : { t: "waiting", phrase: Math.floor(beat / PHRASE) };
+        }
+        break;
+      case "waiting":
+        if (Math.floor(beat / PHRASE) > m.phrase) this.partnerMove = { t: "cutting", from: beat };
+        break;
+      case "cutting":
+        this.setPartnerLow(0.5 * (1 - clamp01((beat - m.from) / 2)), h);
+        if (beat - m.from >= 2) this.partnerMove = { t: "swapped", since: beat };
+        break;
+      case "swapped":
+        if (this.eq[you][0] >= 0.45 || beat - m.since >= 8) this.partnerMove = { t: "fading", from: beat, level: this.channel[h] };
+        break;
+      case "fading": {
+        const t = clamp01((beat - m.from) / (vex ? 4 : 16));
+        this.setPartnerFader(m.level * (1 - t), h);
+        if (t >= 1) {
+          her.motorOn = false;
+          this.partnerMove = { t: "out", since: time };
+        }
+        break;
+      }
+      case "out": {
+        if (this.partnerBag.length === 0) break;
+        // Your record has to be on air by itself for a while before she answers it.
+        if (!(decks[you].rate > 0.5 && this.channel[you] >= 0.5)) {
+          this.partnerMove = { t: "out", since: time };
+        } else if (time - m.since >= (vex ? 20 : 35)) {
+          const track = this.partnerPick();
+          if (!track) break;
+          this.partnerMove = { t: "loading" };
+          this.partnerPlayed.add(track.id);
+          this.loadRecord(h, track.id).then(() => this.partnerLanded(h)).catch(() => { this.partnerMove = { t: "out", since: time }; });
+        }
+        break;
+      }
+      case "loading":
+        break;
+      case "ready": {
+        this.partnerMatchTempo(h);
+        // Her fader is down: a small slip is put right by moving the needle (now and then, so a
+        // move has landed before the next is measured).
+        const slip = phaseOffset(yours, beat);
+        if (time >= this.partnerTrimAt && her.rate > 0.9 && Math.abs(slip) > 0.01) {
+          her.seek(her.grid.secondsAtBeat(beat + slip));
+          this.partnerTrimAt = time + 0.3;
+        }
+        // Helena comes in at your next phrase; VEX as soon as his record is up to speed.
+        const go = vex ? her.rate > 0.9 && time >= this.partnerTrimAt : Math.floor(yours / PHRASE) > m.phrase;
+        if (go) this.partnerMove = { t: "rising", from: yours };
+        break;
+      }
+      case "rising": {
+        this.partnerMatchTempo(h);
+        // Helena over a phrase; VEX slams it up in a bar, bass and all, then grabs your fader.
+        const t = clamp01((yours - m.from) / (vex ? 4 : PHRASE));
+        this.setPartnerFader(0.85 * t, h);
+        if (t >= 1) {
+          if (vex) { this.partnerSteals += 1; this.partnerMove = { t: "stealing", from: beat, level: this.channel[you] }; }
+          else this.partnerMove = { t: "bassing", from: beat };
+        }
+        break;
+      }
+      case "bassing":
+        this.partnerMatchTempo(h);
+        this.setPartnerLow(0.5 * clamp01((beat - m.from) / 2), h);
+        if (beat - m.from >= 2) this.partnerMove = { t: "on", armed: false };
+        break;
+      case "stealing":
+        this.partnerMatchTempo(h);
+        this.setPartnerFader(m.level * (1 - clamp01(beat - m.from)), you);
+        if (beat - m.from >= 1) this.partnerMove = { t: "holding", until: time + 8, fought: false };
+        break;
+      case "holding":
+        if (!m.fought && this.channel[you] > 0.5) {
+          this.partnerFights += 1;
+          this.partnerMove = { t: "holding", until: m.until, fought: true };
+        } else if (time >= m.until) {
+          // After a fight your record is still up: he only hands over once it has been down.
+          this.partnerMove = { t: "on", armed: !m.fought };
+        }
+        break;
+    }
+  }
+
+  /** Her answer is on her deck: at your tempo, a phrase past her intro where yours is in its
+   * phrase (plus the 0.05 s the platter takes to come up to speed), fader down, low out. */
+  private partnerLanded(h: number): void {
+    if (this.partnerDeck !== h) return;
+    const her = this.decks[h], yours = this.decks[1 - h].beat;
+    const vex = this.partnerStyle === "vex";
+    this.setPartnerLow(vex ? 0.5 : 0, h);
+    this.setPartnerFader(0, h);
+    this.sync[h] = false;
+    this.partnerMatchTempo(h);
+    // (VEX lands on your beat but half a phrase off: his set, his timing.)
+    const into = ((yours % PHRASE) + PHRASE) % PHRASE;
+    her.seek(her.grid.secondsAtBeat(PHRASE + into + (vex ? 16 : 0) + 0.05 * her.bpm / 60));
+    her.motorOn = true;
+    this.partnerTrimAt = this.lastTime / 1000 + 0.3;
+    this.partnerAnswers += 1;
+    this.partnerMove = { t: "ready", phrase: Math.floor(yours / PHRASE) };
+  }
+
+  /** She rides her pitch fader to your tempo (with your SYNC on, yours follows hers: no change). */
+  private partnerMatchTempo(h: number): void {
+    const her = this.decks[h], you = this.decks[1 - h];
+    if (!her.isLoaded || !you.isLoaded) return;
+    const p = Math.max(-PITCH_RANGE, Math.min(PITCH_RANGE, pitchToPlay(her.grid.bpm, you.bpm)));
+    if (Math.abs(p - her.pitch) <= 1e-7) return;
+    her.pitch = p;
+    this.pitchFader[h] = 0.5 - p / (2 * PITCH_RANGE);
+  }
+
+  /** Her answer: a record from her bag she has not played, in a key that fits yours and close to
+   * your tempo (no key lock: her pitch fader moves its key too); failing that, any that fits.
+   * VEX: the next record on his list, whatever you play. */
+  private partnerPick(): TrackInfo | null {
+    const h = this.partnerDeck;
+    if (h === null) return null;
+    const find = (id: string) => this.tracks.find((t) => t.id === id) ?? null;
+    if (this.partnerStyle === "vex") {
+      const id = this.partnerBag.find((x) => !this.partnerPlayed.has(x));
+      return id ? find(id) : null;
+    }
+    const yours = this.decks[1 - h].info, tempo = this.decks[1 - h].bpm;
+    const open = this.partnerBag.filter((x) => !this.partnerPlayed.has(x) && x !== yours?.id).map(find).filter((t): t is TrackInfo => t !== null);
+    const fits = open.filter((t) => compatible(t.camelot, yours?.camelot ?? t.camelot));
+    return fits.find((t) => Math.abs(t.bpm - tempo) <= 2.1) ?? fits[0] ?? null;
+  }
+
+  private setPartnerLow(v: number, h: number): void {
+    this.eq[h][0] = v;
+    this.decks[h].setEQ(0, v);
+  }
+
+  private setPartnerFader(v: number, h: number): void {
+    this.channel[h] = v;
+    this.applyMix();
   }
 
   /** Feeds the lesson what the decks are doing, points at the control it names, and turns the
@@ -715,7 +954,9 @@ export class Booth {
     if (!this.lessonReady) { this.lessonReady = true; lesson.begin(); }
     const decks = this.decks;
     // In a lesson a record that runs out starts again, so nobody gets stuck waiting.
-    decks.forEach((deck) => {
+    decks.forEach((deck, d) => {
+      // Back to back: her record never jumps while yours is in the room with it.
+      if (d === this.partnerDeck && this.channel[1 - d] > 0.04) return;
       if (deck.motorOn && deck.progress > 0.985) deck.seek(deck.cuePoint < deck.duration * 0.9 ? deck.cuePoint : deck.grid.firstBeat);
     });
     const page = this.pageFacts();
@@ -741,7 +982,7 @@ export class Booth {
       pattern: page.pattern,
       page: page.page,
       cuts: page.cuts,
-      stepOns: 0,
+      stepOns: this.stepOns,
     });
     // A step that makes the needle skip: it lands 0.4 beat on, the kicks fall apart.
     const skip = lesson.takeSkip();
@@ -794,7 +1035,10 @@ export class Booth {
         deck.pitch = p;
         this.pitchFader[d] = 0.5 - p / (2 * PITCH_RANGE);
       }
-      if (deck.motorOn && !deck.held && !deck.lifted && deck.rate > 0.5 && other.rate > 0.5) {
+      // Back to back: never chase the partner's deck while her fader is down (her silent spin-up
+      // would pull your record on air).
+      const partnerSilent = 1 - d === this.partnerDeck && this.channel[1 - d] <= 0.04;
+      if (deck.motorOn && !deck.held && !deck.lifted && deck.rate > 0.5 && other.rate > 0.5 && !partnerSilent) {
         const behind = phaseOffset(other.beat, deck.beat);
         deck.bend = Math.max(-0.06, Math.min(0.06, behind * 0.8));
       } else if (deck.bend !== 0) {

@@ -77,6 +77,7 @@ async function begin(): Promise<void> {
     await engine.start();
     content = await loadContent();
     tracks = content.tracks;
+    booth.tracks = tracks;
     fillLessons();
     const lesson = params.get("lesson");
     if (lesson) {
@@ -131,7 +132,11 @@ function fillCrate(bag: string[] | null, chapter: number): void {
       const b = document.createElement("button");
       b.textContent = d === 0 ? "LEFT" : "RIGHT";
       b.className = d === 0 ? "left" : "right";
-      b.addEventListener("click", () => { crate.hidden = true; loadRecord(d, t).catch((e) => { note.textContent = String(e); }); });
+      b.addEventListener("click", () => {
+        crate.hidden = true;
+        if (booth.refuseLoad(d)) return; // back to back: her deck is hers
+        loadRecord(d, t).catch((e) => { note.textContent = String(e); });
+      });
       row.append(b);
     }
     crateList.append(row);
@@ -151,10 +156,7 @@ function fillLessons(): void {
     row.innerHTML = `<span class="n"></span><b></b><span class="c"></span>`;
     row.querySelector(".n")!.textContent = String(l.number);
     row.querySelector("b")!.textContent = l.title;
-    // Lessons that need a part of the booth the web does not have yet are shown, not offered.
-    const missing = l.desk.partner !== null ? "the partner's deck" : null;
-    row.querySelector(".c")!.textContent = `chapter ${chapterOf.get(l.id) ?? "?"} · ${l.coach}${missing ? ` · needs ${missing}, not on the web yet` : ""}`;
-    row.disabled = missing !== null;
+    row.querySelector(".c")!.textContent = `chapter ${chapterOf.get(l.id) ?? "?"} · ${l.coach}`;
     row.addEventListener("click", () => { lessonsSheet.hidden = true; startLesson(l.id).catch((e) => { note.textContent = String(e); }); });
     lessonsList.append(row);
   }

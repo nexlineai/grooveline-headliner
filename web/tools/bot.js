@@ -7,6 +7,9 @@ window.__bot = setInterval(() => {
   const L = booth.lesson, d = engine.decks;
   if (!L || L.goalMet || L.stars !== null) return;
   const step = L.lesson.steps[L.index], g = step.goal;
+  // Back to back: the partner's deck is hers. A player never touches it.
+  const hers = booth.partnerDeck;
+  if (hers !== null && "deck" in g && g.deck === hers) return;
   const into = (beat, span) => ((beat % span) + span) % span;
   const mid = (r) => (r[0] + r[1]) / 2;
   const cells = (row) => {
@@ -51,8 +54,15 @@ window.__bot = setInterval(() => {
       if (L.postAt !== null && L.postAt - performance.now() / 1000 < 0.2) { booth.channel = [0, 0]; booth.applyMix(); }
       break;
     case "bassSwap":
-      if (into(d[g.to].beat, 32) < 0.5) { booth.setEQ(g.from, 0, 0); booth.setEQ(g.to, 0, 0.5); }
+      if (g.from === hers) { if (booth.eq[hers][0] <= 0.1) booth.setEQ(g.to, 0, 0.5); } // when her low goes out
+      else if (into(d[g.to].beat, 32) < 0.5) { booth.setEQ(g.from, 0, 0); booth.setEQ(g.to, 0, 0.5); }
       break;
+    case "pickRecord":
+    case "recordLoaded": {
+      const id = g.type === "pickRecord" ? g.good[0] : g.id;
+      if (d[g.deck].info?.id !== id && window.__loading !== id) { window.__loading = id; booth.loadRecord(g.deck, id); }
+      break;
+    }
     case "crossfaderCut":
       if (into(d[0].beat, 32) < 0.5) { booth.cross = 1; booth.applyMix(); }
       break;
