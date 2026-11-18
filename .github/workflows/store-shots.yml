@@ -1,0 +1,45 @@
+# App Store screenshots on a Pro Max iPhone simulator, started by pushing a `store-shots-*` tag
+# (no token needed: `git tag store-shots-N && git push origin store-shots-N`). The pictures go to the
+# `store-shots` branch. No secrets anywhere in this workflow. Never use pull_request_target.
+name: store-shots
+
+on:
+  push:
+    tags: ['store-shots-*']
+
+permissions:
+  contents: read
+
+jobs:
+  shots:
+    runs-on: macos-26
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - run: xcodebuild -version
+      - name: Generate the Xcode project
+        run: brew install xcodegen && xcodegen generate
+      - name: Store screenshots
+        run: scripts/ci-store-shots.sh
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+      - name: Push the pictures to the store-shots branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd build/store
+          echo "run ${{ github.run_number }}, commit ${{ github.sha }}" > README.txt
+          git init -q -b store-shots
+          git add -A
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "store shots: run ${{ github.run_number }} (${{ github.sha }})"
+          git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" store-shots
+      - name: Log tails
+        if: failure()
+        run: |
+          for f in build/*.log; do
+            [ -f "$f" ] || continue
+            tail -n 4 "$f" | sed -e 's/%/%25/g' -e "s#^#::error title=$(basename "$f")::#"
+          done
