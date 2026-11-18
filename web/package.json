@@ -1,0 +1,13 @@
+{
+  "name": "grooveline-headliner-web",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "description": "Grooveline Headliner in the browser. No runtime dependencies: Node strips the TypeScript types.",
+  "engines": { "node": ">=26" },
+  "scripts": {
+    "test": "node --test test/*.test.ts",
+    "dev": "node tools/serve.ts",
+    "check": "tsc -p ."
+  }
+}

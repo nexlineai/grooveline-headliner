@@ -1,0 +1,39 @@
+# The web version (web/): the core's unit tests and a type check, on a Linux runner. Runs only when
+# web/ changes; build.yml (the Mac) ignores web/ in turn. No secrets anywhere in this workflow.
+# Never use pull_request_target.
+name: web
+
+on:
+  push:
+    branches: [main]
+    paths: ['web/**', '.github/workflows/web.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          # Only the web code: the records and clips (~380 MB) are not needed to test the core.
+          sparse-checkout: web
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '26.12.1'
+      - name: Core tests (the twins of the Swift CoreTests)
+        run: node --test test/*.test.ts
+      - name: Type check
+        run: |
+          npm install --no-save --no-package-lock --ignore-scripts typescript@5.9.3 @types/node@26.6.6
+          npx --no-install tsc -p .

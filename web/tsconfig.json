@@ -1,0 +1,19 @@
+{
+  // Type-check only (CI: `tsc -p web`). Nothing is compiled by tsc: Node and the dev server strip the
+  // types, so only erasable syntax is allowed (no enums, namespaces or parameter properties), and
+  // type-only imports must say `import type` (a stripped plain import of a type fails at run time).
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "strict": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "skipLibCheck": true
+  },
+  "include": ["src", "test", "tools"]
+}

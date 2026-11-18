@@ -6,6 +6,9 @@ name: build
 on:
   push:
     branches: [main]
+    # The web version has its own workflow (web.yml, Linux): a push that only touches web/ must
+    # not start a Mac build, nor cancel one that is running.
+    paths-ignore: ['web/**', '.github/workflows/web.yml']
   workflow_dispatch:
 
 permissions:

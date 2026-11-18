@@ -17,3 +17,7 @@ xcuserdata/
 *.mobileprovision
 .env*
 *.job
+
+# The web version: type-check tools are installed by CI only; builds are made by CI.
+web/node_modules/
+web/dist/
