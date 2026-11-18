@@ -120,6 +120,9 @@ shot story-carla-meridian 4 -screen story -scene carla-meridian
 shot lesson-skip 8 -screen lesson -lesson skip
 shot bag 5 -screen bag -demoBag 1
 shot before-night 10 -screen night -night night-before -demo 1
+# A packed bag (out of catalogue order, dubplate first): decks = its first two, crate = its order.
+shot packed-night 8 -screen night -night night-before -demo 1 -demoClosingSet your-dubplate,meridiano,saturday-job,ponte,telhado,nove-anos
+shot packed-crate 6 -screen night -night night-before -crate 1 -demoClosingSet your-dubplate,meridiano,saturday-job,ponte,telhado,nove-anos
 shot lesson-requests 6 -screen lesson -lesson requests
 shot garage 10 -screen night -night garage-party -demo 1
 shot garage-crate 6 -screen night -night garage-party -crate 1

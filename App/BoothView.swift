@@ -191,7 +191,8 @@ struct BoothView: View {
             // THE NIGHT BEFORE: the bag you packed in THE BAG.
             if info.closingSet, let packed = game.progress.closingSet, packed.count == 6 { bag = packed }
         }
-        if let bag { return game.tracks.filter { bag.contains($0.id) } + (bag.contains("your-dubplate") ? [Studio.cutInfo()] : []) }
+        // In the bag's own order (a packed closing set reads opener first), the dubplate in its place.
+        if let bag { return bag.compactMap { id in id == "your-dubplate" ? Studio.cutInfo() : game.tracks.first { $0.id == id } } }
         return game.tracks.filter { ($0.chapter ?? 1) <= chapter }
     }
 

@@ -98,6 +98,10 @@ final class Game: ObservableObject {
         // Voices and music must sound with the ring switch on silent, like any game with headphones on.
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [])
         gameLog.info("crate: \(self.tracks.count, privacy: .public) records, story: \(self.scenes.count, privacy: .public) scenes")
+        // The screenshot run can bring a packed bag (never saved): ids, comma separated.
+        if let packed = defaults.string(forKey: "demoClosingSet") {
+            progress.closingSet = packed.split(separator: ",").map(String.init)
+        }
         switch defaults.string(forKey: "screen") ?? "" {
         case "booth": openBooth()
         case "lesson": openBooth(lesson: defaults.string(forKey: "lesson") ?? "first-mix")
@@ -194,6 +198,13 @@ final class Game: ObservableObject {
     func run(_ screens: [Screen], home: Screen = .title) {
         self.home = home
         queue = screens
+        // THE NIGHT BEFORE plays the bag you packed: with none packed yet, THE BAG comes first
+        // (before the night's own scene), instead of a set of records that are not yours.
+        if progress.closingSet?.count != 6, !queue.contains(.bag),
+           let at = queue.firstIndex(where: { if case .night(let id) = $0 { return Nights.find(id)?.closingSet == true }; return false }) {
+            let before = at > 0 && queue[at - 1] == .story(Nights.nightBefore.id) ? at - 1 : at
+            queue.insert(.bag, at: before)
+        }
         next()
     }
 

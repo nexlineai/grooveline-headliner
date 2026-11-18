@@ -195,7 +195,8 @@ final class BoothScene: SKScene {
         } else if let info = nightInfo {
             // A night starts like a gig: the first record ready, the second one's fader down.
             // THE NIGHT BEFORE plays the bag you packed: its first two records on the decks.
-            let packed = info.closingSet ? game.progress.closingSet?.filter { id in game.tracks.contains { $0.id == id } } : nil
+            // Your dubplate keeps its place (dropping it moved the next record onto its deck).
+            let packed = info.closingSet ? game.progress.closingSet?.filter { id in id == "your-dubplate" || game.tracks.contains { $0.id == id } } : nil
             let records = packed.flatMap { $0.count >= 2 ? Array($0.prefix(2)) : nil } ?? info.records
             setTheDesk(LessonDesk(crossfader: 0.5, channel: [0.85, 0], sync: info.syncAllowed ? [false, true] : [false, false],
                                   room: info.room, syncAllowed: info.syncAllowed, records: records, crate: true, chapter: info.chapter,
@@ -254,7 +255,12 @@ final class BoothScene: SKScene {
         // BPM); put them on if the crate swapped them.
         let wanted = desk.records ?? game.tracks.prefix(2).map { $0.id }
         for d in 0..<min(2, wanted.count) where decks[d].info?.id != wanted[d] {
-            if let track = game.tracks.first(where: { $0.id == wanted[d] }) { game.load(track, on: decks[d]) }
+            if let track = game.tracks.first(where: { $0.id == wanted[d] }) {
+                game.load(track, on: decks[d])
+            } else if wanted[d] == "your-dubplate" {
+                // A packed bag can open with your own cut (or the lessons' groove if none was cut).
+                Studio.loadCut(game.progress.track ?? .track, on: decks[d])
+            }
         }
         // The studio: the left deck plays the drum pattern.
         if desk.studio { Studio.load(game.pattern, on: decks[0], keepPlace: false) }
