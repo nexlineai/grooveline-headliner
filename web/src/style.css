@@ -327,3 +327,14 @@ button.quiet[hidden] { display: none; }
 #learn { position: fixed; z-index: 4; left: 50%; transform: translateX(-50%); top: 9vh; display: flex; gap: 12px; align-items: center; max-width: 92vw;
   padding: 10px 16px; border-radius: 14px; background: rgba(0, 0, 0, 0.85); border: 1.5px solid var(--orange); color: var(--ink); font: 600 15px system-ui, sans-serif; }
 #learn[hidden] { display: none; }
+
+/* The Grooveline mark (src/logo.ts): eleven bars that breathe, as on grooveline.org. */
+.gl-logo { display: inline-flex; align-items: center; gap: calc(8px * var(--k, 1)); }
+.gl-bars { display: inline-flex; align-items: flex-end; gap: calc(2px * var(--k, 1)); height: calc(28px * var(--k, 1));
+  filter: drop-shadow(0 0 calc(3.5px * var(--k, 1)) rgba(0, 212, 200, 0.55)); }
+.gl-bars i { display: block; width: calc(3px * var(--k, 1)); border-radius: calc(2px * var(--k, 1)) calc(2px * var(--k, 1)) 0 0;
+  background: linear-gradient(#4dffe0, #00a98f); transform-origin: bottom;
+  animation-name: gl-swing; animation-timing-function: ease-in-out; animation-iteration-count: infinite; animation-direction: alternate; }
+@keyframes gl-swing { from { transform: scaleY(0.3); opacity: 0.45; } to { transform: scaleY(1); opacity: 1; } }
+.gl-name { font: 700 calc(17.6px * var(--k, 1)) "Orbitron", sans-serif; letter-spacing: calc(4px * var(--k, 1)); color: #00d4c8; }
+@media (prefers-reduced-motion: reduce) { .gl-bars i { animation: none; } }

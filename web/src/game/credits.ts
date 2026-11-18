@@ -3,6 +3,9 @@
 // Grooveline (his own voice, a link to grooveline.org). Then back to the title. The text is the
 // one Zé approved for the iPhone (18 Nov 2026); change both together.
 
+import { fade } from "../fade.ts";
+import { groovelineLogo } from "../logo.ts";
+
 const DROP_AT = 414.5; // seconds into the white label (121 BPM)
 const ROLL_SPEED = 24; // pixels per second the text climbs
 const START_AT = 0.42; // where the top of the text starts, as a share of the screen height
@@ -33,16 +36,6 @@ const el = (tag: string, className = "", text = ""): HTMLElement => {
   return e;
 };
 
-/** A volume that moves to `to` over `seconds` (HTML audio has no fades of its own). */
-function fade(a: HTMLAudioElement, to: number, seconds: number): void {
-  const from = a.volume, start = performance.now();
-  const step = () => {
-    const t = Math.min(1, (performance.now() - start) / (seconds * 1000));
-    a.volume = Math.max(0, Math.min(1, from + (to - from) * t));
-    if (t < 1) requestAnimationFrame(step);
-  };
-  requestAnimationFrame(step);
-}
 
 export class Credits {
   private readonly root: HTMLElement;
@@ -72,7 +65,7 @@ export class Credits {
 
     const roll = el("div", "roll");
     const logo = el("div", "logo");
-    logo.innerHTML = `<span class="bars"><i></i><i></i><i></i><i></i></span>GROOVELINE`;
+    groovelineLogo(logo, 30);
     roll.append(logo, el("div", "name", "HEADLINER"));
     for (const [title, paragraphs] of SECTIONS) {
       const section = el("section");

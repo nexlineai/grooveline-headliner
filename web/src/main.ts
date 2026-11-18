@@ -19,6 +19,8 @@ import { StoryPlayer, loadScenes } from "./game/story.ts";
 import type { StoryScene } from "./game/story.ts";
 import * as Progress from "./game/progress.ts";
 import { showChapter } from "./menus.ts";
+import { groovelineLogo } from "./logo.ts";
+import { fade } from "./fade.ts";
 import { BagScreen } from "./game/bag.ts";
 import type { PhonesMode } from "./audio/engine.ts";
 import { keyOf } from "./booth/booth.ts";
@@ -159,6 +161,7 @@ const newestFirst = (list: TrackInfo[]) =>
 const upTo = (chapter: number) => newestFirst(tracks.filter((t) => (t.chapter ?? 1) <= chapter && t.id !== "white-label"));
 
 function showMode(mode: "free" | "lesson" | "night" | "story" | "menu"): void {
+  setMenuMusic(mode === "menu");
   lessonOverlay.hidden = mode !== "lesson";
   nightOverlay.hidden = mode !== "night";
   result.hidden = true;
@@ -168,6 +171,33 @@ function showMode(mode: "free" | "lesson" | "night" | "story" | "menu"): void {
 }
 
 // MARK: - Title and chapters
+
+groovelineLogo(title.querySelector<HTMLElement>(".logo")!, 30);
+
+// The menu music (Saturday Job, a 16-bar loop) on the title and the chapter screens, fading out
+// on every other screen, as on the iPhone. Browsers allow it only after a first click or key.
+let menuMusic: HTMLAudioElement | null = null;
+let menuWanted = false;
+function setMenuMusic(on: boolean): void {
+  menuWanted = on;
+  if (on) {
+    if (!menuMusic) {
+      menuMusic = new Audio("assets/Art/menu-loop.m4a");
+      menuMusic.loop = true;
+      menuMusic.volume = 0;
+    }
+    const m = menuMusic;
+    if (m.paused) m.play().then(() => fade(m, 0.55, 1.2)).catch(() => {});
+    else fade(m, 0.55, 1.2);
+  } else if (menuMusic && !menuMusic.paused) {
+    const m = menuMusic;
+    fade(m, 0, 0.5);
+    setTimeout(() => { if (!menuWanted) m.pause(); }, 550);
+  }
+}
+const firstGesture = () => { if (menuWanted && menuMusic?.paused !== false) setMenuMusic(true); };
+window.addEventListener("pointerdown", firstGesture);
+window.addEventListener("keydown", firstGesture);
 
 /** MERIDIAN played (it has a star) or its ending seen. */
 const careerOver = () => (progress.stars["meridian"] ?? 0) > 0 || progress.seen.includes("meridian-end");
@@ -735,7 +765,7 @@ function fillControls(): void {
   body.append(keys, m);
 }
 
-Object.assign((window as unknown as { headliner: object }).headliner, { midi, learn: setLearn });
+Object.assign((window as unknown as { headliner: object }).headliner, { midi, learn: setLearn, menu: () => menuMusic });
 
 // Keys and controllers work only while the booth is on screen (not a menu, a scene, the bag, the
 // credits or a result card).
