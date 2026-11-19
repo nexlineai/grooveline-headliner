@@ -18,6 +18,22 @@ export function phonesGainFor(knob: number): number {
   return Math.pow(10, dB / 20);
 }
 
+/** The channel's gain knob (the trim, free play): knob 0...1 -> dB. 0 dB at the middle (0.5), down to
+ * -24 dB at the bottom for records that are mastered too loud, up to +6 dB at the top for quiet ones. */
+export const TRIM_MIN_DB = -24;
+export const TRIM_MAX_DB = 6;
+
+export function trimDecibels(knob: number): number {
+  const x = Math.max(0, Math.min(1, knob));
+  return x <= 0.5 ? TRIM_MIN_DB * (0.5 - x) / 0.5 : TRIM_MAX_DB * (x - 0.5) / 0.5;
+}
+
+/** The trim as a gain; exactly 1 at the middle, so a knob left alone changes nothing. */
+export function trimGainFor(knob: number): number {
+  const dB = trimDecibels(knob);
+  return dB === 0 ? 1 : Math.pow(10, dB / 20);
+}
+
 /** Transparent below 0.9, a soft knee above it, never beyond 1: boosted headphones must not hard-clip at the device. */
 export function softClip(x: number): number {
   const a = Math.abs(x);

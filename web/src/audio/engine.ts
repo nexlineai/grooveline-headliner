@@ -5,7 +5,7 @@
 import { BeatGrid } from "../core/beatgrid.ts";
 import type { TrackInfo } from "../core/beatgrid.ts";
 import { eqDecibels } from "../core/mixjudge.ts";
-import { PHONES_UNITY, phonesGainFor } from "./fx.ts";
+import { PHONES_UNITY, phonesGainFor, trimGainFor } from "./fx.ts";
 import { isAiff, parseAiff } from "../library/aiff.ts";
 import { firstOnset, overview } from "../core/vinyl.ts";
 import { AUDIO_FIELDS, D, DECKS, M, S, SIZE, deckAt, mixerAt, stripAt } from "./layout.ts";
@@ -19,7 +19,7 @@ export type PhonesMode = "off" | "split" | "card" | "second";
 export interface OutputDevice { id: string; label: string; }
 
 /** The shared values plus a way to tell the audio thread they changed (when not shared). */
-class Shared {
+export class Shared {
   readonly values: Float64Array;
   readonly isShared: boolean;
   private port: MessagePort | null = null;
@@ -90,6 +90,8 @@ export class Deck {
   private _held = false;
   private _handRate = 0;
   private _volume = 1;
+  /** The gain knob (free play), 0...1, 0.5 = 0 dB. It stays on the deck when a new record is loaded. */
+  private _trim = 0.5;
   private _cue = false;
   private _lifted = false;
   private seekSeq = 0;
@@ -107,7 +109,7 @@ export class Deck {
     this.shared = shared;
     this.index = index;
     this.shared.set(stripAt(index, S.fader), 1);
-    this.shared.set(deckAt(index, D.targetGain), 1);
+    this.pushGain();
     this.apply();
   }
 
@@ -139,7 +141,19 @@ export class Deck {
   set cue(v: boolean) { this._cue = v; this.shared.set(stripAt(this.index, S.cue), v ? 1 : 0); }
   /** The needle is off the record (being carried to another spot): the platter keeps turning, no sound. */
   get lifted(): boolean { return this._lifted; }
-  set lifted(v: boolean) { this._lifted = v; this.shared.set(deckAt(this.index, D.targetGain), v ? 0 : 1); }
+  set lifted(v: boolean) { this._lifted = v; this.pushGain(); }
+  /** The gain knob of the channel (web only), 0...1 with 0.5 = 0 dB: turns a record that is mastered too loud down,
+   * a quiet one up. It works through the needle's gain, so it comes before the EQ, the filter and the fader, and the
+   * channel meter shows the record as the mixer will hear it. */
+  get trim(): number { return this._trim; }
+  set trim(v: number) {
+    const x = Math.max(0, Math.min(1, v));
+    if (x === this._trim) return;
+    this._trim = x;
+    this.pushGain();
+  }
+  /** What the audio thread's needle gain glides to: silent while the needle is lifted, else the trim. */
+  private pushGain(): void { this.shared.set(deckAt(this.index, D.targetGain), this._lifted ? 0 : trimGainFor(this._trim)); }
 
   private apply(): void {
     let target: number, seconds: number; // time for the platter to cover most of the gap
@@ -181,7 +195,7 @@ export class Deck {
     this._motorOn = false;
     this._lifted = false;
     this._pitch = 0; this._bend = 0;
-    this.shared.set(deckAt(this.index, D.targetGain), 1);
+    this.pushGain();
     this.apply();
     // The audio thread swaps records between two buffers, so it never reads a half-loaded one.
     this.shared.set(deckAt(this.index, D.position), Math.max(1, this.cuePoint * this.fileRate));
@@ -212,7 +226,7 @@ export class Deck {
       this._lifted = false;
       this._pitch = 0; this._bend = 0;
       this.frames = frames;
-      this.shared.set(deckAt(this.index, D.targetGain), 1);
+      this.pushGain();
       this.apply();
     }
     const l = left.slice(0, frames), r = right.slice(0, frames);

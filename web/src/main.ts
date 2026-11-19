@@ -806,7 +806,7 @@ function kindFromKey(key: string): Kind | null {
   const [t, ds, bs] = key.split(":");
   const d = Number(ds), band = Number(bs);
   switch (t) {
-    case "play": case "cue": case "sync": case "phones": case "pitch": case "channel": case "filter": case "jog":
+    case "play": case "cue": case "sync": case "phones": case "pitch": case "channel": case "filter": case "trim": case "jog":
       return { t, d } as Kind;
     case "eq": return { t: "eq", d, band };
     case "cross": return { t: "cross" };
@@ -824,7 +824,7 @@ function targetKind(key: string): TargetKind | null {
   if (["play", "sync", "phones", "fxOn", "fxType", "fxDiv"].includes(t)) return "button";
   if (t === "jog") return "relative";
   if (t === "nudge" || t === "cue") return "hold"; // held down: a nudge pushes, CUE plays from its mark
-  if (["pitch", "channel", "cross", "eq", "filter", "cueMix", "phonesLevel", "fxAmount"].includes(t)) return "absolute";
+  if (["pitch", "channel", "cross", "eq", "filter", "trim", "cueMix", "phonesLevel", "fxAmount"].includes(t)) return "absolute";
   return null;
 }
 
@@ -837,7 +837,7 @@ function labelOf(key: string): string {
   if (t === "fxDiv") return `NOTE ${FX_DIVISIONS[Number(ds)]?.label ?? "(NEXT)"}`;
   const side = ds === "0" ? "LEFT " : ds === "1" ? "RIGHT " : "";
   const names: Record<string, string> = { play: "PLAY", cue: "CUE", sync: "SYNC", phones: "PHONES", pitch: "PITCH", channel: "FADER",
-    filter: "FILTER", jog: "JOG (THE RECORD)", cross: "CROSSFADER", cueMix: "CUE MIX", phonesLevel: "HEADPHONES LEVEL" };
+    filter: "FILTER", trim: "GAIN", jog: "JOG (THE RECORD)", cross: "CROSSFADER", cueMix: "CUE MIX", phonesLevel: "HEADPHONES LEVEL" };
   if (t === "eq") return `${side}${["LOW", "MID", "HI"][Number(bs)] ?? "EQ"}`;
   if (t === "nudge") return `${side}NUDGE ${bs === "-1" ? "BACK" : "FORWARD"} (BUTTON)`;
   return `${side}${names[t] ?? t.toUpperCase()}`;

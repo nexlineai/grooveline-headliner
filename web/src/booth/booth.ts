@@ -18,7 +18,7 @@ import type { NightRunner } from "../game/night.ts";
 import type { NightInfo } from "../game/content.ts";
 import type { LessonRunner } from "../game/lesson.ts";
 import { PHRASE } from "../game/lesson.ts";
-import { FX, FX_DIVISIONS, FX_TYPES, PHONES_UNITY, beatDelaySeconds } from "../audio/fx.ts";
+import { FX, FX_DIVISIONS, FX_TYPES, PHONES_UNITY, beatDelaySeconds, trimDecibels } from "../audio/fx.ts";
 
 export type Kind =
   | { t: "jog"; d: number }
@@ -26,6 +26,8 @@ export type Kind =
   | { t: "cross" } | { t: "eq"; d: number; band: number } | { t: "play"; d: number } | { t: "cue"; d: number }
   | { t: "sync"; d: number } | { t: "needle"; d: number } | { t: "wave"; d: number } | { t: "phones"; d: number }
   | { t: "cueMix" } | { t: "phonesLevel" } | { t: "filter"; d: number }
+  // The channel's gain knob above its fader (free play).
+  | { t: "trim"; d: number }
   // The effect unit (free play): `d` is the effect or the note value, -1 = the next one.
   | { t: "fxOn" } | { t: "fxAmount" } | { t: "fxType"; d: number } | { t: "fxDiv"; d: number };
 
@@ -73,7 +75,9 @@ interface Layout {
   bpmX: number[]; topY: number; phaseY: number; phaseWidth: number;
   knobX: number[]; knobY: number[]; knobTravel: number;
   channelX: number[]; channelY: number; channelTravel: number;
-  phonesY: number; meterX: number[]; meterY: number;
+  phonesY: number; meterX: number[]; meterY: number; meterH: number;
+  /** The gain knobs above the faders (free play only): their height, else null. */
+  trimY: number | null;
   crossY: number; crossTravel: number; filterY: number;
   /** The effect bar under the gear (free play only). */
   fx: { panel: Rect; cy: number; typeX: number[]; divX: number[]; knobX: number; onX: number } | null;
@@ -96,6 +100,8 @@ export class Booth {
   private phones = [false, false];
   /** The one-knob filter per channel (0.5 = off). */
   private filterSetting = [0.5, 0.5];
+  /** The gain knob per channel (0.5 = 0 dB); it only works in free play (a lesson or a night is the iPhone's desk). */
+  private trimSetting = [0.5, 0.5];
   private syncAllowed = true;
   private hideNumbers = false;
   private hasFilter = true;
@@ -411,7 +417,9 @@ export class Booth {
     const knobX = [mx + 27 * u, mx + mw - 27 * u];
     const knobY = [0, 1, 2].map((band) => my + 74 * u + band * 41 * u);
     const channelX = [mx + 72 * u, mx + mw - 72 * u];
-    const channelY = my + 110 * u, channelTravel = 88 * u;
+    // Free play has a gain knob above each fader: the faders are a little shorter to make room.
+    const trimY = fxBar ? my + 163 * u : null;
+    const channelTravel = (fxBar ? 72 : 88) * u, channelY = my + (fxBar ? 102 : 110) * u;
     const phonesY = my + 49 * u;
     const crossTravel = Math.min(112 * u, mw * 0.55);
     const crossY = my + 24 * u, filterY = my + 27 * u;
@@ -419,6 +427,7 @@ export class Booth {
       for (const band of [0, 1, 2]) first({ t: "eq", d, band }, centred(knobX[d], knobY[band], 42 * u, 40 * u));
       first({ t: "channel", d }, centred(channelX[d], channelY, 40 * u, channelTravel + 28 * u));
       first({ t: "phones", d }, centred(channelX[d], phonesY, 44 * u, 24 * u));
+      if (trimY !== null) first({ t: "trim", d }, centred(channelX[d], trimY, 30 * u, 30 * u));
     }
     // The cue mix and the headphones level knobs side by side between the PHONES buttons.
     first({ t: "cueMix" }, centred(mid - KNOB_GAP * u, phonesY, 22 * u, 26 * u));
@@ -446,7 +455,7 @@ export class Booth {
       needleReach: Math.max(20, 20 * u), rowY, titleX, timeX, dotX, wave, buttonW, buttonH, buttonX, buttonY,
       pitchX, pitchY, pitchTravel, bpmX: [mx + 32 * u, mx + mw - 32 * u], topY: my + mh - 15 * u, phaseY: my + mh - 30 * u,
       phaseWidth: Math.min(104 * u, mw * 0.5), knobX, knobY, knobTravel: 90 * u, channelX, channelY, channelTravel,
-      phonesY, meterX: [mid - 9 * u, mid + 9 * u], meterY: my + 110 * u, crossY, crossTravel, filterY, fx,
+      phonesY, meterX: [mid - 9 * u, mid + 9 * u], meterY: channelY, meterH: channelTravel + 8 * u, trimY, crossY, crossTravel, filterY, fx,
     };
     this.platterImg = TINTS.map((t) => platterPicture(r, t, this.dpr));
     this.sheenImg = sheenPicture(r, this.dpr);
@@ -579,6 +588,7 @@ export class Booth {
       case "cross": return this.cross;
       case "eq": return this.eq[k.d][k.band];
       case "filter": return this.filterSetting[k.d];
+      case "trim": return this.trimSetting[k.d];
       case "cueMix": return this.engine.cueMix;
       case "phonesLevel": return this.engine.phonesLevel;
       case "fxAmount": return this.fx.amount;
@@ -665,6 +675,9 @@ export class Booth {
       case "filter":
         if (doubleTap) { this.setFilter(kind.d, 0.5); grab.startValue = 0.5; }
         break;
+      case "trim":
+        if (doubleTap) { this.setTrim(kind.d, 0.5); grab.startValue = 0.5; }
+        break;
       case "phonesLevel":
         // The headphones level's default is unity: as loud as before the knob.
         if (doubleTap) { this.engine.phonesLevel = PHONES_UNITY; grab.startValue = PHONES_UNITY; }
@@ -744,6 +757,9 @@ export class Booth {
       case "filter":
         this.setFilter(k.d, clamp01(grab.startValue + (p.y - grab.start.y) / L.knobTravel));
         break;
+      case "trim":
+        this.setTrim(k.d, clamp01(grab.startValue + (p.y - grab.start.y) / L.knobTravel));
+        break;
       default:
         break;
     }
@@ -786,6 +802,7 @@ export class Booth {
       case "cross": this.cross = clamp01(this.cross - step); this.applyMix(); break;
       case "eq": this.setEQ(kind.d, kind.band, clamp01(this.eq[kind.d][kind.band] + step)); break;
       case "filter": this.setFilter(kind.d, clamp01(this.filterSetting[kind.d] + step)); break;
+      case "trim": this.setTrim(kind.d, clamp01(this.trimSetting[kind.d] + step)); break;
       case "cueMix": this.engine.cueMix = clamp01(this.engine.cueMix + step); break;
       case "phonesLevel": this.engine.phonesLevel = clamp01(this.engine.phonesLevel + step); break;
       case "fxAmount": this.setFxAmount(this.fx.amount + step); break;
@@ -871,6 +888,7 @@ export class Booth {
       case "cross": this.cross = x; this.applyMix(); break;
       case "eq": this.setEQ(k.d, k.band, x); break;
       case "filter": this.setFilter(k.d, x); break;
+      case "trim": this.setTrim(k.d, x); break;
       case "cueMix": this.engine.cueMix = x; break;
       case "phonesLevel": this.engine.phonesLevel = x; break;
       case "fxAmount": this.setFxAmount(x); break;
@@ -924,6 +942,17 @@ export class Booth {
     const v = Math.abs(raw - 0.5) < 0.03 ? 0.5 : raw;
     this.filterSetting[d] = v;
     this.decks[d].setFilter(v);
+  }
+
+  private setTrim(d: number, raw: number): void {
+    this.trimSetting[d] = Math.abs(raw - 0.5) < 0.03 ? 0.5 : raw;
+    this.applyTrim();
+  }
+
+  /** The gain knobs act in free play only; in a lesson or a night every channel is at 0 dB (the knob keeps its place). */
+  private applyTrim(): void {
+    const on = this.lesson === null && this.night === null;
+    for (const d of [0, 1]) this.decks[d].trim = on ? this.trimSetting[d] : 0.5;
   }
 
   private waveProgress(p: Point, d: number): number {
@@ -1008,6 +1037,7 @@ export class Booth {
     // The effect bar comes and goes with free play (a lesson or a night is the iPhone's desk).
     if (this.L && (this.L.fx !== null) !== (this.lesson === null && this.night === null)) this.L = null;
     if (!this.L) this.build();
+    this.applyTrim();
     if (this.L) {
       this.updateFxTime();
       this.moveHands(dt);
@@ -1563,7 +1593,12 @@ export class Booth {
       for (const band of [0, 1, 2]) knob(ctx, L.knobX[d], L.knobY[band], 13 * u, TINTS[d], names[band], this.eq[d][band]);
       fader(ctx, L.channelX[d], L.channelY, { travel: L.channelTravel, vertical: true, capW: 24 * u, capH: 13 * u, tint: TINTS[d], value: this.channel[d], alpha: d === this.deadFader ? 0.4 : 1 });
       button(ctx, L.channelX[d], L.phonesY, 36 * u, 15 * u, "PHONES", Palette.orange, this.phones[d]);
-      meter(ctx, L.meterX[d], L.meterY, 7 * u, 96 * u, Math.min(1, this.meterLevel[d] * 1.15));
+      meter(ctx, L.meterX[d], L.meterY, 7 * u, L.meterH, Math.min(1, this.meterLevel[d] * 1.15));
+      if (L.trimY !== null) {
+        // Free play: the gain knob above the fader; turned, it shows how many dB.
+        const dB = trimDecibels(this.trimSetting[d]);
+        knob(ctx, L.channelX[d], L.trimY, 9 * u, TINTS[d], dB === 0 ? "GAIN" : `${dB > 0 ? "+" : "\u2212"}${Math.abs(Math.round(dB))} dB`, this.trimSetting[d]);
+      }
       if (this.hasFilter) knob(ctx, L.knobX[d], L.filterY, 10 * u, TINTS[d], "FILTER", this.filterSetting[d]);
     }
     // Cue mix, between the PHONES buttons: left = only the cued record, right = only the room.

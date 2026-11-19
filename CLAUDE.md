@@ -251,6 +251,17 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
   PLAY only (no lesson/night: `setTheDesk` forces it off; `build()` reads `lesson/night`, and the booth rebuilds
   when that changes, which also ends a CUE hold). Settings in localStorage `headliner.fx`; always OFF at start.
   The old `echoDelay` in `core/mixer.ts` is the far-speakers mishap (one late copy), not this delay.
+- **Channel GAIN knobs (web only, 19 Nov): a knob above each fader, FREE PLAY only.** For records mastered too loud (own
+  music). `Deck.trim` (0...1, 0.5 = 0 dB; `trimDecibels` in `audio/fx.ts`: -24 dB at the bottom, +6 at the top, 0.03 detent,
+  double tap = 0 dB) goes through the deck's existing needle gain: `Deck.pushGain()` writes `D.targetGain` = `lifted ? 0 :
+  trimGainFor(trim)`, and EVERY write of that field goes through it (the lift, a load, a made record), so a needle drop or a
+  new record never puts it back to 0 dB. That is `core/vinyl.ts`'s own gain glide (5 ms), so nothing in `core/mixer.ts` (the
+  Swift twin) changed, and the trim sits before the EQ, the filter and the fader; the channel meter shows the trimmed level.
+  The knob stays on the deck when a record is loaded (hardware-like). `Booth.applyTrim()` runs every frame: outside free
+  play every channel is at exactly 0 dB (the knob keeps its place, and the layout has no knobs and the old 88-unit
+  faders; in free play the faders are 72 units to make room, `L.trimY`/`L.meterH`). MIDI target `trim:d` (absolute,
+  "LEFT GAIN"), mouse, wheel. `heardGain` (the lessons' and nights' view of the mix) is the fader only, so the trim never
+  changes a verdict. Not remembered between visits or per track (a possible next step: store it with the library track).
 - **My music (web only, 19 Nov): `web/src/library/`, free play only (CRATE -> MY MUSIC; hidden in lessons and nights).**
   Your own files, read in the browser, never uploaded. `showDirectoryPicker` (Chromium; the handle is kept in IndexedDB
   `headliner-library`, a new visit needs one RECONNECT click) with an `<input webkitdirectory>` fallback (this visit only).
