@@ -7,7 +7,7 @@ import { trackId } from "../src/library/search.ts";
 import type { LibraryTrack } from "../src/library/store.ts";
 import type { TrackInfo } from "../src/core/beatgrid.ts";
 
-const item = (artist: string, title: string, over: Partial<WallItem> = {}): WallItem => ({ id: `${artist}|${title}`, title, artist, sub: "", genre: "", bpm: 0, track: null, game: null, fav: false, plays: 0, ...over });
+const item = (artist: string, title: string, over: Partial<WallItem> = {}): WallItem => ({ id: `${artist}|${title}`, title, artist, sub: "", genre: "", bpm: 0, track: null, game: null, fav: false, plays: 0, seconds: 0, type: "", mtime: 0, ...over });
 const track = (name: string, over: Partial<LibraryTrack> = {}): LibraryTrack => ({
   key: `1:${name}`, folder: 1, path: [name], name, ext: "mp3", size: 1, mtime: 1, title: name, artist: "", album: "", genre: "", tagBpm: 0, musicKey: "", camelot: "", ...over,
 });

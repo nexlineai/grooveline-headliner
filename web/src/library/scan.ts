@@ -2,6 +2,7 @@
 // thousand track disk fills the list while you watch. A file whose size and date are unchanged since the
 // last visit is not read again.
 
+import { readSeconds } from "./length.ts";
 import { fromFilename, readTags } from "./tags.ts";
 import type { Source } from "./tags.ts";
 import type { LibraryTrack } from "./store.ts";
@@ -10,7 +11,14 @@ import type { LibraryTrack } from "./store.ts";
 export const AUDIO_EXTENSIONS = new Set(["mp3", "flac", "m4a", "aac", "mp4", "wav", "aif", "aiff", "ogg", "opus"]);
 
 /** Bumped whenever the tag reader learns something (2: ID3v2.4 cover pictures with frame flags, and covers in folders). */
-export const TAGS_VERSION = 2;
+export const TAGS_VERSION = 3;
+
+/** What belongs to YOU and not to the file's tags: it must survive a rescan (a new version of the tag reader, or a file that changed). */
+export const USER_FIELDS = ["grid", "analysis", "cues", "loops", "fav", "plays"] as const;
+export function carryOver(old: LibraryTrack, t: LibraryTrack): void {
+  const o = old as unknown as Record<string, unknown>, n = t as unknown as Record<string, unknown>;
+  for (const k of USER_FIELDS) if (o[k] !== undefined) n[k] = o[k];
+}
 
 export const extensionOf = (name: string): string => (name.includes(".") ? name.split(".").pop()! : "").toLowerCase();
 
@@ -110,10 +118,13 @@ export function fileSource(file: File): Source {
 /** A library track from a file: its tags, and what its name says where the tags do not. */
 export async function trackFromFile(folder: number, path: string[], file: File): Promise<LibraryTrack> {
   const name = path[path.length - 1];
-  const tags = await readTags(fileSource(file));
+  const src = fileSource(file);
+  const tags = await readTags(src);
+  const seconds = await readSeconds(src);
   const guess = fromFilename(name);
   return {
     key: trackKey(folder, path), v: TAGS_VERSION, folder, path, name, ext: extensionOf(name), size: file.size, mtime: file.lastModified,
+    ...(seconds !== undefined ? { seconds } : {}),
     title: tags.title || guess.title, artist: tags.artist || guess.artist || "", album: tags.album ?? "", genre: tags.genre ?? "",
     tagBpm: tags.bpm ?? 0, musicKey: tags.key ?? "", camelot: tags.camelot ?? "", cover: tags.cover,
   };
@@ -143,8 +154,8 @@ export async function scanEntries(folder: number, entries: Entry[], existing: Ma
         const art = e.art?.path;
         if (!old || old.size !== file.size || old.mtime !== file.lastModified || (old.v ?? 1) < TAGS_VERSION) {
           const t = await trackFromFile(folder, e.path, file);
-          // Your corrections and what the analysis found belong to the file: they stay while the file's name does.
-          if (old) { t.grid = old.grid; t.analysis = old.analysis; changed++; } else added++;
+          // Your corrections, hot cues, loops, hearts and plays belong to you, not to the tags: they stay while the file's name does.
+          if (old) { carryOver(old, t); changed++; } else added++;
           if (art) t.art = art;
           pending.push(t);
           if (pending.length >= 100) await flush();

@@ -526,7 +526,7 @@ body.live #wall .d-left { padding-left: 18px; }
   color: var(--ink); border: 1px solid var(--edge); font: 600 calc(var(--ws) * 11px) system-ui, sans-serif; letter-spacing: 0.08em; }
 #wall .w-search:focus { outline: none; border-color: #26c6f0; }
 #wall.listing .w-shelf, #wall.listing .w-floor { display: none; }
-#wall .w-list { display: none; flex: 1; min-height: 0; flex-direction: column; padding: 0 14px 8px; --l-cols: minmax(0, 2fr) minmax(0, 3fr) calc(var(--ws) * 52px) calc(var(--ws) * 44px) minmax(0, 1.3fr) calc(var(--ws) * 62px); }
+#wall .w-list { display: none; flex: 1; min-height: 0; flex-direction: column; padding: 0 14px 8px; --l-cols: minmax(0, 2fr) minmax(0, 3fr) calc(var(--ws) * 46px) calc(var(--ws) * 42px) calc(var(--ws) * 36px) calc(var(--ws) * 44px) calc(var(--ws) * 78px) minmax(0, 1fr) calc(var(--ws) * 86px); }
 #wall.listing .w-list { display: flex; }
 #wall .l-head { flex: none; display: grid; grid-template-columns: var(--l-cols); gap: 10px; padding: 0 8px 4px; border-bottom: 1px solid var(--edge); }
 #wall .l-col { background: none; border: 0; padding: 4px 0; text-align: left; color: var(--dim); font: 700 calc(var(--ws) * 10px) system-ui, sans-serif; letter-spacing: 0.14em; cursor: pointer; }
@@ -546,7 +546,8 @@ body.live #wall .d-left { padding-left: 18px; }
 #wall .l-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #wall .l-artist { color: var(--ink); }
 #wall .l-title { color: rgba(236, 240, 245, 0.8); }
-#wall .l-num, #wall .l-key { color: var(--dim); font-variant-numeric: tabular-nums; }
+#wall .l-num, #wall .l-key, #wall .l-time, #wall .l-type, #wall .l-date { color: var(--dim); font-variant-numeric: tabular-nums; }
+#wall .l-time, #wall .l-date { white-space: nowrap; }
 #wall .l-genre { color: var(--dim); font-size: 0.9em; }
 #wall .mark { display: inline-block; margin-right: 6px; padding: 0 4px; border-radius: 3px; font: 800 0.72em system-ui, sans-serif; font-style: normal; color: #04070a; }
 #wall .mark.a { background: #26c6f0; }

@@ -2,7 +2,7 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { entriesFromFiles, extensionOf, listFolder, scanEntries, trackKey } from "../src/library/scan.ts";
+import { carryOver, entriesFromFiles, extensionOf, listFolder, scanEntries, trackKey } from "../src/library/scan.ts";
 import { MemoryStore } from "../src/library/store.ts";
 import type { LibraryTrack } from "../src/library/store.ts";
 import { buildIndex, filterIndex, labelOf, tempoOf, trackId } from "../src/library/search.ts";
@@ -84,6 +84,28 @@ describe("scanning a folder", () => {
     const r2 = await scanEntries(1, await listFolder(dirHandle(root)), existing, { batch: (l) => { changed.push(...l); } });
     assert.equal(r2.changed, 1);
     assert.deepEqual(changed[0].grid, { bpm: 126.5, firstBeat: 0.25 });
+  });
+
+  test("a rescan (a newer tag reader, or a file that changed) keeps EVERYTHING that is yours: grid, analysis, cues, loops, the heart and the plays; and fills in the length", async () => {
+    const root = await tree();
+    const entries = await listFolder(dirHandle(root));
+    const first: LibraryTrack[] = [];
+    await scanEntries(1, entries, new Map(), { batch: (l) => { first.push(...l); } });
+    const a = first.find((t) => t.name === "a.mp3")!;
+    assert.ok(a.seconds !== undefined && Math.abs(a.seconds - 1.567) < 0.01, `its length is read at the scan: ${a.seconds}`);
+    // The entry is as an older reader left it (version 2, no length), with what you did to it.
+    const old: LibraryTrack = { ...a, v: 2, grid: { bpm: 126.5, firstBeat: 0.25 }, analysis: { bpm: 120, firstBeat: 0.1, confidence: 1 },
+      cues: [1.5, null, 3], loops: [{ start: 2, end: 4 }], fav: true, plays: 7 };
+    delete old.seconds;
+    const again: LibraryTrack[] = [];
+    await scanEntries(1, entries, new Map([[old.key, old]]), { batch: (l) => { again.push(...l); } });
+    const t = again.find((x) => x.name === "a.mp3")!;
+    assert.ok(t, "an entry from an older reader is read again");
+    assert.deepEqual(t.grid, old.grid); assert.deepEqual(t.analysis, old.analysis);
+    assert.deepEqual(t.cues, [1.5, null, 3]); assert.deepEqual(t.loops, [{ start: 2, end: 4 }]);
+    assert.equal(t.fav, true); assert.equal(t.plays, 7);
+    assert.ok(t.seconds !== undefined && t.seconds > 1, "and the length is filled in");
+    assert.equal(carryOver.length, 2);
   });
 
   test("an aborted scan says it is not complete (so nothing is dropped from the index)", async () => {

@@ -5,8 +5,8 @@
 import { byName } from "./crates.ts";
 import type { WallItem } from "./crates.ts";
 
-export type SortKey = "artist" | "title" | "bpm" | "key";
-export const SORT_KEYS: SortKey[] = ["artist", "title", "bpm", "key"];
+export type SortKey = "artist" | "title" | "time" | "bpm" | "key" | "type" | "date";
+export const SORT_KEYS: SortKey[] = ["artist", "title", "time", "bpm", "key", "type", "date"];
 
 const keyOf = (i: WallItem): string => i.track?.camelot ?? i.game?.camelot ?? "";
 
@@ -34,13 +34,17 @@ export function camelotRank(key: string): number {
   return m ? Number(m[1]) * 2 + (m[2].toUpperCase() === "B" ? 1 : 0) : Infinity;
 }
 
-/** A sorted copy. Records with no tempo or no key come last whichever way it runs; ties are broken by name. */
+/** A sorted copy. Records with no tempo, key, length or date come last whichever way it runs; ties are broken by name. */
 export function sortItems(items: WallItem[], by: SortKey, descending = false): WallItem[] {
   const sign = descending ? -1 : 1;
-  const value = (i: WallItem): number => (by === "bpm" ? (i.bpm > 0 ? i.bpm : Infinity) : camelotRank(keyOf(i)));
+  const value = (i: WallItem): number => by === "bpm" ? (i.bpm > 0 ? i.bpm : Infinity) : by === "time" ? (i.seconds > 0 ? i.seconds : Infinity) : by === "date" ? (i.mtime > 0 ? i.mtime : Infinity) : camelotRank(keyOf(i));
   const out = items.slice();
   if (by === "artist") return out.sort((a, b) => sign * byName(a, b));
   if (by === "title") return out.sort((a, b) => sign * (a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: "base" }) || byName(a, b)));
+  if (by === "type") return out.sort((a, b) => {
+    if (!a.type !== !b.type) return a.type ? -1 : 1; // no type (the game's records) last
+    return sign * a.type.localeCompare(b.type) || byName(a, b);
+  });
   return out.sort((a, b) => {
     const x = value(a), y = value(b);
     if (x === y) return byName(a, b);
@@ -79,7 +83,20 @@ const make = <K extends keyof HTMLElementTagNameMap>(tag: K, className = "", tex
 };
 const n = (v: number) => v.toLocaleString("en");
 const SORT_STORE = "headliner.listSort";
-const COLUMNS: [SortKey | null, string][] = [["artist", "ARTIST"], ["title", "TITLE"], ["bpm", "BPM"], ["key", "KEY"], [null, "GENRE"]];
+const COLUMNS: [SortKey | null, string][] = [["artist", "ARTIST"], ["title", "TITLE"], ["time", "TIME"], ["bpm", "BPM"], ["key", "KEY"], ["type", "TYPE"], ["date", "DATE"], [null, "GENRE"]];
+
+/** 3:45, or 1:02:09 over an hour; nothing when the length is not known. */
+export function clockOf(seconds: number): string {
+  if (!(seconds > 0)) return "";
+  const s = Math.round(seconds), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}` : `${m}:${String(r).padStart(2, "0")}`;
+}
+/** The file's date as 2026-11-19 (the day it was last written, in your time zone); nothing when there is none. */
+export function dateOf(ms: number): string {
+  if (!(ms > 0)) return "";
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 export function buildList(host: HTMLElement, hooks: ListHooks): ListView {
   let all: WallItem[] = [];
@@ -101,7 +118,7 @@ export function buildList(host: HTMLElement, hooks: ListHooks): ListView {
       const c = make("button", by === sort.by ? "l-col on" : "l-col", name + (by === sort.by ? (sort.descending ? " ▾" : " ▴") : ""));
       c.type = "button";
       if (by) c.addEventListener("click", () => {
-        sort = by === sort.by ? { by, descending: !sort.descending } : { by, descending: false };
+        sort = by === sort.by ? { by, descending: !sort.descending } : { by, descending: by === "date" }; // the newest files first
         try { localStorage.setItem(SORT_STORE, JSON.stringify(sort)); } catch { /* private window */ }
         apply();
       });
@@ -138,8 +155,9 @@ export function buildList(host: HTMLElement, hooks: ListHooks): ListView {
       for (const d of on) who.append(make("i", d === 0 ? "mark a" : "mark b", d === 0 ? "A" : "B"));
       who.append(item.artist || "—");
       const genre = item.genre || "";
-      row.append(who, make("span", "l-title", item.title), make("span", "l-num", item.bpm > 0 ? (Number.isInteger(item.bpm) ? String(item.bpm) : item.bpm.toFixed(1)) : ""),
-                 make("span", "l-key", keyOf(item)), make("span", "l-genre", genre));
+      row.append(who, make("span", "l-title", item.title), make("span", "l-time", clockOf(item.seconds)),
+                 make("span", "l-num", item.bpm > 0 ? (Number.isInteger(item.bpm) ? String(item.bpm) : item.bpm.toFixed(1)) : ""),
+                 make("span", "l-key", keyOf(item)), make("span", "l-type", item.type), make("span", "l-date", dateOf(item.mtime)), make("span", "l-genre", genre));
       const buttons = make("span", "l-load");
       if (hooks.toggleFav) {
         const heart = make("button", "heart" + (item.fav ? " on" : ""), "\u2665");

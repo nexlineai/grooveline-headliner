@@ -1,7 +1,7 @@
 // The LIVE library's list: what a search matches and how the columns sort (library/browse.ts, no browser).
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { camelotRank, filterItems, sortItems } from "../src/library/browse.ts";
+import { SORT_KEYS, camelotRank, clockOf, dateOf, filterItems, sortItems } from "../src/library/browse.ts";
 import type { WallItem } from "../src/library/crates.ts";
 import type { LibraryTrack } from "../src/library/store.ts";
 
@@ -9,7 +9,7 @@ const track = (over: Partial<LibraryTrack> = {}): LibraryTrack => ({
   key: "1:x", folder: 1, path: ["x"], name: "x.mp3", ext: "mp3", size: 1, mtime: 1, title: "x", artist: "", album: "", genre: "", tagBpm: 0, musicKey: "", camelot: "", ...over,
 });
 const item = (artist: string, title: string, o: { bpm?: number; key?: string; genre?: string; album?: string; name?: string } = {}): WallItem => ({
-  id: `${artist}|${title}`, title, artist, sub: [o.bpm ? `${o.bpm} BPM` : "", o.key ?? "", o.genre ?? ""].filter(Boolean).join(" · "), genre: o.genre ?? "", bpm: o.bpm ?? 0, fav: false, plays: 0,
+  id: `${artist}|${title}`, title, artist, sub: [o.bpm ? `${o.bpm} BPM` : "", o.key ?? "", o.genre ?? ""].filter(Boolean).join(" · "), genre: o.genre ?? "", bpm: o.bpm ?? 0, fav: false, plays: 0, seconds: 0, type: "", mtime: 0,
   track: track({ camelot: o.key ?? "", album: o.album ?? "", name: o.name ?? `${title}.mp3` }), game: null,
 });
 
@@ -75,5 +75,31 @@ describe("sorting the columns", () => {
     const out = sortItems(LIB, "bpm");
     assert.notEqual(out, LIB);
     assert.deepEqual(LIB, copy);
+  });
+});
+
+describe("the length, the type and the date", () => {
+  const rec = (title: string, o: Partial<WallItem>): WallItem => ({ ...item("a", title), ...o });
+  test("a length reads as m:ss, h:mm:ss over an hour, and nothing when it is not known", () => {
+    assert.equal(clockOf(0), ""); assert.equal(clockOf(NaN), "");
+    assert.equal(clockOf(59.6), "1:00"); assert.equal(clockOf(225), "3:45"); assert.equal(clockOf(3600), "1:00:00"); assert.equal(clockOf(3729), "1:02:09");
+  });
+  test("a date reads as year-month-day, and nothing when there is none", () => {
+    assert.equal(dateOf(0), "");
+    const d = new Date(2026, 10, 19, 15, 30).getTime();
+    assert.equal(dateOf(d), "2026-11-19");
+    assert.equal(dateOf(new Date(2025, 0, 5).getTime()), "2025-01-05");
+  });
+  test("TIME sorts short to long with the unknown last, whichever way; TYPE sorts by name with no type last; DATE by the file's date", () => {
+    const list = [rec("c", { seconds: 300, type: "MP3", mtime: 3000 }), rec("a", { seconds: 0, type: "", mtime: 0 }), rec("b", { seconds: 100, type: "FLAC", mtime: 1000 }), rec("d", { seconds: 200, type: "M4A", mtime: 2000 })];
+    assert.deepEqual(sortItems(list, "time").map((i) => i.title), ["b", "d", "c", "a"]);
+    assert.deepEqual(sortItems(list, "time", true).map((i) => i.title), ["c", "d", "b", "a"]);
+    assert.deepEqual(sortItems(list, "type").map((i) => i.title), ["b", "d", "c", "a"]);
+    assert.deepEqual(sortItems(list, "type", true).map((i) => i.title), ["c", "d", "b", "a"]);
+    assert.deepEqual(sortItems(list, "date").map((i) => i.title), ["b", "d", "c", "a"]);
+    assert.deepEqual(sortItems(list, "date", true).map((i) => i.title), ["c", "d", "b", "a"]);
+  });
+  test("every column but the genre can be sorted", () => {
+    assert.deepEqual(SORT_KEYS, ["artist", "title", "time", "bpm", "key", "type", "date"]);
   });
 });

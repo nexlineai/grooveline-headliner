@@ -189,6 +189,7 @@ export function buildWall(root: HTMLElement, lib: Library, sleeves: Sleeves, hoo
       group.append(b);
     }
     topLeft.append(group, pill("SHUFFLE", "mini w-shuffle", () => { shuffled = true; picks = pickRandom(items.length ? items : gameItems, MAX_PICKS); drawShelf(); }, "Another handful of records for the wall"));
+    if (lib.folders.some((f) => f.handle)) topLeft.append(pill("RESCAN", "mini w-rescan", () => { lib.rescanAll().catch(() => {}); }, "Look through your folders again: new files, changed ones, files that are gone; lengths and dates are read"));
     if (hooks.toRoom) topLeft.append(pill("ROOM", "mini w-room", () => hooks.toRoom!(), "Show the crowd instead of the wall"));
     // What the library is doing: reading, or waiting for a click.
     const s = lib.scan;

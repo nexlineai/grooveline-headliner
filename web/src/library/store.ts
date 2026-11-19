@@ -46,6 +46,8 @@ export interface LibraryTrack {
   /** A favourite (the heart), and how many times it was played for a while on a deck: the wall's shelf shows these first. */
   fav?: boolean;
   plays?: number;
+  /** How long the file is, read from its header when the track was scanned (library/length.ts; absent: the format cannot be read, or not scanned since). */
+  seconds?: number;
 }
 
 export interface LibraryStore {

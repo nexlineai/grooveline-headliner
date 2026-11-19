@@ -22,6 +22,10 @@ export interface WallItem {
   /** A favourite of yours, and how often it was played (the game's records: neither). */
   fav: boolean;
   plays: number;
+  /** For the list's columns: the length in seconds (0: not known), the file type ("MP3"; the game's records: ""), and the file's date (ms; 0: none). */
+  seconds: number;
+  type: string;
+  mtime: number;
 }
 
 export function itemOfTrack(t: LibraryTrack): WallItem {
@@ -29,6 +33,7 @@ export function itemOfTrack(t: LibraryTrack): WallItem {
   return {
     id: trackId(t), title: t.title || t.name, artist: t.artist, sub: [l.sub.split(" · ").slice(0, 2).join(" · "), t.genre].filter(Boolean).join(" · "),
     genre: t.genre.trim(), bpm: tempoOf(t), track: t, game: null, fav: !!t.fav, plays: t.plays ?? 0,
+    seconds: t.seconds ?? 0, type: (t.ext || "").toUpperCase(), mtime: t.mtime || 0,
   };
 }
 
@@ -36,6 +41,7 @@ export function itemOfGame(info: TrackInfo): WallItem {
   return {
     id: info.id, title: info.title, artist: info.artist, sub: [`${info.bpm} BPM`, info.camelot, info.genre].filter(Boolean).join(" · "),
     genre: info.genre, bpm: info.bpm, track: null, game: info, fav: false, plays: 0,
+    seconds: info.seconds || 0, type: "", mtime: 0,
   };
 }
 

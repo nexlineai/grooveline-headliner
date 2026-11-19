@@ -1,7 +1,7 @@
 // Your own music: the folders you opened, the tracks found in them, and what is needed to open one. The
 // page asks it for tracks; the panel draws it. Files are read in this browser only, never sent anywhere.
 
-import { entriesFromFiles, listFolder, scanEntries, trackKey } from "./scan.ts";
+import { TAGS_VERSION, entriesFromFiles, listFolder, scanEntries, trackKey } from "./scan.ts";
 import type { Entry } from "./scan.ts";
 import { buildIndex } from "./search.ts";
 import type { Indexed } from "./search.ts";
@@ -48,6 +48,22 @@ export class Library {
     this.reindex();
     await this.checkAccess();
     this.notify();
+    // Tracks an older tag reader read (no length yet, say) are read again in the background, once, when the browser lets us without asking.
+    this.refreshOld().catch(() => {});
+  }
+
+  /** Looks again through every folder that holds tracks read by an older version of the tag reader. */
+  async refreshOld(): Promise<void> {
+    for (const f of [...this.folders]) {
+      if (!f.handle || this.needsAccess.has(f.id)) continue;
+      if (!this.tracks.some((t) => t.folder === f.id && (t.v ?? 1) < TAGS_VERSION)) continue;
+      await this.rescan(f);
+    }
+  }
+
+  /** Looks through every folder again (new files, changed ones, gone ones). */
+  async rescanAll(): Promise<void> {
+    for (const f of [...this.folders]) if (f.handle) await this.rescan(f);
   }
 
   /** Calls `fn` whenever the library changes (a scan step, a folder added or removed). Returns a way to stop. */
