@@ -43,6 +43,9 @@ export interface LibraryTrack {
   /** The hot cues (seconds, null = empty) and the saved loops of LIVE's pads: kept with the track. */
   cues?: (number | null)[];
   loops?: ({ start: number; end: number } | null)[];
+  /** A favourite (the heart), and how many times it was played for a while on a deck: the wall's shelf shows these first. */
+  fav?: boolean;
+  plays?: number;
 }
 
 export interface LibraryStore {

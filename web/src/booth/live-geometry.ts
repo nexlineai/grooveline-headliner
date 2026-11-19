@@ -20,13 +20,16 @@ const GEAR_H = 300;
 const DECK_MIN = 296, MIXER_W = 226, FX_W = 92, GAP = 5.333;
 /** The knobs of the mixer strips and of the effect unit are all this size (units). */
 export const KNOB_R = 11;
+/** The right of a deck's header (time, lamps, key, tempo) takes this many units; the title stops before it. */
+export const HEADER_RIGHT = 134;
 
 export interface LiveDeckGeometry {
   rect: Rect;
   /** Where the title starts (left aligned, baseline), and how wide it may be. */
   title: Point; titleMax: number;
-  /** Remaining time (right aligned) and the four beat lamps. */
-  time: Point; lamps: Point[];
+  /** The right of the header, left to right: the time left (right aligned), the four lamps that count the bar, the key (right aligned, a smaller
+   * type than the tempo) and the tempo (right aligned, at the corner). `titleMax` is where the title must stop: left of the time. */
+  time: Point; lamps: Point[]; key: Point; bpm: Point;
   /** The zoomable waveform (it scrolls with the record), the strip of the WHOLE record under it (a touch there drops the needle),
    * and the two zoom buttons over the corner of the big one. */
   zoom: Rect; wave: Rect; zoomIn: Rect; zoomOut: Rect;
@@ -46,16 +49,18 @@ export interface LiveDeckGeometry {
 
 export interface LiveStrip {
   x: number;
-  /** TRIM, HI, MID, LOW, FILTER from the top. */
+  /** GAIN, HI, MID, LOW from the top, then FILTER, which sits UNDER the fader (the fifth). */
   knobY: number[]; knobR: number;
+  /** Where the FILTER's name goes (between the fader and the knob). */
+  filterLabelY: number;
   cue: Point; cueW: number; cueH: number;
   fader: { x: number; y: number; travel: number };
 }
 
 export interface LiveMixerGeometry {
   rect: Rect;
-  /** The tempo of each deck at the top corners, the key right under it (the same size). */
-  bpm: Point[]; key: Point[]; phase: { c: Point; w: number };
+  /** Where deck B's beat falls against deck A's. */
+  phase: { c: Point; w: number };
   strip: LiveStrip[];
   /** The middle column. */
   mid: { x: number; master: Point; masterR: number; meterX: number[]; meter: { y: number; h: number; w: number };
@@ -128,8 +133,8 @@ function deckGeometry(rect: Rect, u: number): LiveDeckGeometry {
   const padW = (w - 16 - 7 * 3) / 8;
   return {
     rect,
-    title: P(8, 11), titleMax: (w - 8 - 58 - 14) * u,
-    time: P(w - 52, 11), lamps: [0, 1, 2, 3].map((i) => P(w - 36 + i * 9, 11)),
+    title: P(8, 11), titleMax: (w - 8 - HEADER_RIGHT - 6) * u,
+    time: P(w - 104, 11), lamps: [0, 1, 2, 3].map((i) => P(w - 96 + i * 8, 11)), key: P(w - 45, 11), bpm: P(w - 8, 11),
     zoom: { x: rect.x + 8 * u, y: top - 76 * u, w: rect.w - 16 * u, h: 56 * u },
     wave: { x: rect.x + 8 * u, y: top - 90 * u, w: rect.w - 16 * u, h: 11 * u },
     zoomOut: { x: rect.x + (w - 8 - 31) * u, y: top - 33 * u, w: 14 * u, h: 12 * u },
@@ -169,13 +174,13 @@ function mixerGeometry(rect: Rect, u: number): LiveMixerGeometry {
   const centre = w / 2;
   const strip = [43, w - 43].map((cx): LiveStrip => ({
     x: rect.x + cx * u,
-    knobY: [40, 72, 104, 136, 168].map((dy) => top - dy * u), knobR: KNOB_R * u,
-    cue: P(cx, 196), cueW: 44 * u, cueH: 14 * u,
-    fader: { x: rect.x + cx * u, y: top - 252 * u, travel: 74 * u },
+    knobY: [24, 58, 92, 126, 282].map((dy) => top - dy * u), knobR: KNOB_R * u, filterLabelY: top - 260 * u,
+    cue: P(cx, 162), cueW: 44 * u, cueH: 14 * u,
+    fader: { x: rect.x + cx * u, y: top - 212 * u, travel: 64 * u },
   }));
   return {
     rect,
-    bpm: [P(8, 11), P(w - 8, 11)], key: [P(8, 24), P(w - 8, 24)], phase: { c: P(centre, 11), w: 70 * u },
+    phase: { c: P(centre, 11), w: 70 * u },
     strip,
     mid: {
       x: rect.x + centre * u, master: P(centre, 42), masterR: 12.5 * u,

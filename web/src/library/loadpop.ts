@@ -9,6 +9,8 @@ export interface LoadPopHooks {
   load(deck: number, item: WallItem): void;
   /** True while a deck plays and cannot take a record. */
   busy?(deck: number): boolean;
+  /** The heart. */
+  toggleFav?(item: WallItem): void;
 }
 
 export interface LoadPop {
@@ -35,9 +37,15 @@ export function createLoadPop(hooks: LoadPopHooks): LoadPop {
   el.setAttribute("aria-label", "Load this record on a deck");
   const title = document.createElement("b");
   const artist = document.createElement("i");
+  const names = document.createElement("div");
+  names.className = "lp-names";
+  names.append(title, artist);
+  const heart = document.createElement("button");
+  heart.type = "button";
+  heart.className = "lp-heart";
   const head = document.createElement("div");
   head.className = "lp-title";
-  head.append(title, artist);
+  head.append(names, ...(hooks.toggleFav ? [heart] : []));
   const ask = document.createElement("p");
   ask.className = "lp-ask";
   ask.textContent = "LOAD ON";
@@ -61,6 +69,14 @@ export function createLoadPop(hooks: LoadPopHooks): LoadPop {
   let item: WallItem | null = null;
   let isOpen = false;
   const hide = (): void => { if (!isOpen) return; isOpen = false; el.classList.remove("open"); el.hidden = true; item = null; };
+  heart.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (!item || !hooks.toggleFav) return;
+    item.fav = !item.fav; // the popup shows it at once; the page saves it and the wall follows
+    hooks.toggleFav(item);
+    paintHeart();
+  });
+  const paintHeart = (): void => { heart.textContent = "\u2665"; heart.classList.toggle("on", !!item?.fav); heart.title = item?.fav ? "Remove from your favourites" : "Add to your favourites"; };
   buttons.forEach(({ b }, d) => b.addEventListener("click", (e) => { e.stopPropagation(); const it = item; hide(); if (it) hooks.load(d, it); }));
   document.addEventListener("pointerdown", (e) => { if (isOpen && !el.contains(e.target as Node)) hide(); }, true);
   document.addEventListener("keydown", (e) => { if (isOpen && e.key === "Escape") { e.preventDefault(); hide(); } });
@@ -72,6 +88,7 @@ export function createLoadPop(hooks: LoadPopHooks): LoadPop {
       item = it;
       title.textContent = it.title;
       artist.textContent = it.artist || it.sub || "";
+      paintHeart();
       buttons.forEach(({ b, sub }, d) => { const busy = hooks.busy?.(d) ?? false; b.classList.toggle("busy", busy); sub.textContent = busy ? "PLAYING" : d === 0 ? "DECK A" : "DECK B"; });
       el.hidden = false;
       isOpen = true;

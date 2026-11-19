@@ -19,20 +19,23 @@ export interface WallItem {
   /** Own music: where the cover comes from. Null for the game's records (they get a sleeve made from the name). */
   track: LibraryTrack | null;
   game: TrackInfo | null;
+  /** A favourite of yours, and how often it was played (the game's records: neither). */
+  fav: boolean;
+  plays: number;
 }
 
 export function itemOfTrack(t: LibraryTrack): WallItem {
   const l = labelOf(t);
   return {
     id: trackId(t), title: t.title || t.name, artist: t.artist, sub: [l.sub.split(" · ").slice(0, 2).join(" · "), t.genre].filter(Boolean).join(" · "),
-    genre: t.genre.trim(), bpm: tempoOf(t), track: t, game: null,
+    genre: t.genre.trim(), bpm: tempoOf(t), track: t, game: null, fav: !!t.fav, plays: t.plays ?? 0,
   };
 }
 
 export function itemOfGame(info: TrackInfo): WallItem {
   return {
     id: info.id, title: info.title, artist: info.artist, sub: [`${info.bpm} BPM`, info.camelot, info.genre].filter(Boolean).join(" · "),
-    genre: info.genre, bpm: info.bpm, track: null, game: info,
+    genre: info.genre, bpm: info.bpm, track: null, game: info, fav: false, plays: 0,
   };
 }
 
@@ -132,4 +135,12 @@ export function pickRandom(items: WallItem[], n: number, rand: () => number = Ma
   if (withArt.length >= n) return withArt.slice(0, n);
   const others = shuffle(items.filter((i) => !withArt.includes(i)));
   return [...withArt, ...others].slice(0, n);
+}
+
+/** The records the shelf shows before any random ones: your favourites (the most played first), then the most played of the rest. */
+export function rankShelf(items: WallItem[], n: number): WallItem[] {
+  const byPlays = (a: WallItem, b: WallItem) => b.plays - a.plays || a.title.localeCompare(b.title);
+  const favs = items.filter((i) => i.fav).sort(byPlays);
+  const played = items.filter((i) => !i.fav && i.plays > 0).sort(byPlays);
+  return [...favs, ...played].slice(0, n);
 }

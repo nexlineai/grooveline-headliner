@@ -3,6 +3,9 @@
 //   ?lesson=<id>[&step=<n>]   start straight in a lesson
 //   ?night=<id>[&length=<s>]  start straight in a night (a short length for tests)
 //   ?demo                     free play with both records turning (screenshots)
+//   ?live                     the page opens on one button: LIVE (the link for the website)
+//   &playcount=<s>            how many seconds make a play (30), for the tests
+//   ?autostart&live[&records] straight into LIVE (screenshots, tests); &records puts the game's first two records on the decks
 //   ?autostart                no click needed (screenshots; the browser must allow sound)
 //   ?unlockAll=1|0            the hidden unlock, for tests
 
@@ -40,6 +43,7 @@ import { KEYS, attachKeys } from "./input/keys.ts";
 import { MidiInput } from "./input/midi.ts";
 import type { Binding, TargetKind } from "./input/midi.ts";
 import { Credits } from "./game/credits.ts";
+import { createShare } from "./share.ts";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const engine = new DeckEngine();
@@ -118,8 +122,10 @@ const wall = buildWall($("wall"), library, bigSleeves, {
   },
   onDeck: (item) => [0, 1].filter((d) => engine.decks[d].info?.id === item.id),
   openFolder: openMusicFolder,
-  game: () => gameRecords,
+  game: () => [], // LIVE's library is your own music: the game's records stay in the game
   busy: (d) => booth.mode === "live" && engine.decks[d].motorOn && Math.abs(engine.decks[d].rate) > 0.1,
+  // The heart: kept with the track; the wall's shelf shows favourites (and what you play most) first.
+  toggleFav: (item) => { const t = item.track; if (!t) return; t.fav = !t.fav; library.update(t).catch(() => {}); wall.refresh(); },
 });
 /** The library track on each deck (null: a record of the game, or nothing). */
 const userOnDeck: (LibraryTrack | null)[] = [null, null];
@@ -159,6 +165,7 @@ async function loadUserTrack(d: number, t: LibraryTrack): Promise<void> {
     };
     deck.loadDecoded(info, audio, grid ?? undefined);
     userOnDeck[d] = t;
+    playedFor[d] = 0; counted[d] = false;
     // Its hot cues and saved loops come back, and what is set or cleared from now on is kept with the track.
     deck.setMarks({ cues: t.cues, loops: t.loops });
     deck.onMarks = () => { const m = deck.marks(); t.cues = m.cues; t.loops = m.loops; library.update(t).catch(() => {}); };
@@ -280,7 +287,9 @@ function ensureStarted(): Promise<void> {
   return starting;
 }
 
-const failed = (e: unknown) => { note.textContent = String(e); console.error(e); };
+const failed = (e: unknown) => { note.textContent = String(e).replace(/^Error: /, ""); console.error(e); };
+// A message too long for its place is cut short on the page; the whole of it shows when the pointer rests on it.
+new MutationObserver(() => { note.title = note.textContent ?? ""; }).observe(note, { childList: true, characterData: true, subtree: true });
 
 /** The links for tests and screenshots. */
 async function autostart(): Promise<void> {
@@ -289,6 +298,7 @@ async function autostart(): Promise<void> {
   title.hidden = true;
   if (lesson) await startLesson(lesson, Number(params.get("step") ?? 0));
   else if (night) await startNight(night, Number(params.get("length") ?? 0) || null);
+  else if (params.has("live")) await openLive();
   else {
     await openFreePlay();
     if (params.has("demo")) booth.demo();
@@ -302,10 +312,10 @@ const newestFirst = (list: TrackInfo[]) =>
   list.map((t, i) => ({ t, i })).sort((x, y) => (y.t.chapter ?? 1) - (x.t.chapter ?? 1) || x.i - y.i).map((x) => x.t);
 const upTo = (chapter: number) => newestFirst(tracks.filter((t) => (t.chapter ?? 1) <= chapter && t.id !== "white-label"));
 
-function showMode(mode: "free" | "lesson" | "night" | "story" | "menu"): void {
-  // Free play is LIVE (the DJ's booth); lessons and nights are the game's (the iPhone's desk).
-  if (mode === "free") booth.setMode("live");
-  else if (mode === "lesson" || mode === "night") booth.setMode("game");
+function showMode(mode: "free" | "live" | "lesson" | "night" | "story" | "menu"): void {
+  // LIVE is the DJ's booth; free play, lessons and nights are the game's (the iPhone's desk, with its room).
+  if (mode === "live") booth.setMode("live");
+  else if (mode === "free" || mode === "lesson" || mode === "night") booth.setMode("game");
   setMenuMusic(mode === "menu");
   lessonOverlay.hidden = mode !== "lesson";
   nightOverlay.hidden = mode !== "night";
@@ -344,9 +354,6 @@ const firstGesture = () => { if (menuWanted && menuMusic?.paused !== false) setM
 window.addEventListener("pointerdown", firstGesture);
 window.addEventListener("keydown", firstGesture);
 
-/** MERIDIAN played (it has a star) or its ending seen. */
-const careerOver = () => (progress.stars["meridian"] ?? 0) > 0 || progress.seen.includes("meridian-end");
-
 function showTitle(): void {
   sequence = null;
   booth.clearSession();
@@ -354,8 +361,12 @@ function showTitle(): void {
   showMode("menu");
   chapterScreen.hidden = true;
   title.hidden = false;
-  $("title-ending").hidden = !(careerOver() || Progress.unlockedAll());
+  title.classList.toggle("live-link", liveLink);
+  title.querySelector<HTMLElement>(".live-note")!.hidden = !liveLink;
 }
+
+/** The page was opened by a link to LIVE (?live): the title offers just that, until you leave it. */
+let liveLink = params.has("live") && !params.has("autostart");
 
 function openChapter(n: number): void {
   if (!content) return;
@@ -377,11 +388,8 @@ $("title-play").addEventListener("click", () => {
   // The chapter you are up to.
   ensureStarted().then(() => openChapter(Progress.current(progress, content!.career.chapters))).catch(failed);
 });
-$("title-free").addEventListener("click", () => { ensureStarted().then(() => openFreePlay()).catch(failed); });
-$("title-ending").addEventListener("click", () => {
-  // Once the career is over: Lia, the credits and zdB's record again.
-  ensureStarted().then(() => playScreens([{ type: "story", id: "meridian-end" }, { type: "credits" }])).catch(failed);
-});
+$("title-free").addEventListener("click", () => { liveLink = false; ensureStarted().then(() => openFreePlay()).catch(failed); });
+$("title-live").addEventListener("click", () => { liveLink = false; ensureStarted().then(() => openLive()).catch(failed); });
 
 // Zé's hidden unlock, as on the iPhone: hold the Grooveline logo three seconds.
 {
@@ -394,7 +402,6 @@ $("title-ending").addEventListener("click", () => {
       toast.textContent = Progress.unlockedAll() ? "EVERY CHAPTER OPEN" : "CHAPTERS IN ORDER";
       toast.hidden = false;
       setTimeout(() => { toast.hidden = true; }, 2000);
-      $("title-ending").hidden = !(careerOver() || Progress.unlockedAll());
       timer = null;
     }, 3000);
   });
@@ -404,6 +411,18 @@ $("title-ending").addEventListener("click", () => {
 }
 
 // MARK: - Free play and the crate
+
+/** LIVE: the DJ's booth. Its library is your own music only; the decks start empty (the game's records stay in the game). */
+async function openLive(): Promise<void> {
+  showMode("live");
+  sequence = null;
+  booth.clearSession();
+  midi.resetTakeover();
+  $("crate-button").hidden = true; // the wall under the gear row is LIVE's crate
+  $("jingle-button").hidden = true;
+  // For the page tests: the first two records of the game on the decks, so there is something to play.
+  if (params.has("records") && (!engine.decks[0].isLoaded || !engine.decks[1].isLoaded)) await Promise.all([loadRecord(0, tracks[0]), loadRecord(1, tracks[1])]);
+}
 
 async function openFreePlay(): Promise<void> {
   showMode("free");
@@ -740,6 +759,7 @@ $("crate-close").addEventListener("click", () => { crate.hidden = true; });
 $("phones-close").addEventListener("click", () => { phonesPanel.hidden = true; });
 $("jingle-button").addEventListener("click", playJingle);
 $("controls-button").addEventListener("click", () => { fillControls(); toggle($("controls")); });
+createShare($("share-button")); // LIVE's SHARE: copy the link, the share sheet, a few networks
 
 // FULLSCREEN: the whole page (the booth redraws to the new size by itself). Not offered where the
 // browser has none (iPhone Safari).
@@ -1003,7 +1023,19 @@ const boothActive = () => title.hidden && chapterScreen.hidden && $("story").hid
 midi.active = boothActive;
 
 // LIVE's own parts (the wall under the gear row, the stream panel, the top bar's title) show while the booth is in LIVE and on screen.
+// A record counts as played once it has run for half a minute on a deck (the wall's "most played").
+const playedFor = [0, 0], counted = [false, false];
+const PLAY_COUNT_SECONDS = Number(params.get("playcount")) || 30; // ?playcount=2 for the tests
+let lastTick = performance.now();
 (function liveLoop() {
+  const now = performance.now(), dt = Math.min(1, (now - lastTick) / 1000);
+  lastTick = now;
+  for (const d of [0, 1]) {
+    const t = userOnDeck[d], deck = engine.decks[d];
+    if (!t || counted[d] || booth.mode !== "live") continue;
+    if (deck.motorOn && deck.rate > 0.3) playedFor[d] += dt;
+    if (playedFor[d] >= PLAY_COUNT_SECONDS) { counted[d] = true; t.plays = (t.plays ?? 0) + 1; library.update(t).catch(() => {}); wall.refresh(); }
+  }
   const live = booth.mode === "live" && boothActive();
   wall.setVisible(live);
   $("stream").hidden = !live;

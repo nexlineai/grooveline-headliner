@@ -59,6 +59,8 @@ export interface LabelStyle {
   align?: CanvasTextAlign;
   /** Squeeze the text to this width when it is wider. */
   maxWidth?: number;
+  /** With `maxWidth`: cut the text short with an ellipsis instead of squeezing it. */
+  ellipsis?: boolean;
   spacing?: number;
 }
 
@@ -73,9 +75,16 @@ export function label(ctx: Ctx, text: string, x: number, y: number, s: LabelStyl
   ctx.textAlign = s.align ?? "center";
   ctx.textBaseline = "middle";
   if (s.spacing) ctx.letterSpacing = `${s.spacing}px`;
-  const width = ctx.measureText(text).width;
+  let width = ctx.measureText(text).width;
+  if (s.ellipsis && s.maxWidth && width > s.maxWidth && s.maxWidth > 0) {
+    // Cut short with an ellipsis (a long title must not run into what is beside it).
+    let lo = 0, hi = text.length;
+    while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (ctx.measureText(text.slice(0, mid).trimEnd() + "\u2026").width <= s.maxWidth) lo = mid; else hi = mid - 1; }
+    text = text.slice(0, lo).trimEnd() + "\u2026";
+    width = ctx.measureText(text).width;
+  }
   // Squeezed around its anchor (the text's left, right or centre stays where it is).
-  if (s.maxWidth && width > s.maxWidth && s.maxWidth > 0) ctx.scale(s.maxWidth / width, s.maxWidth / width);
+  else if (s.maxWidth && width > s.maxWidth && s.maxWidth > 0) ctx.scale(s.maxWidth / width, s.maxWidth / width);
   ctx.fillText(text, 0, 0);
   ctx.restore();
   return Math.min(width, s.maxWidth ?? width);

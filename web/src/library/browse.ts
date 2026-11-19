@@ -57,6 +57,8 @@ export interface ListHooks {
   onDeck(item: WallItem): number[];
   /** A click on the row itself (not on its A or B button): the page asks on which deck. */
   ask?(item: WallItem, anchor: { x: number; y: number; w: number; h: number }): void;
+  /** The heart at the start of the row's buttons. */
+  toggleFav?(item: WallItem): void;
 }
 
 export interface ListView {
@@ -129,7 +131,7 @@ export function buildList(host: HTMLElement, hooks: ListHooks): ListView {
     for (let i = first; i < last; i++) {
       const item = shown[i];
       const on = hooks.onDeck(item);
-      const row = make("div", "l-row" + (on.length ? " on" : ""));
+      const row = make("div", "l-row" + (on.length ? " on" : "") + (on.includes(0) ? " ona" : "") + (on.includes(1) ? " onb" : ""));
       row.style.top = `${i * rowH}px`;
       row.style.height = `${rowH}px`;
       const who = make("span", "l-artist");
@@ -139,6 +141,13 @@ export function buildList(host: HTMLElement, hooks: ListHooks): ListView {
       row.append(who, make("span", "l-title", item.title), make("span", "l-num", item.bpm > 0 ? (Number.isInteger(item.bpm) ? String(item.bpm) : item.bpm.toFixed(1)) : ""),
                  make("span", "l-key", keyOf(item)), make("span", "l-genre", genre));
       const buttons = make("span", "l-load");
+      if (hooks.toggleFav) {
+        const heart = make("button", "heart" + (item.fav ? " on" : ""), "\u2665");
+        heart.type = "button";
+        heart.title = item.fav ? "Remove from your favourites" : "Add to your favourites";
+        heart.addEventListener("click", () => hooks.toggleFav!(item));
+        buttons.append(heart);
+      }
       for (const d of [0, 1]) {
         const b = make("button", d === 0 ? "left" : "right", d === 0 ? "A" : "B");
         b.type = "button";

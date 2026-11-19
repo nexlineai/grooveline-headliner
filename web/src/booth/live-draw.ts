@@ -311,12 +311,15 @@ export class LiveRenderer {
     // The deck's badge, then the record.
     roundRect(ctx, centred(G.title.x + 7 * u, G.title.y, 14 * u, 13 * u), 2.5 * u, rgba(tint, 0.95));
     label(ctx, d === 0 ? "A" : "B", G.title.x + 7 * u, G.title.y + 0.3, { size: 9 * u, color: "#04070a", spacing: 0 });
-    label(ctx, info ? `${info.artist.toUpperCase()}  ·  ${info.title.toUpperCase()}` : "NO RECORD", G.title.x + 20 * u, G.title.y, { size: 9 * u, color: LIVE.ink, align: "left", maxWidth: G.titleMax - 20 * u, spacing: 0.5 * u });
+    label(ctx, info ? `${info.artist.toUpperCase()}  ·  ${info.title.toUpperCase()}` : "NO RECORD", G.title.x + 20 * u, G.title.y, { size: 9 * u, color: LIVE.ink, align: "left", maxWidth: G.titleMax - 20 * u, ellipsis: true, spacing: 0.5 * u });
     const drop = v.dropAt[d];
     const timeText = drop !== null ? clock(drop * deck.duration) : deck.isLoaded ? "-" + clock(Math.max(0, deck.duration - seconds)) : "";
     label(ctx, timeText, G.time.x, G.time.y, { size: 9 * u, color: drop !== null ? LIVE.ink : LIVE.dim, mono: true, align: "right" });
     const beatNow = deck.grid.beatInBar(seconds), flash = 1 - deck.grid.phase(seconds);
     for (let i = 0; i < 4; i++) circle(ctx, G.lamps[i].x, G.lamps[i].y, 2.5 * u, rgba(tint, moving && i === beatNow ? 0.35 + 0.65 * flash : 0.16));
+    // Then the key, in a smaller type than the tempo, and the tempo at the corner.
+    label(ctx, info?.camelot ?? "", G.key.x, G.key.y, { size: 8.4 * u, color: LIVE.ink, mono: true, align: "right" });
+    label(ctx, deck.isLoaded ? deck.bpm.toFixed(1) : "", G.bpm.x, G.bpm.y, { size: 10 * u, color: rgba(tint), mono: true, align: "right" });
 
     this.zoomWave(ctx, g, v, d);
     this.overviewStrip(ctx, g, v, d);
@@ -522,27 +525,24 @@ export class LiveRenderer {
   private mixer(ctx: Ctx, g: LiveGeometry, v: LiveView): void {
     const M = g.mixer, u = g.u;
     panel(ctx, M.rect, u);
-    // Tempos at the top, and where deck B's beat falls against deck A's.
-    [0, 1].forEach((d) => label(ctx, v.decks[d].isLoaded ? v.decks[d].bpm.toFixed(1) : "---.-", M.bpm[d].x, M.bpm[d].y, { size: 11 * u, color: rgba(LIVE.deck[d]), mono: true, align: d === 0 ? "left" : "right" }));
-    // The key right under it, in the same size.
-    [0, 1].forEach((d) => label(ctx, v.decks[d].info?.camelot ?? "--", M.key[d].x, M.key[d].y, { size: 11 * u, color: LIVE.ink, mono: true, align: d === 0 ? "left" : "right" }));
+    // Where deck B's beat falls against deck A's (the tempo and the key are in each deck's header).
     roundRect(ctx, centred(M.phase.c.x, M.phase.c.y, M.phase.w, 3 * u), 1.5 * u, "#020304", "rgba(255,255,255,0.08)");
     ctx.fillStyle = LIVE.dimmer;
     ctx.fillRect(M.phase.c.x - 0.6, M.phase.c.y - 4.5 * u, 1.2, 9 * u);
     if (v.phase !== null) circle(ctx, M.phase.c.x - v.phase * M.phase.w, M.phase.c.y, 3.4 * u, Math.abs(v.phase) < 0.03 ? rgba(LIVE.play) : rgba(LIVE.warn));
     else circle(ctx, M.phase.c.x, M.phase.c.y, 3 * u, "rgba(255,255,255,0.1)");
 
-    const names = ["GAIN", "HI", "MID", "LOW", "FILTER"];
+    const names = ["GAIN", "HI", "MID", "LOW", ""];
     M.strip.forEach((s, d) => {
       const tint = LIVE.deck[d];
       const rings = [LIVE.red, LIVE.eqHigh, LIVE.eqMid, LIVE.eqLow, LIVE.filter];
       const values = [(v.trim[d]), v.eq[d][2], v.eq[d][1], v.eq[d][0], v.filter[d]];
       const bipolar = [true, true, true, true, true];
       s.knobY.forEach((y, i) => {
-        // The gain's pointer is red; the FILTER knob sits in a thin blue outline (no fill), so neither is taken for an EQ knob.
-        if (i === 4) roundRect(ctx, centred(s.x, y, 2 * (s.knobR + 6.5 * u), 2 * (s.knobR + 6.5 * u)), 4 * u, null, rgba(LIVE.filter, 0.4), 1);
+        // The gain's pointer is red; the FILTER knob is under the fader (blue ring), so it is not taken for an EQ knob.
         knob(ctx, s.x, y, s.knobR, values[i], rings[i], bipolar[i], true, i === 0 ? LIVE.red : null);
-        small(ctx, names[i], s.x + (d === 0 ? 1 : -1) * 19 * u, y, 5.6 * u, { align: d === 0 ? "left" : "right" });
+        if (i < 4) small(ctx, names[i], s.x + (d === 0 ? 1 : -1) * 19 * u, y, 5.6 * u, { align: d === 0 ? "left" : "right" });
+        else small(ctx, "FILTER", s.x, s.filterLabelY, 5.6 * u, { color: rgba(LIVE.filter, 0.9) });
       });
       // The gain, in dB, once it is not at zero.
       const db = Math.round(v.trimDb(d));

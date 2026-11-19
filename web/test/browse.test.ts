@@ -9,7 +9,7 @@ const track = (over: Partial<LibraryTrack> = {}): LibraryTrack => ({
   key: "1:x", folder: 1, path: ["x"], name: "x.mp3", ext: "mp3", size: 1, mtime: 1, title: "x", artist: "", album: "", genre: "", tagBpm: 0, musicKey: "", camelot: "", ...over,
 });
 const item = (artist: string, title: string, o: { bpm?: number; key?: string; genre?: string; album?: string; name?: string } = {}): WallItem => ({
-  id: `${artist}|${title}`, title, artist, sub: [o.bpm ? `${o.bpm} BPM` : "", o.key ?? "", o.genre ?? ""].filter(Boolean).join(" · "), genre: o.genre ?? "", bpm: o.bpm ?? 0,
+  id: `${artist}|${title}`, title, artist, sub: [o.bpm ? `${o.bpm} BPM` : "", o.key ?? "", o.genre ?? ""].filter(Boolean).join(" · "), genre: o.genre ?? "", bpm: o.bpm ?? 0, fav: false, plays: 0,
   track: track({ camelot: o.key ?? "", album: o.album ?? "", name: o.name ?? `${title}.mp3` }), game: null,
 });
 

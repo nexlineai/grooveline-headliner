@@ -45,6 +45,7 @@
     <button id="jingle-button" class="pill" hidden>JINGLE</button>
     <button id="controls-button" class="pill">KEYS &amp; MIDI</button>
     <button id="phones-button" class="pill"><svg class="icon" viewBox="0 0 24 24" width="1.2em" height="1.2em" aria-hidden="true"><path d="M4 15v-3a8 8 0 0 1 16 0v3" fill="none" stroke="currentColor" stroke-width="2.4"/><rect x="2.5" y="13.5" width="5" height="8" rx="2" fill="currentColor"/><rect x="16.5" y="13.5" width="5" height="8" rx="2" fill="currentColor"/></svg>PHONES</button>
+    <button id="share-button" class="pill" aria-haspopup="dialog">SHARE</button>
     <button id="crate-button" class="pill">CRATE</button>
     <button id="fullscreen-button" class="pill" hidden>FULLSCREEN</button>
   </div>
@@ -99,9 +100,12 @@
     <h1>HEADLINER</h1>
     <p class="tagline">From the bedroom to the main stage</p>
     <button id="title-play" class="primary">PLAY</button>
-    <div class="row"><button id="title-free" class="quiet">LIVE</button><button id="title-ending" class="quiet" hidden>THE ENDING</button></div>
+    <div class="row"><button id="title-free" class="quiet">FREE PLAY</button><button id="title-live" class="quiet">LIVE</button></div>
+    <p class="live-note" hidden>Stream your set to Grooveline Radio</p>
     <p class="hint">Web preview</p>
   </div>
+
+  <div id="deck-tip" hidden></div>
 
   <script type="module" src="src/main.ts"></script>
 </body>

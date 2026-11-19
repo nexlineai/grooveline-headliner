@@ -5,7 +5,7 @@
 
 import type { TrackInfo } from "../core/beatgrid.ts";
 import { buildList } from "./browse.ts";
-import { groupCrates, itemOfGame, itemOfTrack, pickRandom } from "./crates.ts";
+import { groupCrates, itemOfGame, itemOfTrack, pickRandom, rankShelf } from "./crates.ts";
 import { createLoadPop } from "./loadpop.ts";
 import type { Crate, Grouping, WallItem } from "./crates.ts";
 import type { Library } from "./library.ts";
@@ -22,6 +22,8 @@ export interface WallHooks {
   game(): TrackInfo[];
   /** True while a deck plays and cannot take a record (the popup says so). */
   busy?(deck: number): boolean;
+  /** The heart: a favourite or not (kept with the track). */
+  toggleFav?(item: WallItem): void;
 }
 
 export interface Wall {
@@ -63,6 +65,8 @@ export function buildWall(root: HTMLElement, lib: Library, sleeves: Sleeves, hoo
   let gameItems: WallItem[] = [];
   let crates: Crate[] = [];
   let picks: WallItem[] = [];
+  /** SHUFFLE was pressed: random records, until the page is opened again. */
+  let shuffled = false;
   let shown = MAX_PICKS;
   /** Covers waiting to be read for what is on the wall now: dropped when the wall is drawn again. */
   let pending: (() => void)[] = [];
@@ -88,8 +92,9 @@ export function buildWall(root: HTMLElement, lib: Library, sleeves: Sleeves, hoo
   const viewList = pill("LIST", "mini", () => setView("list"), "One line for each record, with the search and sorting");
   topRight.append(search, viewWall, viewList);
   // A click on a record asks "on which deck?" with one popup, wherever the record is (shelf, open crate, list).
-  const pop = createLoadPop({ load: (d, item) => { hooks.load(d, item); if (current) renderInfo(); }, busy: hooks.busy });
-  const list = buildList(listHost, { load: (d, item) => hooks.load(d, item), onDeck: (item) => hooks.onDeck(item), ask: (item, anchor) => pop.show(item, anchor) });
+  const toggleFav = (item: WallItem): void => { hooks.toggleFav?.(item); };
+  const pop = createLoadPop({ load: (d, item) => { hooks.load(d, item); if (current) renderInfo(); }, busy: hooks.busy, toggleFav });
+  const list = buildList(listHost, { load: (d, item) => hooks.load(d, item), onDeck: (item) => hooks.onDeck(item), ask: (item, anchor) => pop.show(item, anchor), toggleFav });
   function setView(v: "wall" | "list"): void {
     view = v;
     try { localStorage.setItem(VIEW_KEY, v); } catch { /* private window */ }
@@ -116,6 +121,15 @@ export function buildWall(root: HTMLElement, lib: Library, sleeves: Sleeves, hoo
     const pool = items.length ? items : gameItems;
     const ids = new Set(pool.map((i) => i.id));
     if (picks.length === 0 || picks.some((p) => !ids.has(p.id))) picks = pickRandom(pool, MAX_PICKS);
+    // The shelf shows your favourites, or what you play most, first; random records fill what is left (and stay as they were between redraws).
+    if (!shuffled) {
+      const ranked = rankShelf(pool, MAX_PICKS);
+      if (ranked.length) {
+        const keep = picks.filter((p) => !ranked.some((r) => r.id === p.id)).map((p) => pool.find((i) => i.id === p.id)!).filter(Boolean);
+        picks = [...ranked, ...keep].slice(0, MAX_PICKS);
+        if (picks.length < MAX_PICKS) picks = [...picks, ...pickRandom(pool.filter((i) => !picks.some((p) => p.id === i.id)), MAX_PICKS - picks.length)];
+      }
+    }
     draw();
   }
 
@@ -172,7 +186,7 @@ export function buildWall(root: HTMLElement, lib: Library, sleeves: Sleeves, hoo
       });
       group.append(b);
     }
-    topLeft.append(group, pill("SHUFFLE", "mini w-shuffle", () => { picks = pickRandom(items.length ? items : gameItems, MAX_PICKS); drawShelf(); }, "Another handful of records for the wall"));
+    topLeft.append(group, pill("SHUFFLE", "mini w-shuffle", () => { shuffled = true; picks = pickRandom(items.length ? items : gameItems, MAX_PICKS); drawShelf(); }, "Another handful of records for the wall"));
     // What the library is doing: reading, or waiting for a click.
     const s = lib.scan;
     if (s) topLeft.append(make("span", "w-status", s.phase === "listing" ? `Looking through ${s.name}… ${n(s.found)}` : `Reading ${s.name}: ${n(s.done)} of ${n(s.total)}`));
@@ -194,6 +208,7 @@ export function buildWall(root: HTMLElement, lib: Library, sleeves: Sleeves, hoo
     tile.tabIndex = 0;
     tile.title = `${item.artist ? item.artist + " · " : ""}${item.title}`;
     tile.append(cover(item, 192));
+    if (item.fav) tile.append(make("span", "w-fav", "\u2665"));
     const ask = () => { const r = tile.getBoundingClientRect(); pop.show(item, { x: r.x, y: r.y, w: r.width, h: r.height }); };
     tile.addEventListener("click", ask);
     tile.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ask(); } });
@@ -208,7 +223,7 @@ export function buildWall(root: HTMLElement, lib: Library, sleeves: Sleeves, hoo
 
   function drawFloor(): void {
     floor.replaceChildren();
-    for (const crate of crates) floor.append(crateButton(crate));
+    crates.forEach((crate, i) => floor.append(crateButton(crate, i)));
     if (items.length === 0 && lib.folders.length === 0) {
       const ask = make("button", "w-crate w-ask");
       ask.type = "button";
@@ -218,8 +233,11 @@ export function buildWall(root: HTMLElement, lib: Library, sleeves: Sleeves, hoo
     }
   }
 
-  function crateButton(crate: Crate): HTMLElement {
-    const b = make("button", "w-crate");
+  /** A crate is a DJ's flight case or a record bag (they alternate along the floor). */
+  function crateButton(crate: Crate, index: number): HTMLElement {
+    const bag = index % 2 === 1;
+    const b = make("button", "w-crate " + (bag ? "bag" : "case"));
+    b.style.setProperty("--i", String(index));
     b.type = "button";
     b.title = `${crate.label}: ${n(crate.items.length)} records`;
     const peek = make("span", "w-peek");
@@ -233,7 +251,11 @@ export function buildWall(root: HTMLElement, lib: Library, sleeves: Sleeves, hoo
       peek.append(rec);
     }
     const box = make("span", "w-box");
-    box.append(make("b", "", crate.label), make("i", "", n(crate.items.length)));
+    // The case has a handle on its lid, two latches and steel corners; the bag has a flap with a buckle, two straps and a patch.
+    const deco = make("span", "w-deco");
+    if (bag) deco.append(make("span", "w-strap l"), make("span", "w-strap r"), make("span", "w-flap"), make("span", "w-buckle"));
+    else deco.append(make("span", "w-handle"), make("span", "w-latch l"), make("span", "w-latch r"), make("span", "w-corner tl"), make("span", "w-corner tr"), make("span", "w-corner bl"), make("span", "w-corner br"));
+    box.append(deco, make("b", "", crate.label), make("i", "", n(crate.items.length)));
     b.append(peek, box);
     b.addEventListener("click", () => openDig(crate));
     return b;

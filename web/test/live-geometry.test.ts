@@ -81,13 +81,16 @@ describe("LIVE layout", () => {
         const M = g.mixer;
         for (const s of M.strip) {
           for (const y of s.knobY) assert.ok(inside(M.rect, box(s.x, y, s.knobR)));
-          for (let i = 1; i < s.knobY.length; i++) assert.ok(s.knobY[i - 1] - s.knobY[i] >= 2 * s.knobR + 4 * g.u, "knobs apart");
+          for (let i = 1; i < 4; i++) assert.ok(s.knobY[i - 1] - s.knobY[i] >= 2 * s.knobR + 4 * g.u, "knobs apart");
           const cue = { x: s.cue.x - s.cueW / 2, y: s.cue.y - s.cueH / 2, w: s.cueW, h: s.cueH };
           assert.ok(inside(M.rect, cue));
           const fader: Rect = { x: s.fader.x - 12 * g.u, y: s.fader.y - s.fader.travel / 2 - 7 * g.u, w: 24 * g.u, h: s.fader.travel + 14 * g.u };
           assert.ok(inside(M.rect, fader));
           assert.ok(apart(cue, fader), "CUE button and the fader");
-          assert.ok(s.knobY[4] - s.knobR > cue.y + cue.h, "the last knob above the CUE button");
+          assert.ok(s.knobY[3] - s.knobR > cue.y + cue.h, "the last of the four knobs above the CUE button");
+          // FILTER is under the fader: its name between the fader and the knob, the knob inside the strip.
+          assert.ok(s.knobY[4] + s.knobR < fader.y - 1 && s.filterLabelY > s.knobY[4] + s.knobR && s.filterLabelY < fader.y, "FILTER under the fader");
+          assert.ok(inside(M.rect, box(s.x, s.knobY[4], s.knobR + 3.5 * g.u)), "FILTER's ring inside the mixer");
         }
         const mid = M.mid, strips = M.strip.map((s) => s.x);
         assert.ok(inside(M.rect, box(mid.master.x, mid.master.y, mid.masterR)));
@@ -124,31 +127,24 @@ describe("LIVE layout", () => {
         assert.ok(last.value.y - 4 * u > F.rect.y);
       });
 
-      test("the readouts: the key sits right under the tempo at the same x, clear of the knobs; the pitch reads out under its fader", () => {
-        const M = g.mixer;
-        for (let d = 0; d < 2; d++) {
-          assert.ok(M.key[d].y < M.bpm[d].y && M.bpm[d].y - M.key[d].y <= 16 * g.u, "key under the tempo");
-          assert.equal(Math.round(M.key[d].x), Math.round(M.bpm[d].x));
-          // The key (about 16 units wide, toward the middle from its corner) must not run into the GAIN knob or its ring beside it.
-          const s = M.strip[d], ring = s.knobR + 3.5 * g.u;
-          const keyBox: Rect = d === 0 ? { x: M.key[d].x, y: M.key[d].y - 5 * g.u, w: 18 * g.u, h: 10 * g.u } : { x: M.key[d].x - 18 * g.u, y: M.key[d].y - 5 * g.u, w: 18 * g.u, h: 10 * g.u };
-          assert.ok(apart(keyBox, box(s.x, s.knobY[0], ring)), "key and the first knob");
-          assert.ok(inside(M.rect, keyBox));
-        }
+      test("the deck header, left to right: the title (cut short, never over the rest), the time, the four bar lamps, the key (a smaller type), the tempo at the corner; the pitch reads out under its fader", () => {
         for (const d of g.deck) {
+          const right = d.rect.x + d.rect.w;
+          // The right of the header in order, with room for each text: time 30 units, lamps 4 x 8, key 16, tempo 31.
+          assert.ok(d.time.x < d.lamps[0].x - 2.5 * g.u, "the time left of the lamps");
+          for (let i = 1; i < 4; i++) assert.ok(d.lamps[i].x - d.lamps[i - 1].x >= 7.9 * g.u);
+          assert.ok(d.lamps[3].x + 2.5 * g.u < d.key.x - 16 * g.u + 8 * g.u, "the lamps left of the key");
+          assert.ok(d.key.x < d.bpm.x - 31 * g.u + 2 * g.u, "the key left of the tempo");
+          assert.ok(Math.abs(d.bpm.x - (right - 8 * g.u)) < 1e-6, "the tempo at the corner");
+          assert.equal(Math.round(d.key.y), Math.round(d.bpm.y)); assert.equal(Math.round(d.time.y), Math.round(d.bpm.y));
+          // The title stops before the time's text (30 units left of the time's right edge).
+          assert.ok(d.title.x + d.titleMax <= d.time.x - 30 * g.u + 1e-6, "a long title does not run into the time");
+          assert.ok(d.titleMax >= 100 * g.u, "and still has room");
           assert.ok(d.pitchText.y < d.pitch.y - d.pitch.travel / 2, "pitch % under the fader");
           assert.ok(inside(d.rect, { x: d.pitchText.x - 16 * g.u, y: d.pitchText.y - 5 * g.u, w: 32 * g.u, h: 10 * g.u }));
         }
       });
 
-      test("the FILTER knob's square (a knob and a margin, drawn round it) stays inside the strip and clear of the knob above and the CUE button below", () => {
-        for (const s of g.mixer.strip) {
-          const half = s.knobR + 6.5 * g.u, sq = box(s.x, s.knobY[4], half);
-          assert.ok(inside(g.mixer.rect, sq));
-          assert.ok(s.knobY[3] - s.knobR - 3.5 * g.u > sq.y + sq.h - E, "clear of LOW's ring");
-          assert.ok(sq.y > s.cue.y + s.cueH / 2 - E, "clear of the CUE button");
-        }
-      });
 
       test("touch areas: knobs, faders and buttons are big enough for a finger and a mouse, and do not overlap each other", () => {
         const t = liveTouch(g);

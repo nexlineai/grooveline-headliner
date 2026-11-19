@@ -1,13 +1,13 @@
 // The record room's crates (library/crates.ts): grouping, order and the wall's picks.
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { groupCrates, initialOf, itemOfGame, itemOfTrack, pickRandom } from "../src/library/crates.ts";
+import { groupCrates, initialOf, itemOfGame, itemOfTrack, pickRandom, rankShelf } from "../src/library/crates.ts";
 import type { WallItem } from "../src/library/crates.ts";
 import { trackId } from "../src/library/search.ts";
 import type { LibraryTrack } from "../src/library/store.ts";
 import type { TrackInfo } from "../src/core/beatgrid.ts";
 
-const item = (artist: string, title: string, over: Partial<WallItem> = {}): WallItem => ({ id: `${artist}|${title}`, title, artist, sub: "", genre: "", bpm: 0, track: null, game: null, ...over });
+const item = (artist: string, title: string, over: Partial<WallItem> = {}): WallItem => ({ id: `${artist}|${title}`, title, artist, sub: "", genre: "", bpm: 0, track: null, game: null, fav: false, plays: 0, ...over });
 const track = (name: string, over: Partial<LibraryTrack> = {}): LibraryTrack => ({
   key: `1:${name}`, folder: 1, path: [name], name, ext: "mp3", size: 1, mtime: 1, title: name, artist: "", album: "", genre: "", tagBpm: 0, musicKey: "", camelot: "", ...over,
 });
@@ -115,5 +115,21 @@ describe("the wall's picks", () => {
     assert.notDeepEqual(pickRandom(list, 8, r).map((p) => p.id), pickRandom(list, 8, r).map((p) => p.id));
     assert.equal(pickRandom([plain("a"), plain("b")], 8).length, 2);
     assert.deepEqual(pickRandom([], 8), []);
+  });
+});
+
+describe("the shelf: favourites, then the most played", () => {
+  test("favourites first (the most played of them first), then the most played of the rest; nothing for a record never played or loved", () => {
+    const list = [item("a", "never"), item("b", "loved", { fav: true, plays: 2 }), item("c", "often", { plays: 9 }), item("d", "lovedmore", { fav: true, plays: 5 }), item("e", "once", { plays: 1 })];
+    assert.deepEqual(rankShelf(list, 10).map((i) => i.title), ["lovedmore", "loved", "often", "once"]);
+    assert.deepEqual(rankShelf(list, 2).map((i) => i.title), ["lovedmore", "loved"]);
+  });
+  test("with no favourite and no plays there is nothing to rank (the wall falls back to random picks)", () => {
+    assert.deepEqual(rankShelf([item("a", "x"), item("b", "y")], 5), []);
+  });
+  test("the item carries the heart and the count of its track", () => {
+    const it = itemOfTrack(track("t.mp3", { fav: true, plays: 3 }));
+    assert.equal(it.fav, true); assert.equal(it.plays, 3);
+    assert.equal(itemOfTrack(track("u.mp3")).fav, false);
   });
 });

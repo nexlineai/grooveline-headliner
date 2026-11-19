@@ -233,7 +233,8 @@ export class Booth {
     engine.fxOn = false;
     this.pushFxKnobs();
     canvas.addEventListener("pointerdown", (e) => this.down(e));
-    canvas.addEventListener("pointermove", (e) => this.move(e));
+    canvas.addEventListener("pointermove", (e) => { this.move(e); this.hoverTitle(e); });
+    canvas.addEventListener("pointerleave", () => this.tip(null));
     canvas.addEventListener("pointerup", (e) => this.up(e));
     canvas.addEventListener("pointercancel", (e) => this.up(e));
     canvas.addEventListener("wheel", (e) => this.wheel(e), { passive: false });
@@ -849,6 +850,30 @@ export class Booth {
         break;
     }
     this.grabs.set(e.pointerId, grab);
+  }
+
+  /** LIVE: the pointer over a deck's title shows the whole title (a long one is cut short in the deck). */
+  private hoverTitle(e: PointerEvent): void {
+    const L = this.L;
+    if (!L?.live || this.grabs.size > 0) { this.tip(null); return; }
+    const p = this.at(e), u = L.live.u;
+    for (let d = 0; d < 2; d++) {
+      const G = L.live.deck[d], info = this.decks[d].info;
+      if (info && p.x >= G.title.x && p.x <= G.title.x + G.titleMax && Math.abs(p.y - G.title.y) <= 9 * u) { this.tip(`${info.artist} \u00b7 ${info.title}`, e); return; }
+    }
+    this.tip(null);
+  }
+
+  private tipEl: HTMLElement | null = null;
+  private tip(text: string | null, e?: PointerEvent): void {
+    const el = (this.tipEl ??= document.getElementById("deck-tip"));
+    if (!el) return;
+    if (text === null || !e) { el.hidden = true; return; }
+    el.textContent = text;
+    el.hidden = false;
+    const w = el.offsetWidth;
+    el.style.left = `${Math.max(6, Math.min(window.innerWidth - w - 6, e.clientX + 12))}px`;
+    el.style.top = `${e.clientY + 18}px`;
   }
 
   private move(e: PointerEvent): void {
