@@ -6,6 +6,7 @@ import { BeatGrid } from "../core/beatgrid.ts";
 import type { TrackInfo } from "../core/beatgrid.ts";
 import { eqDecibels } from "../core/mixjudge.ts";
 import { PHONES_UNITY, phonesGainFor } from "./fx.ts";
+import { isAiff, parseAiff } from "../library/aiff.ts";
 import { firstOnset, overview } from "../core/vinyl.ts";
 import { AUDIO_FIELDS, D, DECKS, M, S, SIZE, deckAt, mixerAt, stripAt } from "./layout.ts";
 import type { FromWorklet, ToWorklet } from "./layout.ts";
@@ -158,7 +159,7 @@ export class Deck {
   /** Puts a decoded record on the platter, needle on the first beat, motor off. The browser
    * decodes at the output rate; its AAC decoder may trim the encoder's priming differently from
    * the iPhone's, so the grid starts where the first kick is found in the decoded audio. */
-  loadDecoded(track: TrackInfo, audio: AudioBuffer): void {
+  loadDecoded(track: TrackInfo, audio: AudioBuffer, grid?: { bpm: number; firstBeat: number }): void {
     const frames = audio.length;
     if (frames <= 64) throw new Error(`${track.id}: empty file`);
     const left = new Float32Array(frames);
@@ -167,8 +168,9 @@ export class Deck {
     audio.copyFromChannel(right, audio.numberOfChannels > 1 ? 1 : 0);
     this.fileRate = audio.sampleRate;
     this.duration = frames / this.fileRate;
+    // The game's records start on a kick, found here; a record of your own comes with its grid (library/).
     const onset = firstOnset(left, Math.min(frames, Math.trunc(this.fileRate * 2)));
-    this.grid = new BeatGrid(track.bpm, onset / this.fileRate);
+    this.grid = grid ? new BeatGrid(grid.bpm, grid.firstBeat) : new BeatGrid(track.bpm, onset / this.fileRate);
     this.cuePoint = this.grid.firstBeat;
     this.overview = overview(left, frames, 240);
     this.info = track;
@@ -216,6 +218,13 @@ export class Deck {
     const l = left.slice(0, frames), r = right.slice(0, frames);
     this.shared.post({ type: "load", deck: this.index, left: l, right: r, position: 1, keepPlace: swapInPlace,
                        seekSeq: this.seekSeq }, [l.buffer, r.buffer]);
+  }
+
+  /** A new grid for the record on the platter (a corrected tempo, or the first beat moved): the cue mark goes with it when it sat on the old first beat. */
+  setGrid(bpm: number, firstBeat: number): void {
+    const markOnGrid = Math.abs(this.cuePoint - this.grid.firstBeat) < 0.02;
+    this.grid = new BeatGrid(bpm, Math.max(0, firstBeat));
+    if (markOnGrid) this.cuePoint = this.grid.firstBeat;
   }
 
   /** Needle position in seconds. */
@@ -404,6 +413,20 @@ export class DeckEngine {
     if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
     const audio = await context.decodeAudioData(await response.arrayBuffer());
     this.decks[d].loadDecoded(track, audio);
+  }
+
+  /** A file's bytes into audio: whatever the browser decodes, and AIFF (which it does not). */
+  async decode(bytes: ArrayBuffer): Promise<AudioBuffer> {
+    const context = this.context;
+    if (!context) throw new Error("audio not started");
+    const view = new Uint8Array(bytes);
+    if (isAiff(view)) {
+      const pcm = parseAiff(view);
+      const buffer = context.createBuffer(pcm.channels.length, pcm.channels[0].length, pcm.rate);
+      pcm.channels.forEach((c, i) => buffer.copyToChannel(c as Float32Array<ArrayBuffer>, i));
+      return buffer;
+    }
+    return context.decodeAudioData(bytes);
   }
 
   /** The far speakers of a festival stage: the room hears the music this late as well (0 = off). */

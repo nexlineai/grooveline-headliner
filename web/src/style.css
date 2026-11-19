@@ -348,3 +348,27 @@ button.quiet[hidden] { display: none; }
 #phones-body .trim input { flex: 1; accent-color: var(--teal); }
 #phones-body .trim .end { color: var(--dim); font: 800 9px system-ui, sans-serif; letter-spacing: 0.08em; white-space: nowrap; }
 #phones-body .trim .ms { min-width: 58px; text-align: right; font: 700 13px system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+
+/* MY MUSIC: your own files in the crate (free play). */
+.tabs { display: flex; gap: 8px; margin-bottom: 10px; }
+.tabs .pill.on { background: var(--teal); color: #000; border-color: var(--teal); }
+#mymusic { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+#mymusic[hidden], #crate-list[hidden] { display: none; }
+#mymusic .mm-top { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+#mymusic .mm-folder { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border: 1px solid var(--edge); border-radius: 10px; font-size: 13px; }
+#mymusic .mm-folder b { max-width: 12em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#mymusic .mm-folder span { color: var(--dim); }
+#mymusic .mm-status { margin: 0 0 8px; font-size: 13px; color: var(--dim); }
+#mymusic .mm-search { width: 100%; box-sizing: border-box; padding: 9px 10px; margin-bottom: 8px; border-radius: 8px; background: var(--slot); color: var(--ink);
+  border: 1px solid var(--edge); font: 600 13px system-ui, sans-serif; letter-spacing: 0.08em; }
+#mymusic .mm-list { overflow-y: auto; flex: 1; min-height: 80px; }
+#mymusic .mm-loaded { border-top: 1px solid var(--edge); margin-top: 8px; padding-top: 6px; }
+#mymusic .mm-fix { display: flex; align-items: center; gap: 6px; padding: 4px 0; font-size: 13px; }
+#mymusic .mm-fix b { font: 700 11px system-ui, sans-serif; letter-spacing: 0.12em; min-width: 3.4em; }
+#mymusic .mm-fix b.left { color: var(--teal); }
+#mymusic .mm-fix b.right { color: var(--magenta); }
+#mymusic .mm-fix .mm-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#mymusic .mm-fix .mm-bpm { color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+#mymusic .mm-fix .mm-bpm.unsure { color: var(--orange); }
+button.mini { padding: 4px 9px; border-radius: 7px; background: var(--slot); color: var(--ink); border: 1px solid var(--edge); font: 700 11px system-ui, sans-serif; letter-spacing: 0.08em; cursor: pointer; }
+button.mini.on { border-color: var(--orange); color: var(--orange); }

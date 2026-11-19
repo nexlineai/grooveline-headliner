@@ -24,6 +24,14 @@ import { fade } from "./fade.ts";
 import { BagScreen } from "./game/bag.ts";
 import type { PhonesMode } from "./audio/engine.ts";
 import { FX_DIVISIONS, FX_TYPES } from "./audio/fx.ts";
+import { Library } from "./library/library.ts";
+import { buildPanel } from "./library/panel.ts";
+import type { GridFix } from "./library/panel.ts";
+import { analyse } from "./library/analyse.ts";
+import { monoForAnalysis } from "./library/beats.ts";
+import { trackId } from "./library/search.ts";
+import { probeDuration } from "./library/duration.ts";
+import type { LibraryTrack } from "./library/store.ts";
 import { keyOf } from "./booth/booth.ts";
 import type { Kind } from "./booth/booth.ts";
 import { KEYS, attachKeys } from "./input/keys.ts";
@@ -74,8 +82,104 @@ async function loadRecord(d: number, track: TrackInfo): Promise<void> {
     await engine.load(d, track, `assets/Tracks/${track.file}`);
     note.textContent = "";
   }
+  userOnDeck[d] = null;
+  myMusicPanel?.refresh();
   booth.recordChanged(d);
 }
+
+// MARK: - Your own music (free play): the MY MUSIC tab of the crate
+
+const library = new Library();
+/** The library track on each deck (null: a record of the game, or nothing). */
+const userOnDeck: (LibraryTrack | null)[] = [null, null];
+/** A track longer than this is too big to hold decoded (48 kHz stereo float: about 23 MB a minute, and a copy while loading). */
+const MAX_MINUTES = 15;
+let myMusicPanel: { refresh(): void } | null = null;
+
+/** Opens a track of your library on a deck: decode, find its grid (your correction, an earlier analysis, or analysis now), play. */
+async function loadUserTrack(d: number, t: LibraryTrack): Promise<void> {
+  const deck = engine.decks[d];
+  if (deck.motorOn && Math.abs(deck.rate) > 0.1) { note.textContent = "Stop the deck before you change its record."; return; }
+  const name = t.artist ? `${t.artist} - ${t.title}` : t.title;
+  try {
+    note.textContent = `Opening ${name}…`;
+    const file = await library.fileOf(t);
+    // Ask the file how long it is before decoding it: an hour of music is two gigabytes in memory.
+    const length = await probeDuration(file);
+    if (length !== null && length > MAX_MINUTES * 60) { note.textContent = `${name} is ${Math.round(length / 60)} minutes long: too big to hold (the limit is ${MAX_MINUTES}).`; return; }
+    let audio: AudioBuffer;
+    try { audio = await engine.decode(await file.arrayBuffer()); }
+    catch { note.textContent = `${name}: this browser cannot decode this ${t.ext.toUpperCase()} file.`; return; }
+    if (audio.duration > MAX_MINUTES * 60) { note.textContent = `${name} is ${Math.round(audio.duration / 60)} minutes long: too big to hold (the limit is ${MAX_MINUTES}).`; return; }
+    let grid: { bpm: number; firstBeat: number } | null = t.grid ?? (t.analysis ? { bpm: t.analysis.bpm, firstBeat: t.analysis.firstBeat } : null);
+    if (!grid) {
+      note.textContent = `Finding the beat of ${name}…`;
+      const mono = monoForAnalysis(audio.getChannelData(0), audio.getChannelData(Math.min(1, audio.numberOfChannels - 1)), audio.sampleRate);
+      const tempo = await analyse(mono.data, mono.rate, t.tagBpm);
+      if (tempo) {
+        t.analysis = { bpm: tempo.bpm, firstBeat: tempo.firstBeat, confidence: tempo.confidence };
+        grid = { bpm: tempo.bpm, firstBeat: tempo.firstBeat };
+        await library.update(t);
+      }
+    }
+    const info: TrackInfo = {
+      id: trackId(t), title: t.title, artist: t.artist, label: t.album, genre: t.genre, bpm: grid?.bpm ?? (t.tagBpm || 120),
+      key: t.musicKey, camelot: t.camelot, bars: 0, seconds: audio.duration, file: "", chapter: null,
+    };
+    deck.loadDecoded(info, audio, grid ?? undefined);
+    userOnDeck[d] = t;
+    booth.recordChanged(d);
+    const unsure = !grid || (!t.grid && !!t.analysis && t.analysis.confidence < 0.25);
+    note.textContent = unsure ? `${name}: the beat is not clear. Check the grid (CRATE, MY MUSIC).` : "";
+  } catch (e) {
+    note.textContent = `${name}: ${e instanceof Error ? e.message : "could not be opened"}`;
+  }
+  myMusicPanel?.refresh();
+}
+
+// For the screenshot tool's `eval` (tools/shot.ts): the library and its loader.
+Object.assign((window as unknown as { headliner: object }).headliner, { library, loadUserTrack: (d: number, t: LibraryTrack) => loadUserTrack(d, t), userOnDeck, fixGrid, showCrateTab });
+
+function userLoaded(): ({ track: LibraryTrack; bpm: number; unsure: boolean } | null)[] {
+  return [0, 1].map((d) => {
+    const track = userOnDeck[d];
+    if (!track || !engine.decks[d].isLoaded) return null;
+    return { track, bpm: engine.decks[d].grid.bpm, unsure: !track.grid && (!track.analysis || track.analysis.confidence < 0.25) };
+  });
+}
+
+/** The buttons under the list: half or double the tempo, a hundredth of a BPM either way, the first beat to the CUE mark. */
+function fixGrid(d: number, what: GridFix): void {
+  const t = userOnDeck[d], deck = engine.decks[d];
+  if (!t || !deck.isLoaded) return;
+  let bpm = deck.grid.bpm, first = deck.grid.firstBeat;
+  if (what === "half") bpm /= 2;
+  else if (what === "double") bpm *= 2;
+  else if (what === "down") bpm -= 0.1;
+  else if (what === "up") bpm += 0.1;
+  else first = deck.cuePoint;
+  bpm = Math.max(30, Math.min(300, Math.round(bpm * 100) / 100));
+  deck.setGrid(bpm, first);
+  t.grid = { bpm, firstBeat: deck.grid.firstBeat };
+  library.update(t).catch(() => {});
+  myMusicPanel?.refresh();
+}
+
+function showCrateTab(tab: "records" | "mine"): void {
+  $("crate-list").hidden = tab !== "records";
+  $("mymusic").hidden = tab !== "mine";
+  $("tab-records").classList.toggle("on", tab === "records");
+  $("tab-mine").classList.toggle("on", tab === "mine");
+  if (tab !== "mine") return;
+  myMusicPanel ??= buildPanel($("mymusic"), library, {
+    load: (d, t) => { crate.hidden = true; if (booth.refuseLoad(d)) return; loadUserTrack(d, t).catch(failed); },
+    loaded: userLoaded,
+    fix: fixGrid,
+  });
+  library.init().then(() => myMusicPanel?.refresh()).catch(failed);
+}
+$("tab-records").addEventListener("click", () => showCrateTab("records"));
+$("tab-mine").addEventListener("click", () => showCrateTab("mine"));
 
 booth.loadRecord = async (d, id) => {
   const track = trackFor(id);
@@ -583,7 +687,13 @@ function leave(): void {
 const sheets = [crate, phonesPanel, $("controls")];
 const toggle = (sheet: HTMLElement) => { const open = sheet.hidden; for (const s of sheets) s.hidden = true; sheet.hidden = !open; };
 $("back").addEventListener("click", leave);
-$("crate-button").addEventListener("click", () => toggle(crate));
+$("crate-button").addEventListener("click", () => {
+  toggle(crate);
+  // Your own music is free play's: in a lesson or a night the crate is the game's.
+  const free = !booth.lesson && !booth.night;
+  $("crate-tabs").hidden = !free;
+  if (!free) showCrateTab("records");
+});
 $("crate-close").addEventListener("click", () => { crate.hidden = true; });
 $("phones-close").addEventListener("click", () => { phonesPanel.hidden = true; });
 $("jingle-button").addEventListener("click", playJingle);

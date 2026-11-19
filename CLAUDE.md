@@ -251,6 +251,19 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
   PLAY only (no lesson/night: `setTheDesk` forces it off; `build()` reads `lesson/night`, and the booth rebuilds
   when that changes, which also ends a CUE hold). Settings in localStorage `headliner.fx`; always OFF at start.
   The old `echoDelay` in `core/mixer.ts` is the far-speakers mishap (one late copy), not this delay.
+- **My music (web only, 19 Nov): `web/src/library/`, free play only (CRATE -> MY MUSIC; hidden in lessons and nights).**
+  Your own files, read in the browser, never uploaded. `showDirectoryPicker` (Chromium; the handle is kept in IndexedDB
+  `headliner-library`, a new visit needs one RECONNECT click) with an `<input webkitdirectory>` fallback (this visit only).
+  `scan.ts` walks a folder (6 reads at a time, a file with the same size+mtime is not read again), `tags.ts` reads ID3v1/2.2-2.4,
+  FLAC, MP4 (iTunes atoms and QuickTime keys) with random-access reads (title/artist/album/genre/BPM/key -> Camelot, where
+  the cover lies; wav/aiff/ogg get the file name), `aiff.ts` decodes AIFF (Chromium cannot; ALAC and WMA also fail: the
+  load says so). `beats.ts` finds tempo + first beat (onset strength per 2.5 ms, fold over every tempo, then a line through the
+  beats one by one; a file tag BPM only chooses between a tempo and its double/half) in `analysis-worker.ts`; the result
+  (and your corrections: half, double, +-0.1, GRID HERE = first beat at the CUE mark) is stored on the track. A track opens
+  through `loadUserTrack` in main.ts: `probeDuration` first (limit 15 minutes, an hour decoded is 2 GB), `engine.decode`,
+  `Deck.loadDecoded(info, audio, grid)`. Checked against 70 real tracks of the Mixxx library with `tools/check-beats.ts`
+  (read-only; needs the DB and the USB): tempo within 0.5 BPM on 59/70, the rest mostly octave readings; over a whole track
+  it stays on the onsets where Mixxx's analysed tempo drifts. Tests use real ffmpeg output in `web/test/fixtures`.
 - **Outputs (PHONES):** the worklet always renders 4 channels (room 1-2, headphones 3-4); modes only
   rewire a splitter/merger: OFF, SPLIT, SOUND CARD (destination 4 ch, discrete), TWO DEVICES (the
   headphones' pair -> MediaStream -> `<audio>.setSinkId`; the room via `AudioContext.setSinkId`).

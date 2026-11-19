@@ -2,6 +2,7 @@
 //   node tools/shot.ts OUT.png [URL] [--size 1600x740] [--wait 6] [--chromium /usr/bin/chromium] [--gpu]
 //                      [--do "click 181 697; wait 2; drag 515 518 515 440; eval engine.decks[0].pitch"]
 // Verbs: click X Y | down X Y | up X Y (a held button: down, wait, eval, up) | drag X1 Y1 X2 Y2 | wait S | run FILE | eval EXPR
+//        | files SELECTOR PATH... (puts local files into a file input, as a person choosing them would)
 // `run FILE` evaluates a script file in the page (a bot that plays a lesson, for instance).
 // `--do` runs after the wait, then the picture is taken: clicks and drags with the mouse (screen
 // pixels, y down), pauses, and `eval` prints what an expression in the page gives (the page puts
@@ -97,6 +98,11 @@ try {
     if (verb === "click") {
       await mouse("mousePressed", n[0], n[1]);
       await mouse("mouseReleased", n[0], n[1], 0);
+    } else if (verb === "files") {
+      const doc = await send("DOM.getDocument", { depth: 0 });
+      const node = await send("DOM.querySelector", { nodeId: doc.root.nodeId, selector: rest[0] });
+      if (!node?.nodeId) console.log(`files: nothing matches ${rest[0]}`);
+      else await send("DOM.setFileInputFiles", { nodeId: node.nodeId, files: rest.slice(1) });
     } else if (verb === "down") {
       await mouse("mousePressed", n[0], n[1]);
     } else if (verb === "up") {

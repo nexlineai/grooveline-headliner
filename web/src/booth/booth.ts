@@ -1482,7 +1482,7 @@ export class Booth {
   private drawWave(d: number): void {
     const L = this.L!, ctx = this.ctx, deck = this.decks[d], r = L.wave[d];
     roundRect(ctx, { x: r.x - 2, y: r.y - 2, w: r.w + 4, h: r.h + 4 }, 3, rgba(Palette.slot), EDGE);
-    const id = `${deck.info?.id ?? ""}:${deck.duration}:${r.w}`;
+    const id = `${deck.info?.id ?? ""}:${deck.duration}:${r.w}:${deck.grid.bpm}:${deck.grid.firstBeat}`; // the grid's ticks are part of the picture
     if (this.waveFor[d] !== id) {
       this.waveFor[d] = id;
       const ticks: number[] = [];
