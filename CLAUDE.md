@@ -306,6 +306,9 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
   scan reports often); 10,000 tracks group in about 40 ms. Compact (front shorter than 240 px: a phone held sideways): crates only.
   Measured on 500 real files: tag tempo 67 %, genre 56 %, artist 90 %, and 27 % of the files share one copy date (so no "newest" crate).
   Not done: drag a record onto a deck, a crate front board drawn over the dig, remembering the last records played.
+  **Top bar (19 Nov): small buttons.** `#top .pill` and `#wall-open` use `clamp(9px, 0.95vw, 11.5px)` (about two thirds of the sheets'
+  pills, which keep the big size); the bar is about 475 px wide at 1200 px and up. main.ts publishes its real width as `--top-w`
+  (ResizeObserver) and the wall's control row keeps clear of it, so nothing overlaps at any window width.
   **Bug fixed with it (from 0f7f5db):** `build()` set `--gear-h` to the ROOM's height but the CSS uses the GEAR's height (fallback 58vh,
   `#studio bottom`): lesson/night/studio overlays were taller than the room and covered the top of the gear (a lesson caption over the
   mixer's BPM numbers). Now `--gear-h` = `gearTop`.

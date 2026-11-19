@@ -119,6 +119,10 @@ const wall = buildWall($("wall"), library, bigSleeves, {
   toRoom: () => setFront("room"),
 });
 $("wall-open").addEventListener("click", () => setFront("wall"));
+// The wall's own controls keep clear of the top bar, whatever its width is (its buttons come and go, the font follows the window).
+if (typeof ResizeObserver !== "undefined") {
+  new ResizeObserver(() => document.documentElement.style.setProperty("--top-w", `${$("top").getBoundingClientRect().width}px`)).observe($("top"));
+}
 /** The library track on each deck (null: a record of the game, or nothing). */
 const userOnDeck: (LibraryTrack | null)[] = [null, null];
 /** A track longer than this is too big to hold decoded (48 kHz stereo float: about 23 MB a minute, and a copy while loading). */

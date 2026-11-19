@@ -65,7 +65,9 @@ html, body {
 .pill.on { background: var(--teal); color: #000; border-color: var(--teal); }
 .pill .icon { margin-right: 0.6em; vertical-align: -0.25em; }
 
-#top { position: fixed; top: 2vh; right: 2vw; z-index: 3; display: flex; gap: 0.8em; }
+#top { position: fixed; top: 2vh; right: 2vw; z-index: 3; display: flex; gap: 0.5em; }
+/* The bar's buttons are small (about two thirds of the sheets' buttons): the booth is the thing to look at. */
+#top .pill, #wall-open { font-size: clamp(9px, 0.95vw, 11.5px); letter-spacing: 0.13em; padding: 0.55em 1.1em; }
 #note { position: fixed; top: 2.5vh; left: 2vw; z-index: 3; color: var(--orange); font-size: 14px; }
 
 .sheet {
@@ -403,7 +405,7 @@ button.mini.on { border-color: var(--orange); color: var(--orange); }
 #wall .mini { padding: 5px 10px; border-radius: 7px; background: rgba(5, 6, 10, 0.7); color: var(--ink); border: 1px solid var(--edge); font: 700 calc(var(--ws) * 11px) system-ui, sans-serif;
   letter-spacing: 0.1em; cursor: pointer; }
 #wall .mini.on { background: var(--teal); color: #000; border-color: var(--teal); }
-#wall .w-top { flex: none; display: flex; align-items: center; gap: 8px; height: calc(var(--ws) * 48px); padding: 0 min(50vw, 780px) 0 max(88px, 6vw); overflow: hidden; white-space: nowrap; }
+#wall .w-top { flex: none; display: flex; align-items: center; gap: 8px; height: calc(var(--ws) * 48px); padding: 0 calc(var(--top-w, 460px) + 2vw + 16px) 0 max(88px, 6vw); overflow: hidden; white-space: nowrap; }
 #wall .w-group { display: flex; align-items: center; gap: 5px; margin-right: 8px; }
 #wall .w-cap { color: var(--dim); font: 700 calc(var(--ws) * 10px) system-ui, sans-serif; letter-spacing: 0.14em; margin-right: 3px; }
 @media (max-width: 1180px) { #wall .w-cap { display: none; } }
