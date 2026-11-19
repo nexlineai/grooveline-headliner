@@ -50,6 +50,13 @@ export interface LibraryTrack {
   seconds?: number;
 }
 
+/** One record of a playlist: where it lies (the library folder's NAME and the path inside it, so a folder that was removed and added again still matches) and
+ * enough about it to show and to match it by artist and title when the file is not found. */
+export interface PlaylistEntry { folder: string; path: string[]; title: string; artist: string; seconds: number }
+
+/** A playlist of yours: kept in the browser, and saved to / loaded from an .m3u8 file. */
+export interface Playlist { id: number; name: string; created: number; updated: number; items: PlaylistEntry[] }
+
 export interface LibraryStore {
   folders(): Promise<LibraryFolder[]>;
   addFolder(name: string, handle: FileSystemDirectoryHandle | null): Promise<LibraryFolder>;
@@ -58,9 +65,22 @@ export interface LibraryStore {
   tracks(): Promise<LibraryTrack[]>;
   putTracks(list: LibraryTrack[]): Promise<void>;
   deleteTracks(keys: string[]): Promise<void>;
+  playlists(): Promise<Playlist[]>;
+  /** Saves a playlist (a new one has no id yet: the saved copy has). */
+  putPlaylist(p: Omit<Playlist, "id"> & { id?: number }): Promise<Playlist>;
+  deletePlaylist(id: number): Promise<void>;
 }
 
 export class MemoryStore implements LibraryStore {
+  private nextPlaylist = 1;
+  private readonly playlistMap = new Map<number, Playlist>();
+  async playlists(): Promise<Playlist[]> { return [...this.playlistMap.values()].map((p) => structuredClone(p)); }
+  async putPlaylist(p: Omit<Playlist, "id"> & { id?: number }): Promise<Playlist> {
+    const saved = structuredClone({ ...p, id: p.id ?? this.nextPlaylist++ }) as Playlist;
+    this.playlistMap.set(saved.id, saved);
+    return structuredClone(saved);
+  }
+  async deletePlaylist(id: number): Promise<void> { this.playlistMap.delete(id); }
   private nextId = 1;
   private readonly folderList: LibraryFolder[] = [];
   private readonly trackMap = new Map<string, LibraryTrack>();
@@ -89,15 +109,40 @@ export class IdbStore implements LibraryStore {
   private readonly db: IDBDatabase;
   private constructor(db: IDBDatabase) { this.db = db; }
 
-  /** Opens (or creates) the database; throws where IndexedDB is not available. */
+  /** Called when another tab of the page still holds the old database open and so blocks the upgrade (the page says so: close that tab). */
+  static onBlocked: () => void = () => {};
+
+  /** Opens (or creates, or upgrades) the database; throws where IndexedDB is not available. Version 2 added the playlists. */
   static async open(): Promise<IdbStore> {
-    const open = indexedDB.open(DB, 1);
+    const open = indexedDB.open(DB, 2);
     open.onupgradeneeded = () => {
       const db = open.result;
-      db.createObjectStore("folders", { keyPath: "id", autoIncrement: true });
-      db.createObjectStore("tracks", { keyPath: "key" }).createIndex("folder", "folder");
+      if (!db.objectStoreNames.contains("folders")) db.createObjectStore("folders", { keyPath: "id", autoIncrement: true });
+      if (!db.objectStoreNames.contains("tracks")) db.createObjectStore("tracks", { keyPath: "key" }).createIndex("folder", "folder");
+      if (!db.objectStoreNames.contains("playlists")) db.createObjectStore("playlists", { keyPath: "id", autoIncrement: true });
     };
-    return new IdbStore(await request(open));
+    open.onblocked = () => IdbStore.onBlocked();
+    const db = await request(open);
+    // A newer version of the page in another tab wants to upgrade: let go of this one so it can.
+    db.onversionchange = () => db.close();
+    return new IdbStore(db);
+  }
+
+  async playlists(): Promise<Playlist[]> {
+    return request(this.db.transaction("playlists").objectStore("playlists").getAll());
+  }
+
+  async putPlaylist(p: Omit<Playlist, "id"> & { id?: number }): Promise<Playlist> {
+    const t = this.db.transaction("playlists", "readwrite");
+    const id = await request(t.objectStore("playlists").put(p));
+    await done(t);
+    return { ...p, id: Number(id) } as Playlist;
+  }
+
+  async deletePlaylist(id: number): Promise<void> {
+    const t = this.db.transaction("playlists", "readwrite");
+    t.objectStore("playlists").delete(id);
+    await done(t);
   }
 
   async folders(): Promise<LibraryFolder[]> {

@@ -3,6 +3,7 @@
 
 import { TAGS_VERSION, entriesFromFiles, listFolder, scanEntries, trackKey } from "./scan.ts";
 import type { Entry } from "./scan.ts";
+import { Playlists } from "./playlists.ts";
 import { buildIndex } from "./search.ts";
 import type { Indexed } from "./search.ts";
 import { MemoryStore, openStore } from "./store.ts";
@@ -32,6 +33,8 @@ export class Library {
   private nextSession = -1;
   private indexTimer: ReturnType<typeof setTimeout> | null = null;
   private started = false;
+  /** Your playlists (created when the library opens). */
+  playlists = new Playlists(new MemoryStore(), this);
 
   /** Can this browser open a folder and remember it (Chromium)? Others choose files each visit. */
   static get canPickFolder(): boolean { return typeof window !== "undefined" && typeof window.showDirectoryPicker === "function"; }
@@ -46,6 +49,8 @@ export class Library {
     this.folders = await this.store.folders();
     for (const t of await this.store.tracks()) this.byKey.set(t.key, t);
     this.reindex();
+    this.playlists.useStore(this.store);
+    await this.playlists.load().catch(() => {});
     await this.checkAccess();
     this.notify();
     // Tracks an older tag reader read (no length yet, say) are read again in the background, once, when the browser lets us without asking.

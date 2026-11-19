@@ -44,6 +44,7 @@ import { MidiInput } from "./input/midi.ts";
 import type { Binding, TargetKind } from "./input/midi.ts";
 import { Credits } from "./game/credits.ts";
 import { createShare } from "./share.ts";
+import { IdbStore } from "./library/store.ts";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const engine = new DeckEngine();
@@ -181,7 +182,8 @@ async function loadUserTrack(d: number, t: LibraryTrack): Promise<void> {
     sleeves.request(t, (s) => { if (s instanceof HTMLCanvasElement && userOnDeck[d] === t) booth.setLabelArt(d, info.id, s); });
     booth.recordChanged(d);
     const unsure = !grid || (!t.grid && !!t.analysis && t.analysis.confidence < 0.25);
-    note.textContent = unsure ? `${name}: the beat is not clear. Check the grid (CRATE, MY MUSIC).` : "";
+    // The grid is corrected in the CRATE sheet's MY MUSIC (free play); LIVE has no such sheet yet, so it does not point there.
+    note.textContent = unsure ? `${name}: the beat is not clear.${booth.mode === "live" ? "" : " Check the grid (CRATE, MY MUSIC)."}` : "";
   } catch (e) {
     note.textContent = `${name}: ${e instanceof Error ? e.message : "could not be opened"}`;
   }
@@ -294,6 +296,8 @@ function ensureStarted(): Promise<void> {
   return starting;
 }
 
+// Another tab of the page still holds the library's database open and blocks its upgrade: say so, and it goes on by itself once that tab is closed.
+IdbStore.onBlocked = () => { note.textContent = "Close the other Headliner tab: your library has to be updated first."; };
 const failed = (e: unknown) => { note.textContent = String(e).replace(/^Error: /, ""); console.error(e); };
 // A message too long for its place is cut short on the page; the whole of it shows when the pointer rests on it.
 new MutationObserver(() => { note.title = note.textContent ?? ""; }).observe(note, { childList: true, characterData: true, subtree: true });

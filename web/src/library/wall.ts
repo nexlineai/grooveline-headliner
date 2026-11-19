@@ -7,6 +7,7 @@ import type { TrackInfo } from "../core/beatgrid.ts";
 import { buildList } from "./browse.ts";
 import { groupCrates, itemOfGame, itemOfTrack, pickRandom, rankShelf } from "./crates.ts";
 import { createLoadPop } from "./loadpop.ts";
+import { buildPlaylistView } from "./playlistview.ts";
 import type { Crate, Grouping, WallItem } from "./crates.ts";
 import type { Library } from "./library.ts";
 import { Sleeves, paintGenerated, paintSleeve } from "./sleeves.ts";
@@ -55,7 +56,8 @@ const pill = (text: string, className: string, onClick: () => void, title = ""):
   return b;
 };
 const n = (v: number) => v.toLocaleString("en");
-const savedView = (): "wall" | "list" => { try { return localStorage.getItem(VIEW_KEY) === "list" ? "list" : "wall"; } catch { return "wall"; } };
+type View = "wall" | "list" | "plays";
+const savedView = (): View => { try { const v = localStorage.getItem(VIEW_KEY); return v === "list" || v === "plays" ? v : "wall"; } catch { return "wall"; } };
 const savedGrouping = (): Grouping => { try { const v = localStorage.getItem(GROUP_KEY); return v === "genre" || v === "tempo" ? v : "az"; } catch { return "az"; } };
 
 export function buildWall(root: HTMLElement, lib: Library, sleeves: Sleeves, hooks: WallHooks): Wall {
@@ -81,7 +83,8 @@ export function buildWall(root: HTMLElement, lib: Library, sleeves: Sleeves, hoo
   const shelf = make("div", "w-shelf");
   const floor = make("div", "w-floor");
   const listHost = make("div", "w-list");
-  root.replaceChildren(top, shelf, floor, listHost);
+  const plHost = make("div", "w-plays");
+  root.replaceChildren(top, shelf, floor, listHost, plHost);
 
   // The two ways to look at the records: the WALL (covers on a shelf and in crates) and the LIST (one line each, no covers).
   let view = savedView();
@@ -92,24 +95,45 @@ export function buildWall(root: HTMLElement, lib: Library, sleeves: Sleeves, hoo
   search.setAttribute("aria-label", "Search the records");
   const viewWall = pill("WALL", "mini", () => setView("wall"), "Covers on a shelf and in crates");
   const viewList = pill("LIST", "mini", () => setView("list"), "One line for each record, with the search and sorting");
-  topRight.append(search, viewWall, viewList);
+  const viewPlays = pill("PLAYLISTS", "mini", () => setView("plays"), "Your playlists: make them, fill them, save them as files and open them again");
+  topRight.append(search, viewWall, viewList, viewPlays);
+  // A short message for the status line (a playlist was saved, or opened).
+  let flash = "";
+  function say(text: string): void { flash = text; drawTop(); setTimeout(() => { if (flash === text) { flash = ""; drawTop(); } }, 7000); }
   // A click on a record asks "on which deck?" with one popup, wherever the record is (shelf, open crate, list).
   const toggleFav = (item: WallItem): void => { hooks.toggleFav?.(item); };
-  const pop = createLoadPop({ load: (d, item) => { hooks.load(d, item); if (current) renderInfo(); }, busy: hooks.busy, toggleFav });
+  const pop = createLoadPop({
+    load: (d, item) => { hooks.load(d, item); if (current) renderInfo(); }, busy: hooks.busy, toggleFav,
+    // ADD TO PLAYLIST: your own music only (the game's records are not in the library).
+    playlists: {
+      all: () => lib.playlists.lists.map((p) => ({ id: p.id, name: p.name })),
+      add: async (id, item) => {
+        const t = item.track;
+        if (!t) return "Only your own music goes in a playlist";
+        const p = id === null ? await lib.playlists.create() : lib.playlists.get(id);
+        if (!p) return "That playlist is gone";
+        return (await lib.playlists.add(p.id, [t])) > 0 ? `Added to ${p.name}` : `Already in ${p.name}`;
+      },
+    },
+  });
   const list = buildList(listHost, { load: (d, item) => hooks.load(d, item), onDeck: (item) => hooks.onDeck(item), ask: (item, anchor) => pop.show(item, anchor), toggleFav });
-  function setView(v: "wall" | "list"): void {
+  const playlistView = buildPlaylistView(plHost, lib.playlists, { load: (d, item) => hooks.load(d, item), onDeck: (item) => hooks.onDeck(item), ask: (item, anchor) => pop.show(item, anchor), say });
+  function setView(v: View): void {
     view = v;
     try { localStorage.setItem(VIEW_KEY, v); } catch { /* private window */ }
     root.classList.toggle("listing", v === "list");
+    root.classList.toggle("playlisting", v === "plays");
     viewWall.classList.toggle("on", v === "wall");
     viewList.classList.toggle("on", v === "list");
+    viewPlays.classList.toggle("on", v === "plays");
     if (v === "list") { closeDig(); list.resize(); }
+    if (v === "plays") { closeDig(); playlistView.show(); }
   }
   search.addEventListener("input", () => {
-    if (search.value.trim() && view === "wall") setView("list"); // a search shows its answer as a list
+    if (search.value.trim() && view !== "list") setView("list"); // a search shows its answer as a list
     list.setQuery(search.value);
   });
-  setInterval(() => { if (visible && view === "list") list.refreshMarks(); }, 500);
+  setInterval(() => { if (visible && view === "list") list.refreshMarks(); else if (visible && view === "plays") playlistView.refreshMarks(); }, 500);
 
   // MARK: - Data
 
@@ -192,6 +216,7 @@ export function buildWall(root: HTMLElement, lib: Library, sleeves: Sleeves, hoo
     if (lib.folders.some((f) => f.handle)) topLeft.append(pill("RESCAN", "mini w-rescan", () => { lib.rescanAll().catch(() => {}); }, "Look through your folders again: new files, changed ones, files that are gone; lengths and dates are read"));
     if (hooks.toRoom) topLeft.append(pill("ROOM", "mini w-room", () => hooks.toRoom!(), "Show the crowd instead of the wall"));
     // What the library is doing: reading, or waiting for a click.
+    if (flash) topLeft.append(make("span", "w-status flash", flash));
     const s = lib.scan;
     if (s) topLeft.append(make("span", "w-status", s.phase === "listing" ? `Looking through ${s.name}… ${n(s.found)}` : `Reading ${s.name}: ${n(s.done)} of ${n(s.total)}`));
     for (const f of lib.folders) {
@@ -447,7 +472,7 @@ export function buildWall(root: HTMLElement, lib: Library, sleeves: Sleeves, hoo
     const ws = Math.max(0.6, Math.min(1.5, h / DESIGN_HEIGHT, (w - 24) / 1180));
     root.style.setProperty("--ws", String(ws));
     // A short front (a phone held sideways): no shelf, just the crates.
-    root.classList.toggle("compact", h < 240);
+    root.classList.toggle("compact", h < 175);
     const want = Math.max(4, Math.min(MAX_PICKS, Math.floor((w - 60) / (118 * ws))));
     if (want !== shown) { shown = want; if (visible) drawShelf(); }
     if (current) { layoutDig(); place(); }

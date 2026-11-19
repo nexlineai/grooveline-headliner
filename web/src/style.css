@@ -644,3 +644,47 @@ body.live #top .pill.on { background: rgba(38, 198, 240, 0.2); color: #fff; bord
 .share-pop .sp-nets a:hover { border-color: rgba(255, 255, 255, 0.55); }
 /* ROOM / RECORDS: free play's wall can give way to the crowd; in LIVE the wall is the library, there is no room. */
 body.live #wall .w-room { display: none; }
+
+/* The PLAYLISTS view of the library: the playlists on the left, the records of the one picked on the right. */
+#wall .w-plays { display: none; flex: 1; min-height: 0; padding: 0 14px 8px; gap: 14px; font-size: calc(var(--ws) * 13px); }
+#wall.playlisting .w-shelf, #wall.playlisting .w-floor { display: none; }
+#wall.playlisting .w-plays { display: flex; }
+#wall.listing .w-plays { display: none; }
+#wall .pl-side { flex: none; width: calc(var(--ws) * 230px); display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--edge); padding-right: 12px; }
+#wall .pl-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 0 8px; }
+#wall .pl-cap { font: 700 calc(var(--ws) * 10px) system-ui, sans-serif; letter-spacing: 0.16em; color: var(--dim); }
+#wall .pl-bar, #wall .pl-actions { display: flex; gap: 6px; }
+#wall .pl-lists { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; }
+#wall .pl-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: calc(var(--ws) * 7px) calc(var(--ws) * 10px); border-radius: 7px; border: 1px solid transparent; background: rgba(255, 255, 255, 0.03); color: var(--ink); cursor: pointer; text-align: left; font: inherit; }
+#wall .pl-item:hover { background: rgba(255, 255, 255, 0.07); }
+#wall .pl-item.on { background: rgba(38, 198, 240, 0.14); border-color: #26c6f0; }
+#wall .pl-item .pl-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#wall .pl-item i { font-style: normal; color: var(--dim); font-variant-numeric: tabular-nums; font-size: 0.9em; }
+#wall .pl-none, #wall .pl-empty { color: var(--dim); font-size: 0.95em; padding: 10px 4px; margin: 0; }
+#wall .pl-main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+#wall .pl-title { flex: none; display: flex; align-items: center; gap: 12px; padding: 0 0 8px; border-bottom: 1px solid var(--edge); }
+#wall .pl-title h3 { margin: 0; font: 700 calc(var(--ws) * 16px) system-ui, sans-serif; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#wall .pl-count { color: var(--dim); font-size: 0.9em; white-space: nowrap; }
+#wall .pl-actions { margin-left: auto; }
+#wall .pl-rename { flex: 1; min-width: 0; padding: 5px 9px; border-radius: 6px; border: 1px solid #26c6f0; background: #080a0e; color: var(--ink); font: 700 calc(var(--ws) * 15px) system-ui, sans-serif; }
+#wall .pl-rows { flex: 1; min-height: 0; overflow-y: auto; }
+#wall .pl-row { display: grid; grid-template-columns: calc(var(--ws) * 28px) minmax(0, 2fr) minmax(0, 3fr) calc(var(--ws) * 46px) calc(var(--ws) * 64px) calc(var(--ws) * 78px); gap: 10px; align-items: center; padding: calc(var(--ws) * 6px) 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.035); cursor: pointer; }
+#wall .pl-row:hover { background: rgba(255, 255, 255, 0.04); }
+#wall .pl-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#wall .pl-row .pl-n, #wall .pl-row .pl-time { color: var(--dim); font-variant-numeric: tabular-nums; }
+#wall .pl-row.gone { opacity: 0.5; cursor: default; }
+#wall .pl-row.on { background: rgba(38, 198, 240, 0.14); box-shadow: inset 3px 0 0 #26c6f0; }
+#wall .pl-row.on.onb { background: rgba(255, 172, 40, 0.14); box-shadow: inset 3px 0 0 #ffac28; }
+#wall .pl-row.on.onb.ona { background: linear-gradient(90deg, rgba(38, 198, 240, 0.16), rgba(255, 172, 40, 0.16)); box-shadow: inset 3px 0 0 #26c6f0, inset -3px 0 0 #ffac28; }
+#wall .pl-load, #wall .pl-move { display: flex; gap: 4px; justify-content: flex-end; overflow: visible !important; }
+#wall .pl-load button { width: calc(var(--ws) * 26px); padding: calc(var(--ws) * 3px) 0; border-radius: 5px; background: rgba(8, 10, 18, 0.9); font: 800 calc(var(--ws) * 10px) system-ui, sans-serif; border: 1.5px solid; cursor: pointer; }
+#wall .pl-load button.left { color: #26c6f0; border-color: #26c6f0; }
+#wall .pl-load button.right { color: #ffac28; border-color: #ffac28; }
+#wall .pl-move button.arrow { width: calc(var(--ws) * 22px); padding: calc(var(--ws) * 3px) 0; border-radius: 5px; border: 1px solid rgba(255, 255, 255, 0.2); background: transparent; color: var(--dim); font-size: calc(var(--ws) * 10px); cursor: pointer; }
+#wall .pl-move button.arrow:hover { color: var(--ink); border-color: rgba(255, 255, 255, 0.5); }
+#wall .pl-move button.arrow.x:hover { color: #ff6a5a; border-color: #ff6a5a; }
+#wall .w-status.flash { color: #7be3a1; }
+#wall .mini.warn { border-color: #ff6a5a; color: #ff6a5a; }
+.load-pop .lp-add { width: 100%; margin-top: 9px; padding: 8px 8px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.25); background: #0a0d11; color: var(--ink); font: 700 10px "Orbitron", sans-serif; letter-spacing: 0.1em; }
+.load-pop .lp-add[hidden] { display: none; }
+.load-pop .lp-say { margin: 7px 0 0; min-height: 13px; font: 600 11px system-ui, sans-serif; color: #7be3a1; }

@@ -399,6 +399,15 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
   `MasterSection.fxSendOn` + the bus as the effect's input (insert effects replace the channel's own signal, tail effects echo only that channel); the wet returns to the room and,
   by the cue mix, the headphones. The delay's tempo follows the channel(s) the effect is on for. Free play's bar is unchanged (the whole room: `engine.fxOn`).
   The orange page messages (`#note`) sit under GROOVELINE LIVE in the bar, small, up to two lines, full text in the tooltip.
+- **List columns and playlists (19 Nov, night).** The LIST has TIME, TYPE and DATE (all sortable; DATE newest first; the file's modification date). `library/length.ts` reads the
+  length from the header at the scan (mp3: Xing/Info/VBRI frame count, else the size over the bitrate sampled along the file; FLAC STREAMINFO; WAV; AIFF; M4A mvhd; Ogg not read);
+  checked against 150 real files (FLAC and M4A exact, mp3 111/113 within 1 s of ffprobe, Mixxx's own stored durations were stale for some). `TAGS_VERSION` 3: entries from an older
+  reader are read again in the background by `Library.refreshOld` (and the wall has RESCAN); a rescan now keeps EVERY user field (`USER_FIELDS`: grid, analysis, cues, loops, fav,
+  plays; it used to keep only the first two). PLAYLISTS is the wall's third view (`library/playlistview.ts`; data `playlist.ts`, manager `playlists.ts`, store: IndexedDB version 2,
+  `playlists`; the upgrade is safe and an old tab lets go of the database: `onversionchange`, `onBlocked` says "close the other tab"). Entries hold the folder NAME + the path inside it
+  (not the folder id) + title/artist/length. Add from the which-deck popup (ADD TO PLAYLIST, own music only); NEW, RENAME, reorder, take out, DELETE (asks twice). EXPORT writes an
+  extended M3U (.m3u8, UTF-8, paths from the folder that holds your music folders; the browser's save dialog or a plain download), IMPORT reads .m3u8/.m3u from any program: records are
+  found by path suffix, then artist + title; what is not found is KEPT (grey, "NOT IN YOUR LIBRARY"). Tests: `playlist.test.ts`, `playlists.test.ts`, `length.test.ts`, page test `playlist-e2e`.
 - **The effects unit (19 Nov):** `audio/fx.ts`: seven effects (`FX_TYPES`), four knobs each (`FX_KNOBS`: name, steps; `FX_DEFAULTS`; the `tempo` knob picks the note value, the
   page turns it into `fxDelaySeconds`), `M.fxKnob..+3` in the shared mixer slots; knobs glide (30 ms), NaN/runaway output is dropped and the effect restarts, off = bit-identical
   (tests: every knob changes the sound, extremes stay finite and inside full scale). Delay/reverb/DLY+FLT have a tail and take the sound at their input; the others at their output.

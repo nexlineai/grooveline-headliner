@@ -11,6 +11,8 @@ export interface LoadPopHooks {
   busy?(deck: number): boolean;
   /** The heart. */
   toggleFav?(item: WallItem): void;
+  /** ADD TO PLAYLIST: the playlists to choose from, and the adding (null: into a new playlist). Returns what to tell the player. Only your own music can be added. */
+  playlists?: { all(): { id: number; name: string }[]; add(id: number | null, item: WallItem): Promise<string> };
 }
 
 export interface LoadPop {
@@ -62,13 +64,36 @@ export function createLoadPop(hooks: LoadPopHooks): LoadPop {
     decks.append(b);
     return { b, sub };
   });
-  el.append(head, ask, decks);
+  // ADD TO PLAYLIST: one choice list under the deck buttons (for your own music).
+  const add = document.createElement("select");
+  add.className = "lp-add";
+  add.setAttribute("aria-label", "Add this record to a playlist");
+  const say = document.createElement("p");
+  say.className = "lp-say";
+  el.append(head, ask, decks, ...(hooks.playlists ? [add, say] : []));
   el.hidden = true;
   document.body.append(el);
 
   let item: WallItem | null = null;
   let isOpen = false;
   const hide = (): void => { if (!isOpen) return; isOpen = false; el.classList.remove("open"); el.hidden = true; item = null; };
+  add.addEventListener("change", () => {
+    const it = item, choice = add.value;
+    if (!it || !hooks.playlists || !choice) return;
+    hooks.playlists.add(choice === "new" ? null : Number(choice), it).then((msg) => { say.textContent = msg; }, () => { say.textContent = "Could not add it"; });
+    fillAdd();
+  });
+  const fillAdd = (): void => {
+    add.replaceChildren();
+    const first = document.createElement("option");
+    first.value = ""; first.textContent = "ADD TO PLAYLIST\u2026";
+    add.append(first);
+    for (const p of hooks.playlists?.all() ?? []) { const o = document.createElement("option"); o.value = String(p.id); o.textContent = p.name; add.append(o); }
+    const fresh = document.createElement("option");
+    fresh.value = "new"; fresh.textContent = "+ NEW PLAYLIST";
+    add.append(fresh);
+    add.value = "";
+  };
   heart.addEventListener("click", (e) => {
     e.stopPropagation();
     if (!item || !hooks.toggleFav) return;
@@ -89,6 +114,8 @@ export function createLoadPop(hooks: LoadPopHooks): LoadPop {
       title.textContent = it.title;
       artist.textContent = it.artist || it.sub || "";
       paintHeart();
+      say.textContent = "";
+      if (hooks.playlists) { fillAdd(); add.hidden = !it.track; }
       buttons.forEach(({ b, sub }, d) => { const busy = hooks.busy?.(d) ?? false; b.classList.toggle("busy", busy); sub.textContent = busy ? "PLAYING" : d === 0 ? "DECK A" : "DECK B"; });
       el.hidden = false;
       isOpen = true;
