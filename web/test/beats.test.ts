@@ -63,6 +63,18 @@ describe("tempo and first beat", () => {
   });
   check("swung hats", { bpm: 119, first: 0.7, swing: 0.1 });
 
+  test("a long track: the first beat is looked for from the very start, not from the analysis window", () => {
+    // Ten minutes (the analysed window is eight, from a quarter in): the kicks begin at 1.0 s.
+    const r = analyseTempo(music({ bpm: 126, first: 1.0, seconds: 600 }), RATE)!;
+    assert.ok(r, "found something");
+    assert.ok(Math.abs(r.bpm - 126) < 0.01, `bpm ${r.bpm}`);
+    assert.ok(Math.abs(r.firstBeat - 1.0) < 0.012, `first beat ${r.firstBeat.toFixed(3)} (the window starts at 150 s)`);
+    // Twelve minutes with a bare intro: the first beat is where the kicks start, 20 s in, not 3 minutes in.
+    const r2 = analyseTempo(music({ bpm: 124, first: 0.2, seconds: 720, introSilence: 20 }), RATE)!;
+    const beat = 60 / 124, want = 0.2 + Math.ceil((20 - 0.2) / beat - 1e-9) * beat;
+    assert.ok(r2 && Math.abs(r2.firstBeat - want) < 0.012, `first beat ${r2?.firstBeat.toFixed(3)} against ${want.toFixed(3)}`);
+  });
+
   test("an octave: a 62 BPM pulse comes out as 124, never 31", () => {
     const r = analyseTempo(music({ bpm: 124, first: 0.4 }), RATE)!;
     assert.ok(Math.abs(r.bpm - 124) < 0.05);

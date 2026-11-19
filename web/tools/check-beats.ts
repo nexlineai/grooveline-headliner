@@ -80,6 +80,8 @@ for (const [path, bpmS, srS, hex] of rows) {
   if (isAnalysed) { analysed++; if (Math.abs(diff) <= 0.05) within005++; }
   if (r.confidence < 0.5) unsure++;
   let phase = NaN, diag = "";
+  // The first beat in plain seconds (not modulo a beat): Mixxx puts its grid's first beat near the start, mine where the kicks begin.
+  const firstText = frame !== null ? `  first ${r.firstBeat.toFixed(2)}s / Mixxx ${(frame / sr).toFixed(2)}s (${((r.firstBeat - frame / sr) / (60 / theirBpm)).toFixed(0)} beats later)` : "";
   if (frame !== null && !oct) {
     const beat = 60 / theirBpm, their = frame / sr;
     phase = (((r.firstBeat - their) % beat) + beat * 1.5) % beat - beat / 2;
@@ -94,7 +96,7 @@ for (const [path, bpmS, srS, hex] of rows) {
     if (Math.abs(phase) <= 20) ph20++;
     if (Math.abs(phase) <= 40) ph40++;
   }
-  console.log(`${theirBpm.toFixed(3).padStart(9)}${isAnalysed ? "*" : " "}  ${r.bpm.toFixed(3).padStart(8)}  ${diff.toFixed(3).padStart(7)}  ${r.confidence.toFixed(2)}  [${r.detail!.inside.toFixed(2)} ${r.detail!.spreadMs.toFixed(1).padStart(4)} ${r.detail!.sharpness.toFixed(1).padStart(4)}]  ${Number.isNaN(phase) ? "   -   " : phase.toFixed(1).padStart(7)}${oct ? "  OCTAVE" : ""}   ${name}  (${ms.toFixed(0)} ms)${diag}`);
+  console.log(`${theirBpm.toFixed(3).padStart(9)}${isAnalysed ? "*" : " "}  ${r.bpm.toFixed(3).padStart(8)}  ${diff.toFixed(3).padStart(7)}  ${r.confidence.toFixed(2)}  [${r.detail!.inside.toFixed(2)} ${r.detail!.spreadMs.toFixed(1).padStart(4)} ${r.detail!.sharpness.toFixed(1).padStart(4)}]  ${Number.isNaN(phase) ? "   -   " : phase.toFixed(1).padStart(7)}${oct ? "  OCTAVE" : ""}   ${name}  (${ms.toFixed(0)} ms)${diag}${firstText}`);
 }
 const measured = done - none;
 const sorted = phaseErrors.map(Math.abs).sort((a, b) => a - b);

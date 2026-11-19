@@ -12,7 +12,7 @@ export interface Tempo {
   bpm: number;
   /** Seconds into the piece where a beat falls, the first with a real onset (a cue point for the grid). */
   firstBeat: number;
-  /** 0...1: how steady and clear the beat is. Below about 0.5 the grid is a guess: show it as unsure. */
+  /** 0...1: how steady and clear the beat is. Below about 0.25 the grid is probably wrong (a third of the wrong ones are there): show it as unsure. */
   confidence: number;
   /** What the confidence is made of (for tuning): the share of beats on the line, their scatter in ms, and how sharply the onsets pile up. */
   detail?: { inside: number; spreadMs: number; sharpness: number };
@@ -121,13 +121,15 @@ function peakNear(o: Float32Array, fps: number, t: number, reach: number): [numb
 
 /** Estimates the tempo and the first beat. `hint`: the BPM from a file's tag, used only to choose between a tempo and its double or half. */
 export function analyseTempo(mono: Float32Array, rate: number, hint = 0): Tempo | null {
-  // The middle of a long piece is enough (and costs less): up to eight minutes, from a quarter in.
-  const maxSamples = Math.floor(rate * 480);
-  let start = 0;
-  if (mono.length > maxSamples) start = Math.min(Math.floor(mono.length * 0.25), mono.length - maxSamples);
-  const view = mono.subarray(start, Math.min(mono.length, start + maxSamples));
-  const { o, fps } = onsetStrength(view, rate);
-  if (o.length < fps * 8) return null; // under about eight seconds: nothing to find
+  // The onsets of the whole piece (a straight pass), but the tempo is found in the middle of a long one:
+  // up to eight minutes, from a quarter in. The first beat is then looked for from the very start.
+  const { o: all, fps } = onsetStrength(mono, rate);
+  if (all.length < fps * 8) return null; // under about eight seconds: nothing to find
+  const maxFrames = Math.floor(fps * 480);
+  let from = 0;
+  if (all.length > maxFrames) from = Math.min(Math.floor(all.length * 0.25), all.length - maxFrames);
+  const o = all.subarray(from, Math.min(all.length, from + maxFrames));
+  const windowStart = from / fps; // seconds of the file where the analysed window begins
   let total = 0;
   for (let i = 0; i < o.length; i++) total += o[i];
   if (total <= 0) return null;
@@ -199,9 +201,20 @@ export function analyseTempo(mono: Float32Array, rate: number, hint = 0): Tempo 
   const inside = pts.length / found.length;
   // The first beat that really sounds (not an empty intro), on the fitted line, counted from the start of the piece.
   const strong = median * 0.6;
-  const firstReal = pts.find((p) => p.w >= strong) ?? pts[0];
-  // Back to the file's own time.
-  const firstBeat = a + firstReal.k * b + start / rate;
+  // The line in the file's own time, walked back to the start of the piece: the first beat is the first
+  // one with a real onset (and one of the next two), so an empty or beatless intro is skipped.
+  const aFile = a + windowStart;
+  const total2 = all.length / fps;
+  const real = (t: number): boolean => { const hit = peakNear(all, fps, t, Math.min(0.03, b / 6)); return hit !== null && hit[1] >= strong; };
+  let firstBeat = NaN;
+  for (let j = Math.ceil(-aFile / b - 1e-9); aFile + j * b < total2 - 0.5; j++) {
+    const t = aFile + j * b;
+    if (real(t) && (real(t + b) || real(t + 2 * b))) { firstBeat = t; break; }
+  }
+  if (Number.isNaN(firstBeat)) { // (a tempo that wanders too much for the line to reach back): the first beat inside the window
+    const firstReal = pts.find((p) => p.w >= strong) ?? pts[0];
+    firstBeat = aFile + firstReal.k * b;
+  }
   const confidence = Math.max(0, Math.min(1, inside * Math.exp(-Math.pow(spread / 0.008, 2)) * Math.min(1, best.s / (1.6 * prior(bpm0)))));
   return { bpm, firstBeat, confidence, detail: { inside, spreadMs: spread * 1000, sharpness: best.s / prior(bpm0) } };
 }
