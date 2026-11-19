@@ -29,6 +29,13 @@ jobs:
       - run: xcodebuild -version
       - name: Generate the Xcode project
         run: brew install xcodegen && xcodegen generate
+      - name: The app is iPhone only (no iPad in the device family)
+        run: |
+          if grep -h 'TARGETED_DEVICE_FAMILY' *.xcodeproj/project.pbxproj | grep -q '2'; then
+            grep -h 'TARGETED_DEVICE_FAMILY' *.xcodeproj/project.pbxproj | sort -u
+            echo "::error::a target declares iPad; App Store Connect would ask for iPad screenshots"
+            exit 1
+          fi
       - name: Archive, sign, upload
         run: scripts/ci-testflight.sh
         env:

@@ -48,6 +48,10 @@ targets:
         ITSAppUsesNonExemptEncryption: false
     settings:
       base:
+        # iPhone only. Must be HERE: XcodeGen's iOS preset sets "1,2" on the target and beats the
+        # project-wide value above (v0.1.0-4 shipped with iPad and App Store Connect asked for
+        # 13-inch iPad screenshots).
+        TARGETED_DEVICE_FAMILY: "1"
         PRODUCT_BUNDLE_IDENTIFIER: org.grooveline.headliner
         PRODUCT_NAME: GroovelineHeadliner
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
