@@ -77,7 +77,7 @@ xcrun simctl terminate "$udid" "$bundle" || true
 
 shot 01-cold-open 6 -screen story -scene cold-open
 shot 02-booth 9 -screen booth -demo 1
-shot 03-bass-swap 6 -screen lesson -lesson bass-swap
+shot 03-bass-swap 16 -screen lesson -lesson bass-swap
 shot 04-saturday-shift 10 -screen night -night saturday-shift -demo 1
 shot 05-cave 10 -screen night -night cave-warm-up -demo 1
 shot 06-studio 8 -screen lesson -lesson drums -lessonStep 1 -demoPattern 1 -demo 1
