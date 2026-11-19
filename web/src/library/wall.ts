@@ -4,6 +4,7 @@
 // file is only the look and the feel (the data is crates.ts, the covers are sleeves.ts).
 
 import type { TrackInfo } from "../core/beatgrid.ts";
+import { buildList } from "./browse.ts";
 import { groupCrates, itemOfGame, itemOfTrack, pickRandom } from "./crates.ts";
 import type { Crate, Grouping, WallItem } from "./crates.ts";
 import type { Library } from "./library.ts";
@@ -18,8 +19,6 @@ export interface WallHooks {
   openFolder(): void;
   /** The game's records you can play now. */
   game(): TrackInfo[];
-  /** The ROOM button: the crowd instead of the wall. */
-  toRoom(): void;
 }
 
 export interface Wall {
@@ -29,6 +28,7 @@ export interface Wall {
 }
 
 const GROUP_KEY = "headliner.wallBy";
+const VIEW_KEY = "headliner.libView";
 const GROUP_LABELS: [Grouping, string][] = [["az", "A–Z"], ["genre", "GENRE"], ["tempo", "TEMPO"]];
 const MAX_PICKS = 14;
 /** The wall is drawn for a front area this high (CSS pixels); everything scales from there. */
@@ -48,6 +48,7 @@ const pill = (text: string, className: string, onClick: () => void, title = ""):
   return b;
 };
 const n = (v: number) => v.toLocaleString("en");
+const savedView = (): "wall" | "list" => { try { return localStorage.getItem(VIEW_KEY) === "list" ? "list" : "wall"; } catch { return "wall"; } };
 const savedGrouping = (): Grouping => { try { const v = localStorage.getItem(GROUP_KEY); return v === "genre" || v === "tempo" ? v : "az"; } catch { return "az"; } };
 
 export function buildWall(root: HTMLElement, lib: Library, sleeves: Sleeves, hooks: WallHooks): Wall {
@@ -66,9 +67,38 @@ export function buildWall(root: HTMLElement, lib: Library, sleeves: Sleeves, hoo
   const lastIndex = new Map<string, number>();
 
   const top = make("div", "w-top");
+  const topLeft = make("div", "w-topl"); // drawn again whenever the library changes
+  const topRight = make("div", "w-topr"); // the search and the view switch: made once, so typing is never interrupted
+  top.append(topLeft, topRight);
   const shelf = make("div", "w-shelf");
   const floor = make("div", "w-floor");
-  root.replaceChildren(top, shelf, floor);
+  const listHost = make("div", "w-list");
+  root.replaceChildren(top, shelf, floor, listHost);
+
+  // The two ways to look at the records: the WALL (covers on a shelf and in crates) and the LIST (one line each, no covers).
+  let view = savedView();
+  const search = make("input", "w-search");
+  search.type = "search";
+  search.placeholder = "SEARCH THE RECORDS";
+  search.title = "Artist, title, tempo, key, genre, album: every word you type must match";
+  search.setAttribute("aria-label", "Search the records");
+  const viewWall = pill("WALL", "mini", () => setView("wall"), "Covers on a shelf and in crates");
+  const viewList = pill("LIST", "mini", () => setView("list"), "One line for each record, with the search and sorting");
+  topRight.append(search, viewWall, viewList);
+  const list = buildList(listHost, { load: (d, item) => hooks.load(d, item), onDeck: (item) => hooks.onDeck(item) });
+  function setView(v: "wall" | "list"): void {
+    view = v;
+    try { localStorage.setItem(VIEW_KEY, v); } catch { /* private window */ }
+    root.classList.toggle("listing", v === "list");
+    viewWall.classList.toggle("on", v === "wall");
+    viewList.classList.toggle("on", v === "list");
+    if (v === "list") { closeDig(); list.resize(); }
+  }
+  search.addEventListener("input", () => {
+    if (search.value.trim() && view === "wall") setView("list"); // a search shows its answer as a list
+    list.setQuery(search.value);
+  });
+  setInterval(() => { if (visible && view === "list") list.refreshMarks(); }, 500);
 
   // MARK: - Data
 
@@ -78,6 +108,7 @@ export function buildWall(root: HTMLElement, lib: Library, sleeves: Sleeves, hoo
     gameItems = hooks.game().map(itemOfGame);
     const mine = groupCrates(items, grouping);
     crates = [...(gameItems.length ? [{ id: "game", label: "THE GAME", items: gameItems } as Crate] : []), ...mine];
+    list.setItems(items.length ? items : gameItems);
     const pool = items.length ? items : gameItems;
     const ids = new Set(pool.map((i) => i.id));
     if (picks.length === 0 || picks.some((p) => !ids.has(p.id))) picks = pickRandom(pool, MAX_PICKS);
@@ -127,7 +158,7 @@ export function buildWall(root: HTMLElement, lib: Library, sleeves: Sleeves, hoo
   }
 
   function drawTop(): void {
-    top.replaceChildren();
+    topLeft.replaceChildren();
     const group = make("div", "w-group");
     group.append(make("span", "w-cap", "CRATES BY"));
     for (const [g, label] of GROUP_LABELS) {
@@ -138,12 +169,12 @@ export function buildWall(root: HTMLElement, lib: Library, sleeves: Sleeves, hoo
       });
       group.append(b);
     }
-    top.append(group, pill("SHUFFLE", "mini", () => { picks = pickRandom(items.length ? items : gameItems, MAX_PICKS); drawShelf(); }, "Another handful of records for the wall"), pill("ROOM", "mini", hooks.toRoom, "The crowd instead of the wall"));
+    topLeft.append(group, pill("SHUFFLE", "mini w-shuffle", () => { picks = pickRandom(items.length ? items : gameItems, MAX_PICKS); drawShelf(); }, "Another handful of records for the wall"));
     // What the library is doing: reading, or waiting for a click.
     const s = lib.scan;
-    if (s) top.append(make("span", "w-status", s.phase === "listing" ? `Looking through ${s.name}… ${n(s.found)}` : `Reading ${s.name}: ${n(s.done)} of ${n(s.total)}`));
+    if (s) topLeft.append(make("span", "w-status", s.phase === "listing" ? `Looking through ${s.name}… ${n(s.found)}` : `Reading ${s.name}: ${n(s.done)} of ${n(s.total)}`));
     for (const f of lib.folders) {
-      if (lib.needsAccess.has(f.id)) top.append(pill(`RECONNECT ${f.name}`.slice(0, 28), "mini on", () => { lib.reconnect(f).catch(() => {}); }, "The browser asks again before it reads this folder"));
+      if (lib.needsAccess.has(f.id)) topLeft.append(pill(`RECONNECT ${f.name}`.slice(0, 28), "mini on", () => { lib.reconnect(f).catch(() => {}); }, "The browser asks again before it reads this folder"));
     }
   }
 
@@ -381,13 +412,15 @@ export function buildWall(root: HTMLElement, lib: Library, sleeves: Sleeves, hoo
   function layout(): void {
     const h = root.clientHeight, w = root.clientWidth;
     if (!h) return;
-    const ws = Math.max(0.6, Math.min(1.5, h / DESIGN_HEIGHT));
+    // As big as the height allows, but never so big that the row of seven crates no longer fits the width.
+    const ws = Math.max(0.6, Math.min(1.5, h / DESIGN_HEIGHT, (w - 24) / 1180));
     root.style.setProperty("--ws", String(ws));
     // A short front (a phone held sideways): no shelf, just the crates.
     root.classList.toggle("compact", h < 240);
     const want = Math.max(4, Math.min(MAX_PICKS, Math.floor((w - 60) / (118 * ws))));
     if (want !== shown) { shown = want; if (visible) drawShelf(); }
     if (current) { layoutDig(); place(); }
+    list.resize();
   }
   if (typeof ResizeObserver !== "undefined") new ResizeObserver(layout).observe(root);
 
@@ -399,6 +432,7 @@ export function buildWall(root: HTMLElement, lib: Library, sleeves: Sleeves, hoo
       if (!v) { closeDig(); for (const cancel of pending) cancel(); pending = []; return; }
       lib.init().catch(() => {});
       layout();
+      setView(view);
       rebuild();
     },
     refresh(): void { soon(); },

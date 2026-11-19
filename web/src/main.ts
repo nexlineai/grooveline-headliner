@@ -70,12 +70,17 @@ let cutPattern: DrumPattern | null = progress.track ? new DrumPattern(progress.t
 
 const trackFor = (id: string): TrackInfo | null => (id === "your-dubplate" ? cutInfo() : tracks.find((t) => t.id === id) ?? null);
 
+/** A record is not changed under a playing needle: in LIVE a message comes up over that deck. True when the deck is busy. */
+function deckBusy(d: number): boolean {
+  const deck = engine.decks[d];
+  if (booth.mode !== "live" || !deck.motorOn || Math.abs(deck.rate) <= 0.1) return false;
+  booth.alertDeck(d, `STOP THE ${d === 0 ? "LEFT" : "RIGHT"} DECK BEFORE LOADING A NEW RECORD`);
+  return true;
+}
+
 async function loadRecord(d: number, track: TrackInfo): Promise<void> {
   const deck = engine.decks[d];
-  if (deck.motorOn && Math.abs(deck.rate) > 0.1 && !booth.lesson && !booth.night) {
-    note.textContent = "Stop the deck before you change its record.";
-    return;
-  }
+  if (deckBusy(d)) return;
   if (track.id === "your-dubplate") {
     // On the big system (the DUBPLATE night) the cut booms until its low comes down.
     loadCut(cutPattern ?? DrumPattern.track, deck, booth.night?.info.mixdownCheck ?? false);
@@ -94,12 +99,9 @@ async function loadRecord(d: number, track: TrackInfo): Promise<void> {
 const library = new Library();
 const sleeves = new Sleeves(library);
 
-// The record room: in free play the front of the booth is a wall with a shelf and crates (or the crowd, if you choose).
+// The record room: under the gear row of LIVE, a wall with a shelf and crates.
 const bigSleeves = new Sleeves(library, 150, 4, 320);
 let gameRecords: TrackInfo[] = [];
-const FRONT_KEY = "headliner.front";
-let front: "wall" | "room" = (() => { try { return localStorage.getItem(FRONT_KEY) === "room" ? "room" : "wall"; } catch { return "wall"; } })();
-const setFront = (f: "wall" | "room") => { front = f; try { localStorage.setItem(FRONT_KEY, f); } catch { /* private window */ } };
 function openMusicFolder(): void {
   if (Library.canPickFolder) { library.init().then(() => library.pickFolder()).catch(failed); return; }
   const input = document.createElement("input");
@@ -116,13 +118,7 @@ const wall = buildWall($("wall"), library, bigSleeves, {
   onDeck: (item) => [0, 1].filter((d) => engine.decks[d].info?.id === item.id),
   openFolder: openMusicFolder,
   game: () => gameRecords,
-  toRoom: () => setFront("room"),
 });
-$("wall-open").addEventListener("click", () => setFront("wall"));
-// The wall's own controls keep clear of the top bar, whatever its width is (its buttons come and go, the font follows the window).
-if (typeof ResizeObserver !== "undefined") {
-  new ResizeObserver(() => document.documentElement.style.setProperty("--top-w", `${$("top").getBoundingClientRect().width}px`)).observe($("top"));
-}
 /** The library track on each deck (null: a record of the game, or nothing). */
 const userOnDeck: (LibraryTrack | null)[] = [null, null];
 /** A track longer than this is too big to hold decoded (48 kHz stereo float: about 23 MB a minute, and a copy while loading). */
@@ -132,7 +128,7 @@ let myMusicPanel: { refresh(): void } | null = null;
 /** Opens a track of your library on a deck: decode, find its grid (your correction, an earlier analysis, or analysis now), play. */
 async function loadUserTrack(d: number, t: LibraryTrack): Promise<void> {
   const deck = engine.decks[d];
-  if (deck.motorOn && Math.abs(deck.rate) > 0.1) { note.textContent = "Stop the deck before you change its record."; return; }
+  if (deckBusy(d)) return;
   const name = t.artist ? `${t.artist} - ${t.title}` : t.title;
   try {
     note.textContent = `Opening ${name}…`;
@@ -302,6 +298,9 @@ const newestFirst = (list: TrackInfo[]) =>
 const upTo = (chapter: number) => newestFirst(tracks.filter((t) => (t.chapter ?? 1) <= chapter && t.id !== "white-label"));
 
 function showMode(mode: "free" | "lesson" | "night" | "story" | "menu"): void {
+  // Free play is LIVE (the DJ's booth); lessons and nights are the game's (the iPhone's desk).
+  if (mode === "free") booth.setMode("live");
+  else if (mode === "lesson" || mode === "night") booth.setMode("game");
   setMenuMusic(mode === "menu");
   lessonOverlay.hidden = mode !== "lesson";
   nightOverlay.hidden = mode !== "night";
@@ -846,6 +845,7 @@ function kindFromKey(key: string): Kind | null {
   switch (t) {
     case "play": case "cue": case "sync": case "phones": case "pitch": case "channel": case "filter": case "trim": case "jog":
       return { t, d } as Kind;
+    case "master": return { t: "master" };
     case "eq": return { t: "eq", d, band };
     case "cross": return { t: "cross" };
     case "cueMix": return { t: "cueMix" };
@@ -862,7 +862,7 @@ function targetKind(key: string): TargetKind | null {
   if (["play", "sync", "phones", "fxOn", "fxType", "fxDiv"].includes(t)) return "button";
   if (t === "jog") return "relative";
   if (t === "nudge" || t === "cue") return "hold"; // held down: a nudge pushes, CUE plays from its mark
-  if (["pitch", "channel", "cross", "eq", "filter", "trim", "cueMix", "phonesLevel", "fxAmount"].includes(t)) return "absolute";
+  if (["pitch", "channel", "cross", "eq", "filter", "trim", "master", "cueMix", "phonesLevel", "fxAmount"].includes(t)) return "absolute";
   return null;
 }
 
@@ -875,7 +875,7 @@ function labelOf(key: string): string {
   if (t === "fxDiv") return `NOTE ${FX_DIVISIONS[Number(ds)]?.label ?? "(NEXT)"}`;
   const side = ds === "0" ? "LEFT " : ds === "1" ? "RIGHT " : "";
   const names: Record<string, string> = { play: "PLAY", cue: "CUE", sync: "SYNC", phones: "PHONES", pitch: "PITCH", channel: "FADER",
-    filter: "FILTER", trim: "GAIN", jog: "JOG (THE RECORD)", cross: "CROSSFADER", cueMix: "CUE MIX", phonesLevel: "HEADPHONES LEVEL" };
+    filter: "FILTER", trim: "TRIM (GAIN)", master: "MASTER VOLUME", jog: "JOG (THE RECORD)", cross: "CROSSFADER", cueMix: "CUE MIX", phonesLevel: "HEADPHONES LEVEL" };
   if (t === "eq") return `${side}${["LOW", "MID", "HI"][Number(bs)] ?? "EQ"}`;
   if (t === "nudge") return `${side}NUDGE ${bs === "-1" ? "BACK" : "FORWARD"} (BUTTON)`;
   return `${side}${names[t] ?? t.toUpperCase()}`;
@@ -992,13 +992,13 @@ Object.assign((window as unknown as { headliner: object }).headliner, { midi, le
 const boothActive = () => title.hidden && chapterScreen.hidden && $("story").hidden && $("bag").hidden && $("credits").hidden && result.hidden;
 midi.active = boothActive;
 
-// The wall is up in free play when the booth is on screen; then nobody sees the crowd, so its clips rest.
-(function frontLoop() {
-  const free = !booth.lesson && !booth.night && boothActive();
-  wall.setVisible(free && front === "wall");
-  booth.setRoomHidden(free && front === "wall");
-  $("wall-open").hidden = !(free && front === "room");
-  requestAnimationFrame(frontLoop);
+// LIVE's own parts (the wall under the gear row, the stream panel, the top bar's title) show while the booth is in LIVE and on screen.
+(function liveLoop() {
+  const live = booth.mode === "live" && boothActive();
+  wall.setVisible(live);
+  $("stream").hidden = !live;
+  $("livebar").hidden = !live;
+  requestAnimationFrame(liveLoop);
 })();
 attachKeys(booth, boothActive, () => { fillControls(); toggle($("controls")); });
 

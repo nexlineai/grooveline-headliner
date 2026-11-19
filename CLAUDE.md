@@ -246,12 +246,12 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
   delay time). Dry stays full, the wet is added to the room AND to the headphones x cue mix (split: left =
   room, right = phones). Off and finished ringing (under -100 dB for 0.5 s) it does nothing: bit-identical
   output (tested). Soft clip (0.9 knee) only while it works. (2) the headphones level (VOL knob next to MIX;
-  unity at 0.7, -60..+6 dB, kept in localStorage `headliner.phonesLevel`). The FX bar (DELAY/REVERB/FLANGER,
-  1/4..1/32, AMOUNT, ON; keys G T Y V B; MIDI targets fxOn/fxType:i/fxDiv:i/fxAmount) is a third gear row in FREE
-  PLAY only (no lesson/night: `setTheDesk` forces it off; `build()` reads `lesson/night`, and the booth rebuilds
-  when that changes, which also ends a CUE hold). Settings in localStorage `headliner.fx`; always OFF at start.
+  unity at 0.7, -60..+6 dB, kept in localStorage `headliner.phonesLevel`). The effect unit (DELAY/REVERB/FLANGER,
+  1/4..1/32, AMOUNT, ON; keys G T Y V B; MIDI targets fxOn/fxType:i/fxDiv:i/fxAmount) is the first unit of the
+  effects controller of LIVE (see "LIVE booth" below); the game's booth has none (`Booth.mode`). Settings in localStorage
+  `headliner.fx`; always OFF at start.
   The old `echoDelay` in `core/mixer.ts` is the far-speakers mishap (one late copy), not this delay.
-- **Channel GAIN knobs (web only, 19 Nov): a knob above each fader, FREE PLAY only.** For records mastered too loud (own
+- **Channel GAIN knobs (web only, 19 Nov): the TRIM knob at the top of each LIVE channel strip (LIVE only).** For records mastered too loud (own
   music). `Deck.trim` (0...1, 0.5 = 0 dB; `trimDecibels` in `audio/fx.ts`: -24 dB at the bottom, +6 at the top, 0.03 detent,
   double tap = 0 dB) goes through the deck's existing needle gain: `Deck.pushGain()` writes `D.targetGain` = `lifted ? 0 :
   trimGainFor(trim)`, and EVERY write of that field goes through it (the lift, a load, a made record), so a needle drop or a
@@ -259,7 +259,7 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
   Swift twin) changed, and the trim sits before the EQ, the filter and the fader; the channel meter shows the trimmed level.
   The knob stays on the deck when a record is loaded (hardware-like). `Booth.applyTrim()` runs every frame: outside free
   play every channel is at exactly 0 dB (the knob keeps its place, and the layout has no knobs and the old 88-unit
-  faders; in free play the faders are 72 units to make room, `L.trimY`/`L.meterH`). MIDI target `trim:d` (absolute,
+  faders; the game's booth is the plain iPhone desk again). MIDI target `trim:d` (absolute,
   "LEFT GAIN"), mouse, wheel. `heardGain` (the lessons' and nights' view of the mix) is the fader only, so the trim never
   changes a verdict. Not remembered between visits or per track (a possible next step: store it with the library track).
 - **My music (web only, 19 Nov): `web/src/library/`, free play only (CRATE -> MY MUSIC; hidden in lessons and nights).**
@@ -292,21 +292,30 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
   handled (`Cover.unsync`); WAV files with art in an ID3 chunk (about 1 %) still show no cover. Real files: 122 of 122 embedded
   covers decode, median 15 ms, worst 69 ms. NOT done: online tagging (MusicBrainz + Cover Art Archive via the Worker; about 31 % of
   his library has no picture at all), and the "closet" look (crates with records) beyond the grid.
-- **The record room (web only, 19 Nov; item 4b): in free play the front of the booth is a wall and crates.** `library/wall.ts` (look
+- **The record room (web only, 19 Nov; item 4b): in LIVE the library under the gear row is a wall and crates.** `library/wall.ts` (look
   and feel), `library/crates.ts` (data, no DOM, tested), covers from a second, bigger `Sleeves` (320 px, `bigSleeves` in main.ts).
-  `#wall` is a fixed overlay as high as the room (`calc(100dvh - var(--gear-h))`, z 2): a shelf of picks (random, covers first, SHUFFLE),
+  `#wall` is a fixed overlay placed by `body.live #wall` from the CSS variables `--lib-left/top/w/h` that `Booth.buildLive` publishes
+  from `liveGeometry().library` (it used to cover the room above the gear; LIVE has no room): a shelf of picks (random, covers first, SHUFFLE),
   a row of crates, and a crate opens to DIG: the front record stands up, the ones behind show their tops (CSS 3D, only about 10 records
   in the DOM), flip with the wheel, a drag, the arrows (captured only while a crate is open: they are the crossfader otherwise), Home/End,
   PageUp/Down, the scrub bar; Esc or a click on the empty stage closes (in fullscreen Esc leaves fullscreen first: the click and the CLOSE button are the way). LEFT / RIGHT put the record on a deck through the same paths as MY MUSIC
   (`loadUserTrack`, `loadRecord`, `booth.refuseLoad`). Crates are chosen by CRATES BY: A-Z (default; balanced, cut between letters),
   GENRE (your own tags, top ones, rest, none), TEMPO (bands 110/120/126/134, from the analysis or the tag); THE GAME is always the first
   crate; no library: an "OPEN A FOLDER" crate. ROOM button = the crowd instead (then a RECORDS pill); choice in `headliner.front`,
-  grouping in `headliner.wallBy`. Shown only in free play with the booth on screen (`frontLoop` in main.ts), never in a lesson or night.
+  grouping in `headliner.wallBy`. Shown only in LIVE with the booth on screen (`liveLoop` in main.ts), never in a lesson or night. (The ROOM button and the
+  crowd clips pause are gone: LIVE has no room.)
   While it is up the room's clips are not played (`Booth.setRoomHidden`). Rebuilt from `Library.subscribe` at most every 0.8 s (a
   scan reports often); 10,000 tracks group in about 40 ms. Compact (front shorter than 240 px: a phone held sideways): crates only.
   Measured on 500 real files: tag tempo 67 %, genre 56 %, artist 90 %, and 27 % of the files share one copy date (so no "newest" crate).
+  **Search and LIST (19 Nov, Zé's asks):** the wall's top row has a search box and a WALL | LIST switch, built ONCE (the row's other
+  half is redrawn on every library change, which would blur a box being typed in). `library/browse.ts`: `filterItems` (every word must
+  be in the artist, title, tempo/key/genre line, album or file name), `sortItems` (ARTIST, TITLE, BPM, KEY on the Camelot wheel, no
+  tempo or key last), and `buildList`: one line per record, NO covers, virtual scrolling (only the lines in view are elements; tested
+  with 9,004 records), A / B load buttons through the same hooks as the wall, an "on deck" mark that follows the decks (polled every
+  0.5 s), the sort kept in `headliner.listSort` and the view in `headliner.libView`. Typing a search on the wall switches to LIST.
+  The wall's size is capped by the width too (`ws <= (w - 24) / 1180`) so seven crates always fit.
   Not done: drag a record onto a deck, a crate front board drawn over the dig, remembering the last records played.
-  **Top bar (19 Nov): small buttons.** `#top .pill` and `#wall-open` use `clamp(9px, 0.95vw, 11.5px)` (about two thirds of the sheets'
+  **Top bar (19 Nov): small buttons.** `#top .pill` uses `clamp(9px, 0.95vw, 11.5px)` (about two thirds of the sheets'
   pills, which keep the big size); the bar is about 475 px wide at 1200 px and up. main.ts publishes its real width as `--top-w`
   (ResizeObserver) and the wall's control row keeps clear of it, so nothing overlaps at any window width.
   **Bug fixed with it (from 0f7f5db):** `build()` set `--gear-h` to the ROOM's height but the CSS uses the GEAR's height (fallback 58vh,
@@ -317,7 +326,20 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
   headphones' pair -> MediaStream -> `<audio>.setSinkId`; the room via `AudioContext.setSinkId`).
   Never recreate the AudioContext (the records live in the worklet). A vanished device -> OFF (the
   cue must never fall back to the room). Not testable headless: needs Zé's hardware.
-- **Layout unit (18 Nov):** `u = min(height share / 210, width / 816)` (816u = the iPhone's gear width), the gear sits at the
+- **LIVE booth (web only, 19 Nov; step L1 of `headliner-live-roadmap.md` in the vault).** Free play is now LIVE: `main.ts showMode("free")`
+  sets `Booth.mode = "live"`, a lesson or a night sets `"game"` (the iPhone's desk, untouched, plain parity: no trim, no effects, no
+  master, no wall). `booth/live-geometry.ts` = pure layout (tested at 7 window sizes: nothing overlaps, everything inside its module,
+  touch areas big enough): top bar 40 px; ONE gear row (deck A | mixer | FX controller | deck B; width beyond 1000 units goes to the
+  decks' waveforms); under it the library (HTML `#wall`) and the stream panel (`#stream`, a placeholder until L5). `booth/live-draw.ts` =
+  the look (graphite, LED-ring knobs, ridged fader caps, LED meters; deck A cyan, deck B amber; no pink; `LIVE` theme tokens) and
+  `LiveRenderer` (keeps the platter and waveform pictures). `Booth.buildLive()` registers every control as a `hit` with the SAME `Kind`s,
+  so the pointer code, keys, MIDI learn and the wheel work as before; new kinds: `master` (engine.masterVolume; MIDI "MASTER VOLUME")
+  and the cue-mix / phones-level faders are horizontal (`Layout.sliderTravel`). The mixer strip, top to bottom: TRIM, HI, MID, LOW,
+  FILTER, CUE (headphones), channel fader; the middle: MASTER, meters, CUE-MIX and PHONES faders, crossfader. Reserved for later steps
+  and drawn dim: 8 pads per deck (hot cues, loops), a LOOP panel, effect units 2 and 3 with their faders. The stop-the-deck alert:
+  `main.ts deckBusy` -> `Booth.alertDeck` (a message over that deck for 3 s; the record stays). Drawing costs about 4 ms a frame
+  (the static parts are not cached yet: a hardening item). Smokes: `test/live-geometry.test.ts` and the page checks listed in the vault.
+- **Layout unit (18 Nov, the game's booth):** `u = min(height share / 210, width / 816)` (816u = the iPhone's gear width), the gear sits at the
   bottom and the room takes the rest; `build()` publishes `--gear-h` (the gear's height in px) and the overlays (lesson, night,
   studio grid) size themselves from it, so fullscreen 16:9 no longer overlaps. FULLSCREEN button in the top bar (hidden where
   the browser has none). Windows below about 1.45:1 (4:3, 5:4) leave an empty band above the gear (the room picture is fixed 3.08:1).

@@ -49,7 +49,22 @@
     <button id="fullscreen-button" class="pill" hidden>FULLSCREEN</button>
   </div>
   <div id="wall" hidden></div>
-  <button id="wall-open" class="pill" hidden>RECORDS</button>
+  <div id="livebar" hidden>
+    <span class="brand">GROOVELINE<b>LIVE</b></span>
+    <span class="onair"><i></i><span>OFF AIR</span></span>
+    <span class="time">00:00:00</span>
+  </div>
+  <aside id="stream" hidden>
+    <div class="s-head"><span>STREAM</span><span class="s-state">OFF AIR</span></div>
+    <dl>
+      <dt>DESTINATION</dt><dd>Grooveline Radio</dd>
+      <dt>ON AIR</dt><dd>00:00:00</dd>
+      <dt>LISTENERS</dt><dd>&mdash;</dd>
+      <dt>BITRATE</dt><dd>&mdash;</dd>
+      <dt>PREVIEW</dt><dd>&mdash;</dd>
+    </dl>
+    <button class="go" type="button" disabled title="Streaming from the page comes in a later step">GO LIVE</button>
+  </aside>
   <div id="note"></div>
 
   <div id="crate" class="sheet" hidden>
@@ -84,7 +99,7 @@
     <h1>HEADLINER</h1>
     <p class="tagline">From the bedroom to the main stage</p>
     <button id="title-play" class="primary">PLAY</button>
-    <div class="row"><button id="title-free" class="quiet">FREE PLAY</button><button id="title-ending" class="quiet" hidden>THE ENDING</button></div>
+    <div class="row"><button id="title-free" class="quiet">LIVE</button><button id="title-ending" class="quiet" hidden>THE ENDING</button></div>
     <p class="hint">Web preview</p>
   </div>
 
