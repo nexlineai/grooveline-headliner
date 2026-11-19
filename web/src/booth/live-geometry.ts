@@ -18,8 +18,12 @@ import type { Point, Rect } from "./gear.ts";
 export const TOP_BAR = 40;
 const GEAR_H = 300;
 const DECK_MIN = 296, MIXER_W = 226, GAP = 5.333;
-/** The effects strip above the gear row: its height and the gap under it (units). */
+/** The effects strip above the gear row (a narrow window): its height and the gap under it (units). */
 const FX_STRIP_H = 30, FX_STRIP_GAP = 4;
+/** The effects controls sit in the TOP BAR, right after the stream bar's 00:00:00, when the window is wide enough: what the bar's HTML takes on the left
+ * (GROOVELINE LIVE, OFF AIR, the time) and on the right (the buttons), and what the controls need, all in pixels. Narrower: the strip goes under the bar. */
+const BAR_LEFT_PX = 396, BAR_RIGHT_PX = 400, BAR_FX_PX = 470;
+export const fxFitsTheBar = (W: number): boolean => W - BAR_LEFT_PX - BAR_RIGHT_PX >= BAR_FX_PX;
 /** The knobs of the mixer strips and of the effect unit are all this size (units). */
 export const KNOB_R = 11;
 /** The right of a deck's header (time, lamps, key, tempo) takes this many units; the title stops before it. */
@@ -86,6 +90,8 @@ export interface LiveFxGeometry {
 
 export interface LiveGeometry {
   W: number; H: number; u: number;
+  /** The effects controls are in the top bar (else a strip above the gear row). */
+  fxInBar: boolean;
   topBar: Rect; gear: Rect;
   deck: LiveDeckGeometry[]; mixer: LiveMixerGeometry; fx: LiveFxGeometry;
   /** Under the gear row. */
@@ -98,13 +104,15 @@ export function liveGeometry(W: number, H: number): LiveGeometry {
   const margin = 10;
   const fixedW = MIXER_W + 2 * GAP + 2 * DECK_MIN;
   const uW = (W - 2 * margin) / fixedW;
-  const uH = (H * 0.71 - TOP_BAR - 8) / (GEAR_H + FX_STRIP_H + FX_STRIP_GAP);
+  const fxInBar = fxFitsTheBar(W);
+  // In the bar the effects cost the gear row no height; as a strip they cost its height and a gap.
+  const stripUnits = fxInBar ? 0 : FX_STRIP_H + FX_STRIP_GAP;
+  const uH = (H * (fxInBar ? 0.68 : 0.71) - TOP_BAR - 8) / (GEAR_H + stripUnits);
   const u = clamp(Math.min(uW, uH), 0.5, 3);
   const gearH = GEAR_H * u;
-  // The effects strip on top, then the gear row.
   const stripTop = H - TOP_BAR - 4;
   const stripY = stripTop - FX_STRIP_H * u;
-  const gearTop = stripY - FX_STRIP_GAP * u;
+  const gearTop = fxInBar ? stripTop : stripY - FX_STRIP_GAP * u;
   const gearY = gearTop - gearH;
   // The decks share what is left of the width.
   const deckW = Math.max(DECK_MIN * u, (W - 2 * margin - (MIXER_W + 2 * GAP) * u) / 2);
@@ -118,14 +126,14 @@ export function liveGeometry(W: number, H: number): LiveGeometry {
 
   const deck = [rectA, rectB].map((rect) => deckGeometry(rect, u));
   const mixer = mixerGeometry(rectM, u);
-  const fx = fxGeometry({ x: (W - total) / 2, y: stripY, w: total, h: FX_STRIP_H * u }, u);
+  const fx = fxInBar ? fxBarGeometry(W, H) : fxGeometry({ x: (W - total) / 2, y: stripY, w: total, h: FX_STRIP_H * u }, u);
 
   const lowerTop = gearY - 8;
   const lower: Rect = { x: margin, y: 6, w: W - 2 * margin, h: Math.max(0, lowerTop - 6) };
   const panelW = clamp(W * 0.24, 230, 420);
   const library: Rect = { x: lower.x, y: lower.y, w: lower.w - panelW - 10, h: lower.h };
   const streamPanel: Rect = { x: lower.x + lower.w - panelW, y: lower.y, w: panelW, h: lower.h };
-  return { W, H, u, topBar: { x: 0, y: H - TOP_BAR, w: W, h: TOP_BAR }, gear: { x: (W - total) / 2, y: gearY, w: total, h: gearH }, deck, mixer, fx, lower, library, streamPanel };
+  return { W, H, u, fxInBar, topBar: { x: 0, y: H - TOP_BAR, w: W, h: TOP_BAR }, gear: { x: (W - total) / 2, y: gearY, w: total, h: gearH }, deck, mixer, fx, lower, library, streamPanel };
 }
 
 function deckGeometry(rect: Rect, u: number): LiveDeckGeometry {
@@ -206,7 +214,7 @@ function fxGeometry(rect: Rect, u: number): LiveFxGeometry {
   const at = (dx: number): number => rect.x + dx * u;
   const knobX = (i: number): number => x0 + NAME_W + G + i * KNOB_PITCH + 9;
   const lx = x0 + NAME_W + G + 4 * KNOB_PITCH + G;
-  const travel = 92;
+  const travel = 44; // a short fader: a few units of the hand move it from end to end
   return {
     rect, title: { x: at(10), y: cy },
     name: { x: at(x0), y: cy - 11 * u, w: NAME_W * u, h: 22 * u },
@@ -217,6 +225,27 @@ function fxGeometry(rect: Rect, u: number): LiveFxGeometry {
     })),
     level: { x: at(lx + 44 + travel / 2), y: cy, travel: travel * u, capW: 10 * u, capH: 16 * u, label: { x: at(lx), y: cy },
              touch: { x: at(lx + 40), y: cy - 13 * u, w: (travel + 14) * u, h: 26 * u } },
+  };
+}
+
+/** The effects controls in the top bar, left to right right after the stream bar: the name, four knobs (a name and a step to the right of each), LEVEL.
+ * Sizes are in pixels (the bar is 40 px high whatever the scale). */
+function fxBarGeometry(W: number, H: number): LiveFxGeometry {
+  const cy = H - 15, x0 = BAR_LEFT_PX;
+  const PITCH = 62, NAME_W = 84;
+  const knobX = (i: number): number => x0 + NAME_W + 12 + i * PITCH + 10;
+  const lx = x0 + NAME_W + 12 + 4 * PITCH + 8, travel = 46;
+  const rect: Rect = { x: x0, y: cy - 14, w: lx + 36 + travel + 12 - x0, h: 28 };
+  void W;
+  return {
+    rect, title: { x: x0, y: cy },
+    name: { x: x0, y: cy - 11, w: NAME_W, h: 22 },
+    knobs: [0, 1, 2, 3].map((i) => ({
+      c: { x: knobX(i), y: cy }, r: 9,
+      touch: { x: knobX(i) - 12, y: cy - 14, w: PITCH - 2, h: 28 },
+      name: { x: knobX(i) + 13, y: cy + 5 }, value: { x: knobX(i) + 13, y: cy - 6 },
+    })),
+    level: { x: lx + 36 + travel / 2, y: cy, travel, capW: 9, capH: 16, label: { x: lx, y: cy }, touch: { x: lx + 32, y: cy - 14, w: travel + 14, h: 28 } },
   };
 }
 

@@ -576,8 +576,11 @@ export class LiveRenderer {
 
   private fxModule(ctx: Ctx, g: LiveGeometry, v: LiveView): void {
     const F = g.fx, u = g.u;
-    panel(ctx, F.rect, u);
-    small(ctx, "EFFECT", F.title.x, F.title.y, 6.4 * u, { color: LIVE.dim, align: "left" });
+    // In a narrow window the controls are a strip above the gear row, on a panel of their own; in a wide one they sit in the top bar, right after the stream bar.
+    if (!g.fxInBar) {
+      panel(ctx, F.rect, u);
+      small(ctx, "EFFECT", F.title.x, F.title.y, 6.4 * u, { color: LIVE.dim, align: "left" });
+    }
     // The effect's name between two arrows (a touch on the left third goes back, anywhere else forward).
     button(ctx, F.name, FX_TYPES[v.fx.type], v.fx.send[0] || v.fx.send[1], LIVE.play, u, { size: 7 * u });
     small(ctx, "\u2039", F.name.x + 7 * u, F.name.y + F.name.h / 2, 10 * u, { color: LIVE.ink });

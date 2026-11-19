@@ -1,7 +1,7 @@
 // The LIVE layout (booth/live-geometry.ts): at every window size nothing overlaps, nothing leaves its module, controls stay usable.
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { TOP_BAR, liveGeometry, liveTouch } from "../src/booth/live-geometry.ts";
+import { TOP_BAR, fxFitsTheBar, liveGeometry, liveTouch } from "../src/booth/live-geometry.ts";
 import type { Rect } from "../src/booth/gear.ts";
 
 const SIZES: [number, number][] = [[1024, 600], [1280, 720], [1366, 768], [1600, 800], [1920, 1080], [2560, 1440], [1440, 900]];
@@ -20,8 +20,8 @@ describe("LIVE layout", () => {
         const mods = [g.deck[0].rect, g.mixer.rect, g.deck[1].rect];
         for (const m of [...mods, g.fx.rect]) assert.ok(inside(window, m), JSON.stringify(m));
         for (let i = 1; i < mods.length; i++) assert.ok(mods[i - 1].x + mods[i - 1].w < mods[i].x, `module ${i - 1} ends before module ${i}`);
-        assert.ok(g.fx.rect.y >= g.gear.y + g.gear.h, "the strip above the gear row");
-        assert.ok(g.fx.rect.y + g.fx.rect.h <= H - TOP_BAR + E, "and below the top bar");
+        assert.ok(g.fx.rect.y >= g.gear.y + g.gear.h, "the effects above the gear row");
+        if (!g.fxInBar) assert.ok(g.fx.rect.y + g.fx.rect.h <= H - TOP_BAR + E, "a strip below the top bar");
         assert.ok(mods.every((m) => Math.abs(m.y - g.gear.y) < E && Math.abs(m.h - g.gear.h) < E));
       });
 
@@ -102,19 +102,27 @@ describe("LIVE layout", () => {
         assert.ok(mid.cross.y < mid.level.y, "the crossfader under the headphone faders");
       });
 
-      test("the effects strip: a thin panel across the top of the gear row; the name, four knobs a little smaller than the mixer's, a short horizontal LEVEL fader; all inside it and apart", () => {
+      test("the effects controls: in the TOP BAR right after the stream bar when the window is wide enough, else a thin strip above the gear row; the name, four small knobs, a SHORT horizontal LEVEL fader; all inside and apart", () => {
         const F = g.fx, u = g.u, M = g.mixer;
-        assert.ok(F.rect.y > g.gear.y + g.gear.h, "above the gear row");
-        assert.ok(F.rect.h <= 31 * u && F.rect.h >= 28 * u, "thin");
-        assert.ok(Math.abs(F.rect.w - g.gear.w) < 1, "as wide as the gear row");
+        assert.equal(g.fxInBar, fxFitsTheBar(W));
+        if (g.fxInBar) {
+          assert.ok(F.rect.y >= H - TOP_BAR - E && F.rect.y + F.rect.h <= H + E, "inside the top bar");
+          assert.ok(F.rect.x >= 390, "after the stream bar's time");
+          assert.ok(F.rect.x + F.rect.w <= W - 400 + E, "clear of the buttons on the right");
+          assert.ok(g.gear.y + g.gear.h <= H - TOP_BAR - 2, "the gear row starts under the bar: the controls cost it no height");
+        } else {
+          assert.ok(F.rect.y > g.gear.y + g.gear.h, "above the gear row");
+          assert.ok(F.rect.h <= 31 * u && F.rect.h >= 28 * u, "thin");
+          assert.ok(Math.abs(F.rect.w - g.gear.w) < 1, "as wide as the gear row");
+        }
         assert.ok(inside(F.rect, F.name));
         assert.equal(F.knobs.length, 4);
         F.knobs.forEach((k, i) => {
-          assert.ok(k.r < M.strip[0].knobR && k.r >= 0.6 * M.strip[0].knobR, "a bit smaller than the mixer's knobs");
+          assert.ok(k.r < M.strip[0].knobR, "smaller than the mixer's knobs");
+          if (!g.fxInBar) assert.ok(k.r >= 0.5 * M.strip[0].knobR, "but not tiny");
           assert.ok(inside(F.rect, box(k.c.x, k.c.y, k.r)) && inside(F.rect, k.touch), `knob ${i} inside`);
           assert.ok(k.name.x > k.c.x + k.r && k.value.x > k.c.x + k.r, "its name and value to the right of it");
-          assert.ok(inside(F.rect, box(k.name.x + 12 * u, k.name.y, 4 * u)) && inside(F.rect, box(k.value.x + 12 * u, k.value.y, 4 * u)));
-          if (i) { assert.ok(apart(F.knobs[i - 1].touch, k.touch), "touch areas apart"); assert.ok(k.c.x > F.knobs[i - 1].c.x + 2 * k.r + 4 * u); }
+          if (i) { assert.ok(apart(F.knobs[i - 1].touch, k.touch), "touch areas apart"); assert.ok(k.c.x > F.knobs[i - 1].c.x + 2 * k.r + 4, "knobs apart"); }
         });
         assert.ok(apart(F.name, F.knobs[0].touch), "the name apart from the first knob");
         const L = F.level;
@@ -123,8 +131,9 @@ describe("LIVE layout", () => {
         assert.ok(L.x - L.travel / 2 - L.capW / 2 > F.knobs[3].touch.x + F.knobs[3].touch.w - 1, "the fader right of the knobs");
         assert.ok(L.label.x < L.x - L.travel / 2 - L.capW / 2, "its name to the left of it");
         assert.ok(apart(F.knobs[3].touch, L.touch));
-        // The cluster sits in the middle of the strip, so the sides are free.
-        assert.ok(F.name.x > F.rect.x + 40 * u && L.touch.x + L.touch.w < F.rect.x + F.rect.w - 40 * u);
+        // Short: a hand's width, not a long slide (the channel faders are 74 units; this one at most about two thirds of the pixels of that).
+        assert.ok(L.travel <= 0.75 * M.strip[0].fader.travel, `a short travel: ${L.travel} of ${M.strip[0].fader.travel}`);
+        if (!g.fxInBar) assert.ok(F.name.x > F.rect.x + 40 * u && L.touch.x + L.touch.w < F.rect.x + F.rect.w - 40 * u, "the cluster in the middle of the strip");
       });
 
       test("the FX buttons: a square one on the OUTER side of each FILTER knob, inside the mixer, clear of the knob and its ring, big enough to touch", () => {

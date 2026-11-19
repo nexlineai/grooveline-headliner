@@ -562,6 +562,7 @@ export class Booth {
     // The effects strip: the name (the left third goes to the effect before, the rest to the next), the four knobs, the LEVEL fader. The effect is
     // switched on for a channel by the FX button beside its FILTER.
     const F = g.fx, lvl = F.level;
+    document.body.classList.toggle("fxbar", g.fxInBar); // the page's orange message makes room for them
     first({ t: "fxType", d: -1 }, F.name);
     first({ t: "fxType", d: -2 }, { x: F.name.x, y: F.name.y, w: F.name.w * 0.3, h: F.name.h });
     first({ t: "fxAmount" }, lvl.touch);
@@ -841,6 +842,7 @@ export class Booth {
         break;
       case "loop":
       case "zoom":
+      case "fxSend":
         this.press(kind);
         break;
       case "play":
@@ -852,9 +854,17 @@ export class Booth {
       case "fxDiv":
         this.press(kind);
         break;
-      case "fxAmount":
+      case "fxAmount": {
+        const lv = this.L?.live?.fx.level;
         if (doubleTap) { this.setFxAmount(0.5); grab.startValue = 0.5; }
+        else if (lv) {
+          // LIVE's LEVEL is a short horizontal fader: a press on the slot (not on the cap) puts the cap where the finger is, and the drag goes on from there, 1:1.
+          const along = clamp01((p.x - (lv.x - lv.travel / 2)) / lv.travel);
+          const capX = lv.x + (this.fx.amount - 0.5) * lv.travel;
+          if (Math.abs(p.x - capX) > lv.capW * 0.6) { this.setFxAmount(along); grab.startValue = along; grab.start = p; }
+        }
         break;
+      }
       case "fxParam":
         // A double tap puts the knob back where the effect rests.
         if (doubleTap) { const v = FX_DEFAULTS[this.fx.type][kind.d]; this.setFxParam(kind.d, v); grab.startValue = v; }
@@ -977,7 +987,8 @@ export class Booth {
         this.engine.roomVolume = clamp01(grab.startValue + (p.y - grab.start.y) / L.knobTravel);
         break;
       case "fxAmount":
-        this.setFxAmount(grab.startValue + (p.y - grab.start.y) / (L.live ? L.fxTravel : L.knobTravel));
+        // LIVE's LEVEL is a horizontal fader (left to right); free play's AMOUNT is a knob (up and down).
+        this.setFxAmount(grab.startValue + (L.live ? (p.x - grab.start.x) / L.fxTravel : (p.y - grab.start.y) / L.knobTravel));
         break;
       case "fxParam":
         this.setFxParam(k.d, grab.startValue + (p.y - grab.start.y) / L.knobTravel);
