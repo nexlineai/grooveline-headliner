@@ -178,7 +178,8 @@ function offscreen(w: number, h: number, scale: number): { canvas: HTMLCanvasEle
 
 /** The platter with a record on it, seen from above. `r` is the record; the platter's dotted
  * rim reaches to `r * 1.07`, which is the size of the picture. */
-export function platterPicture(r: number, tint: RGB, scale: number): HTMLCanvasElement {
+/** `art`: a cover picture for the label (a record from your own library); the label keeps its rim in the deck's colour. */
+export function platterPicture(r: number, tint: RGB, scale: number, art: CanvasImageSource | null = null): HTMLCanvasElement {
   const outer = r * 1.07;
   const { canvas, ctx: c } = offscreen(outer * 2, outer * 2, scale);
   const mid = outer;
@@ -204,7 +205,26 @@ export function platterPicture(r: number, tint: RGB, scale: number): HTMLCanvasE
   // Label, with a stripe the eye can follow.
   const lr = r * 0.34;
   ring(lr, rgba(tint));
-  ring(lr * 0.74, null, "rgba(0,0,0,0.3)", lr * 0.07);
+  if (art) {
+    const inner = lr * 0.88;
+    c.save();
+    c.beginPath();
+    c.arc(mid, mid, inner, 0, 2 * Math.PI);
+    c.clip();
+    c.drawImage(art, mid - inner, mid - inner, inner * 2, inner * 2);
+    c.restore();
+    ring(inner, null, "rgba(0,0,0,0.55)", Math.max(1, lr * 0.03));
+    // The stripe the eye follows, with a dark edge so it shows on any picture.
+    c.strokeStyle = "rgba(0,0,0,0.55)";
+    c.lineWidth = Math.max(2, r * 0.035) + 2;
+    c.lineCap = "round";
+    c.beginPath();
+    c.moveTo(mid, mid - lr * 0.3);
+    c.lineTo(mid, mid - lr * 0.9);
+    c.stroke();
+  } else {
+    ring(lr * 0.74, null, "rgba(0,0,0,0.3)", lr * 0.07);
+  }
   c.strokeStyle = "#fff";
   c.lineWidth = Math.max(2, r * 0.035);
   c.lineCap = "round";

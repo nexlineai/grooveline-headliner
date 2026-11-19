@@ -361,6 +361,24 @@ button.quiet[hidden] { display: none; }
 #mymusic .mm-status { margin: 0 0 8px; font-size: 13px; color: var(--dim); }
 #mymusic .mm-search { width: 100%; box-sizing: border-box; padding: 9px 10px; margin-bottom: 8px; border-radius: 8px; background: var(--slot); color: var(--ink);
   border: 1px solid var(--edge); font: 600 13px system-ui, sans-serif; letter-spacing: 0.08em; }
+#mymusic .mm-bar { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+#mymusic .mm-bar .mm-search { flex: 1; width: auto; min-width: 0; margin-bottom: 0; }
+#mymusic .mm-bar button.mini.on { background: var(--teal); color: #000; border-color: var(--teal); }
+/* The sleeves: covers in a grid, like the front of a crate; a tap opens LEFT / RIGHT on the cover. */
+#mymusic .mm-list.sleeves { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 14px 10px; align-content: start; padding: 2px 2px 10px; }
+#mymusic .mm-list.sleeves p { grid-column: 1 / -1; }
+.mm-sleeve { position: relative; display: flex; flex-direction: column; gap: 2px; min-width: 0; cursor: pointer; outline: none; }
+.mm-sleeve .mm-cover { position: relative; aspect-ratio: 1; border-radius: 6px; overflow: hidden; border: 1px solid var(--edge); box-shadow: 0 5px 12px rgba(0, 0, 0, 0.5); }
+.mm-sleeve:focus-visible .mm-cover { border-color: var(--teal); }
+.mm-sleeve canvas.mm-art { display: block; width: 100%; height: 100%; }
+.mm-sleeve b { display: block; margin-top: 5px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mm-sleeve > span { color: var(--dim); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mm-sleeve .mm-pick { position: absolute; inset: auto 0 0 0; display: none; gap: 4px; padding: 14px 6px 6px; background: linear-gradient(transparent, rgba(0, 0, 0, 0.88)); }
+.mm-sleeve:hover .mm-pick, .mm-sleeve:focus-visible .mm-pick, .mm-sleeve.open .mm-pick { display: flex; }
+.mm-sleeve .mm-pick button { flex: 1; padding: 7px 0; border-radius: 7px; background: rgba(8, 10, 18, 0.85); font: 800 11px system-ui, sans-serif; letter-spacing: 0.1em; border: 1.5px solid; cursor: pointer; }
+.mm-sleeve .mm-pick button.left { color: var(--teal); border-color: var(--teal); }
+.mm-sleeve .mm-pick button.right { color: var(--magenta); border-color: var(--magenta); }
+.record canvas.mm-art { width: 44px; height: 44px; flex: none; border-radius: 5px; border: 1px solid var(--edge); }
 #mymusic .mm-list { overflow-y: auto; flex: 1; min-height: 80px; }
 #mymusic .mm-loaded { border-top: 1px solid var(--edge); margin-top: 8px; padding-top: 6px; }
 #mymusic .mm-fix { display: flex; align-items: center; gap: 6px; padding: 4px 0; font-size: 13px; }

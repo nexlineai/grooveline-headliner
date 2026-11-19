@@ -100,7 +100,10 @@ export class Library {
     const rel = (list[0] as File & { webkitRelativePath?: string }).webkitRelativePath ?? "";
     const folder: LibraryFolder = { id: this.nextSession--, name: rel.split("/")[0] || "Chosen files", handle: null };
     this.folders.push(folder);
-    for (const e of entries) this.files.set(trackKey(folder.id, e.path), await e.file());
+    for (const e of entries) {
+      this.files.set(trackKey(folder.id, e.path), await e.file());
+      if (e.art) this.files.set(trackKey(folder.id, e.art.path), await e.art.file());
+    }
     await this.readEntries(folder, entries);
   }
 
@@ -193,6 +196,23 @@ export class Library {
       return await (await dir.getFileHandle(track.path[track.path.length - 1])).getFile();
     } catch {
       throw new Error("the file is not there any more (moved or renamed): scan the folder again");
+    }
+  }
+
+  /** A file of a track's folder (the track itself, or its cover picture) for showing a sleeve. It never asks the browser for
+   * anything (that needs a click): "locked" while the folder waits for its RECONNECT, null when the file is not there. */
+  async fileQuiet(track: LibraryTrack, path: string[] = track.path): Promise<File | "locked" | null> {
+    if (track.folder < 0) return this.files.get(trackKey(track.folder, path)) ?? null;
+    const folder = this.folders.find((f) => f.id === track.folder);
+    if (!folder?.handle) return null;
+    if (this.needsAccess.has(folder.id)) return "locked";
+    try {
+      if ((await folder.handle.queryPermission({ mode: "read" })) !== "granted") return "locked";
+      let dir = folder.handle;
+      for (const part of path.slice(0, -1)) dir = await dir.getDirectoryHandle(part);
+      return await (await dir.getFileHandle(path[path.length - 1])).getFile();
+    } catch {
+      return null;
     }
   }
 

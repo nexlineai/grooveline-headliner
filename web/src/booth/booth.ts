@@ -170,6 +170,9 @@ export class Booth {
   private dpr = 1;
   private platterImg: HTMLCanvasElement[] = [];
   private sheenImg: HTMLCanvasElement | null = null;
+  /** A cover picture for the label of the record on a deck (a track of your library), and which one is drawn into `platterImg` now. */
+  private labelArt: ({ id: string; img: CanvasImageSource } | null)[] = [null, null];
+  private labelShown: (string | null)[] = [null, null];
   private waveImg: (HTMLCanvasElement | null)[] = [null, null];
   private waveFor: string[] = ["", ""];
   private meterLevel = [0, 0];
@@ -458,6 +461,7 @@ export class Booth {
       phonesY, meterX: [mid - 9 * u, mid + 9 * u], meterY: channelY, meterH: channelTravel + 8 * u, trimY, crossY, crossTravel, filterY, fx,
     };
     this.platterImg = TINTS.map((t) => platterPicture(r, t, this.dpr));
+    this.labelShown = [null, null]; // the next frame draws the covers again
     this.sheenImg = sheenPicture(r, this.dpr);
     this.waveFor = ["", ""];
     this.placeRoom();
@@ -1410,8 +1414,22 @@ export class Booth {
     }
   }
 
+  /** A cover picture for the label of the record with this id (web only). It is drawn only while that very record is on the deck,
+   * so a record loaded after it, a lesson or a night never shows it. */
+  setLabelArt(d: number, id: string | null, img: CanvasImageSource | null): void {
+    this.labelArt[d] = id && img ? { id, img } : null;
+  }
+
   private draw(dt: number): void {
     const L = this.L!, ctx = this.ctx, u = L.u;
+    for (const d of [0, 1]) {
+      const art = this.labelArt[d];
+      const want = art && art.id === this.decks[d].info?.id ? art.id : null;
+      if (want !== this.labelShown[d]) {
+        this.labelShown[d] = want;
+        this.platterImg[d] = platterPicture(L.r, TINTS[d], this.dpr, want ? art!.img : null);
+      }
+    }
     ctx.setTransform(this.dpr, 0, 0, -this.dpr, 0, L.H * this.dpr); // y up, as in SpriteKit
     ctx.clearRect(0, 0, L.W, L.H);
 

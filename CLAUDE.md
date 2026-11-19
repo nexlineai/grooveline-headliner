@@ -275,6 +275,23 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
   `Deck.loadDecoded(info, audio, grid)`. Checked against 70 real tracks of the Mixxx library with `tools/check-beats.ts`
   (read-only; needs the DB and the USB): tempo within 0.5 BPM on 59/70, the rest mostly octave readings; over a whole track
   it stays on the onsets where Mixxx's analysed tempo drifts. Tests use real ffmpeg output in `web/test/fixtures`.
+- **Sleeves (web only, 19 Nov; item 4a of the roadmap): the crate shows covers.** `library/sleeves.ts`. A track's picture is, in
+  order, the cover inside the file (`LibraryTrack.cover` = where it lies; read lazily with `readCover`) or the cover picture lying
+  in the same folder (`LibraryTrack.art`, found AT SCAN TIME by `listFolder`/`entriesFromFiles` with `pickArtName`: cover, folder,
+  front, albumart, album, artwork, any case, jpg/jpeg/png, "AlbumArtSmall" skipped; an unchanged track gets/loses it on a rescan
+  without a tag re-read). `Sleeves` = queue (4 at a time, newest request first, cancellable) + LRU cache of 160 px master CANVASES
+  (no blob URLs: no CSP change, nothing to revoke); `createImageBitmap(blob, {resizeWidth/Height})` scales while decoding (the
+  size comes from `imageSize`, JPEG/PNG headers), cut square from the middle. "later" (folder waits for RECONNECT, or a read
+  failed) is never cached; "none" is. `Library.fileQuiet` never prompts (needs a click). The tracks of one folder share one decode.
+  No picture: a sleeve made from the name (`paintGenerated`, same track = same look). MY MUSIC has SLEEVES (default, a grid; tap
+  opens LEFT/RIGHT on the cover) and LIST (small covers), kept in localStorage `headliner.myMusicView`; only the visible tiles load
+  (IntersectionObserver on `.mm-list`). On the platter: `Booth.setLabelArt(d, id, canvas)` -> `platterPicture(..., art)`; drawn only
+  while `deck.info.id === art id` (so a game record, lesson or `loadMade` never shows it; nobody clears it). `TAGS_VERSION` (scan.ts)
+  marks what the tag reader could do: a track from an older one is read again by the next SCAN (the panel says "Press SCAN once").
+  Found with 200 real tracks: ID3v2.4 APIC frames with the frame flags (data length indicator + frame unsync) were misread, now
+  handled (`Cover.unsync`); WAV files with art in an ID3 chunk (about 1 %) still show no cover. Real files: 122 of 122 embedded
+  covers decode, median 15 ms, worst 69 ms. NOT done: online tagging (MusicBrainz + Cover Art Archive via the Worker; about 31 % of
+  his library has no picture at all), and the "closet" look (crates with records) beyond the grid.
 - **Outputs (PHONES):** the worklet always renders 4 channels (room 1-2, headphones 3-4); modes only
   rewire a splitter/merger: OFF, SPLIT, SOUND CARD (destination 4 ch, discrete), TWO DEVICES (the
   headphones' pair -> MediaStream -> `<audio>.setSinkId`; the room via `AudioContext.setSinkId`).

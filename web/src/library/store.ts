@@ -15,6 +15,8 @@ export interface LibraryFolder {
 export interface LibraryTrack {
   /** `${folder id}:${path}`: one per file. */
   key: string;
+  /** Which version of the tag reader made this entry (absent: the first). A track from an older one is read again by the next scan. */
+  v?: number;
   folder: number;
   /** Directories down to the file, the file name last. */
   path: string[];
@@ -32,6 +34,8 @@ export interface LibraryTrack {
   musicKey: string;
   camelot: string;
   cover?: Cover;
+  /** The cover picture lying in the track's folder (path from the library folder), when the file has none of its own. */
+  art?: string[];
   /** What the analysis found when the track was first played; the tempo may be wrong by an octave. */
   analysis?: { bpm: number; firstBeat: number; confidence: number };
   /** Your corrections: they win over the analysis. */

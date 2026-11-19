@@ -26,6 +26,7 @@ import type { PhonesMode } from "./audio/engine.ts";
 import { FX_DIVISIONS, FX_TYPES } from "./audio/fx.ts";
 import { Library } from "./library/library.ts";
 import { buildPanel } from "./library/panel.ts";
+import { Sleeves } from "./library/sleeves.ts";
 import type { GridFix } from "./library/panel.ts";
 import { analyse } from "./library/analyse.ts";
 import { monoForAnalysis } from "./library/beats.ts";
@@ -90,6 +91,7 @@ async function loadRecord(d: number, track: TrackInfo): Promise<void> {
 // MARK: - Your own music (free play): the MY MUSIC tab of the crate
 
 const library = new Library();
+const sleeves = new Sleeves(library);
 /** The library track on each deck (null: a record of the game, or nothing). */
 const userOnDeck: (LibraryTrack | null)[] = [null, null];
 /** A track longer than this is too big to hold decoded (48 kHz stereo float: about 23 MB a minute, and a copy while loading). */
@@ -128,6 +130,9 @@ async function loadUserTrack(d: number, t: LibraryTrack): Promise<void> {
     };
     deck.loadDecoded(info, audio, grid ?? undefined);
     userOnDeck[d] = t;
+    // Its cover on the record's label, when the picture is read (the booth shows it only while this very record is on the deck).
+    booth.setLabelArt(d, null, null);
+    sleeves.request(t, (s) => { if (s instanceof HTMLCanvasElement && userOnDeck[d] === t) booth.setLabelArt(d, info.id, s); });
     booth.recordChanged(d);
     const unsure = !grid || (!t.grid && !!t.analysis && t.analysis.confidence < 0.25);
     note.textContent = unsure ? `${name}: the beat is not clear. Check the grid (CRATE, MY MUSIC).` : "";
@@ -138,7 +143,7 @@ async function loadUserTrack(d: number, t: LibraryTrack): Promise<void> {
 }
 
 // For the screenshot tool's `eval` (tools/shot.ts): the library and its loader.
-Object.assign((window as unknown as { headliner: object }).headliner, { library, loadUserTrack: (d: number, t: LibraryTrack) => loadUserTrack(d, t), userOnDeck, fixGrid, showCrateTab });
+Object.assign((window as unknown as { headliner: object }).headliner, { library, sleeves, loadUserTrack: (d: number, t: LibraryTrack) => loadUserTrack(d, t), userOnDeck, fixGrid, showCrateTab });
 
 function userLoaded(): ({ track: LibraryTrack; bpm: number; unsure: boolean } | null)[] {
   return [0, 1].map((d) => {
@@ -175,7 +180,7 @@ function showCrateTab(tab: "records" | "mine"): void {
     load: (d, t) => { crate.hidden = true; if (booth.refuseLoad(d)) return; loadUserTrack(d, t).catch(failed); },
     loaded: userLoaded,
     fix: fixGrid,
-  });
+  }, sleeves);
   library.init().then(() => myMusicPanel?.refresh()).catch(failed);
 }
 $("tab-records").addEventListener("click", () => showCrateTab("records"));

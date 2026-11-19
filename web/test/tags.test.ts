@@ -189,3 +189,49 @@ describe("names", () => {
     assert.deepEqual(fromFilename("07. Name.wav"), { title: "Name" });
   });
 });
+
+describe("cover pictures in ID3v2.4 frames with flags (a real file of the library had one)", () => {
+  const syncsafe = (n: number) => [(n >> 21) & 0x7f, (n >> 14) & 0x7f, (n >> 7) & 0x7f, n & 0x7f];
+  /** What a tagger does for "unsynchronisation": a 0 after every 0xFF that is followed by a byte >= 0xE0 or 0. */
+  const unsyncOut = (b: number[]) => { const o: number[] = []; for (let i = 0; i < b.length; i++) { o.push(b[i]); if (b[i] === 0xff && (i + 1 === b.length || b[i + 1] >= 0xe0 || b[i + 1] === 0)) o.push(0); } return o; };
+  /** A whole file: ID3v2.4 with one APIC frame carrying `flags`, a title frame after it, then a little "audio". */
+  function file(picture: Uint8Array, flags: number, description = [0]): Uint8Array {
+    const content = [0, ...Buffer.from("image/jpeg"), 0, 3, ...description, ...picture];
+    let body = content;
+    const frameData: number[] = [];
+    if (flags & 0x0002) body = unsyncOut(content);
+    if (flags & 0x0001) frameData.push(...syncsafe(content.length)); // the data length indicator: the size before unsynchronisation
+    frameData.push(...body);
+    const apic = [...Buffer.from("APIC"), ...syncsafe(frameData.length), 0, flags, ...frameData];
+    const title = [...Buffer.from("TIT2"), ...syncsafe(1 + 5), 0, 0, 3, ...Buffer.from("Hello")];
+    const tag = [...apic, ...title, 0, 0, 0, 0];
+    return new Uint8Array([...Buffer.from("ID3"), 4, 0, 0, ...syncsafe(tag.length), ...tag, ...new Array(64).fill(0x55)]);
+  }
+  // A picture with every awkward byte pair in it.
+  const picture = new Uint8Array(3000).map((_, i) => (i % 7 === 0 ? 0xff : i % 11 === 0 ? 0x00 : i % 5 === 0 ? 0xe0 : i & 0xff));
+
+  for (const [name, flags] of [["no flags", 0], ["a data length indicator", 1], ["unsynchronised", 2], ["both", 3]] as const) {
+    test(`${name}: the mime, the picture's own bytes and the title after it`, async () => {
+      const src = fromBytes(file(picture, flags));
+      const t = await readTags(src);
+      assert.ok(t.cover, "a cover is found");
+      assert.equal(t.cover!.mime, "image/jpeg");
+      assert.equal(!!t.cover!.unsync, (flags & 2) !== 0);
+      assert.deepEqual([...(await readCover(src, t.cover!))], [...picture]);
+      assert.equal(t.title, "Hello", "the frames after the picture are still found");
+    });
+  }
+
+  test("a UTF-16 description whose byte-order mark (FF FE) is itself unsynchronised does not shift the picture", async () => {
+    // Encoding 1 (UTF-16), a description of "A" with a BOM: FF FE 41 00 00 00. Unsynchronised, the FF gets a 0 after it, which moves the
+    // picture by one byte in the file: the cover's start must count that.
+    const content = [1, ...Buffer.from("image/jpeg"), 0, 3, 0xff, 0xfe, 0x41, 0x00, 0x00, 0x00, ...picture];
+    const framed = unsyncOut(content);
+    const apic = [...Buffer.from("APIC"), ...syncsafe(framed.length), 0, 0x0002, ...framed];
+    const bytes = new Uint8Array([...Buffer.from("ID3"), 4, 0, 0, ...syncsafe(apic.length), ...apic, ...new Array(64).fill(0x55)]);
+    const src = fromBytes(bytes);
+    const t = await readTags(src);
+    assert.ok(t.cover);
+    assert.deepEqual([...(await readCover(src, t.cover!))], [...picture]);
+  });
+});

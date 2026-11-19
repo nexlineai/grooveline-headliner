@@ -10,7 +10,8 @@ export interface Source {
   read(start: number, length: number): Promise<Uint8Array>;
 }
 
-export interface Cover { mime: string; start: number; length: number; }
+/** Where a cover picture lies in the file. `unsync`: its bytes are unsynchronised (an ID3v2.4 frame flag): undo that after reading. */
+export interface Cover { mime: string; start: number; length: number; unsync?: boolean; }
 
 export interface Tags {
   title?: string;
@@ -99,6 +100,13 @@ function unsync(b: Uint8Array): Uint8Array {
   return out.subarray(0, n);
 }
 
+/** How many raw bytes it takes to make the first `n` bytes once unsynchronisation (an inserted 0 after every 0xFF) is undone. */
+function rawLength(raw: Uint8Array, n: number): number {
+  let out = 0, i = 0;
+  while (out < n && i < raw.length) { if (raw[i] === 0xff && raw[i + 1] === 0x00) i++; i++; out++; }
+  return i;
+}
+
 /** BPM written as text: "128", "128.5", "128,5". */
 function parseBpm(s: string): number | undefined {
   const v = Number(s.replace(",", ".").trim());
@@ -148,8 +156,12 @@ async function readId3v2(r: Reader, tags: Tags): Promise<boolean> {
     const what = ID3_NAMES[id];
     if (what === "pic") {
       if (!tags.cover) {
+        // v2.4 frame flags, as for the text frames: 0x0001 a 4-byte data length comes first, 0x0002 the frame is unsynchronised
+        const dli = major === 4 && (fflags & 0x0001) ? 4 : 0, framed = major === 4 && (fflags & 0x0002) !== 0;
+        const base = pos + headLen + dli, room = size - dli;
+        const raw = await at(base, Math.min(room, framed ? 1024 : 512));
         // encoding, mime (a 3-letter format in v2.2), picture type, description, then the picture itself
-        const body = await at(pos + headLen, Math.min(size, 512));
+        const body = framed ? unsync(raw) : raw;
         const enc = body[0];
         let i = 1, mime: string;
         if (major === 2) { mime = "image/" + ascii(body, 1, 4).toLowerCase().replace("jpg", "jpeg"); i = 4; }
@@ -158,7 +170,8 @@ async function readId3v2(r: Reader, tags: Tags): Promise<boolean> {
         if (enc === 1 || enc === 2) { while (i + 1 < body.length && !(body[i] === 0 && body[i + 1] === 0)) i += 2; i += 2; }
         else { while (i < body.length && body[i] !== 0) i++; i += 1; }
         if (!mime.includes("/")) mime = "image/" + mime.toLowerCase();
-        if (i < size && !whole) tags.cover = { mime: mime || "image/jpeg", start: pos + headLen + i, length: size - i };
+        const skip = framed ? rawLength(raw, i) : i; // where the picture starts, counted in the file's own bytes
+        if (skip < room && !whole) tags.cover = { mime: mime || "image/jpeg", start: base + skip, length: room - skip, ...(framed ? { unsync: true } : {}) };
       }
     } else if (what) {
       let body = await at(pos + headLen, size);
@@ -351,5 +364,6 @@ export function fromFilename(name: string): { artist?: string; title: string } {
 
 /** The cover's bytes (when `cover` was found), read only now. */
 export async function readCover(src: Source, cover: Cover): Promise<Uint8Array> {
-  return src.read(cover.start, cover.length);
+  const bytes = await src.read(cover.start, cover.length);
+  return cover.unsync ? unsync(bytes) : bytes;
 }
