@@ -17,7 +17,7 @@ import type { Point, Rect } from "./gear.ts";
 
 export const TOP_BAR = 40;
 const GEAR_H = 300;
-const DECK_MIN = 296, MIXER_W = 226, FX_W = 166, GAP = 5.333;
+const DECK_MIN = 296, MIXER_W = 226, FX_W = 112, GAP = 5.333;
 
 export interface LiveDeckGeometry {
   rect: Rect;
@@ -29,7 +29,7 @@ export interface LiveDeckGeometry {
   wave: Rect;
   platter: { c: Point; outer: number };
   /** The column between the platter and the pitch fader: tempo, key, pitch; and a reserved panel for loops (L2). */
-  info: Rect; bpm: Point; key: Point; pitchText: Point; loop: Rect;
+  info: Rect; pitchText: Point; loop: Rect;
   pitch: { x: number; y: number; travel: number };
   buttons: { cue: Point; play: Point; sync: Point; w: number; h: number };
   /** Eight pads under the transport (hot cues and loops: L2). */
@@ -46,7 +46,8 @@ export interface LiveStrip {
 
 export interface LiveMixerGeometry {
   rect: Rect;
-  bpm: Point[]; phase: { c: Point; w: number };
+  /** The tempo of each deck at the top corners, the key right under it (the same size). */
+  bpm: Point[]; key: Point[]; phase: { c: Point; w: number };
   strip: LiveStrip[];
   /** The middle column. */
   mid: { x: number; master: Point; masterR: number; meterX: number[]; meter: { y: number; h: number; w: number };
@@ -54,16 +55,20 @@ export interface LiveMixerGeometry {
          cross: { x: number; y: number; travel: number } };
 }
 
-export interface LiveFxUnit {
-  rect: Rect; name: Rect; div: Rect; on: Rect; assign: Rect[];
-  knob: Point; knobR: number;
-  faders: { x: number; y: number; travel: number }[];
+/** The effect controller: one unit, narrow: the effect's name (arrows either side), ON, four vertical faders for what the effect
+ * does, and DIV, a vertical stepped selector for the note value. */
+export interface LiveFxGeometry {
+  rect: Rect; title: Point;
+  name: Rect; on: Rect;
+  faders: { x: number; y: number; travel: number }[]; capW: number; labelY: number;
+  /** DIV: the four steps from the top (1/4, 1/8, 1/16, 1/32), where each cap sits, its touch area, and where its label goes. */
+  div: { x: number; labelX: number; steps: Point[]; touch: Rect[]; labelY: number };
 }
 
 export interface LiveGeometry {
   W: number; H: number; u: number;
   topBar: Rect; gear: Rect;
-  deck: LiveDeckGeometry[]; mixer: LiveMixerGeometry; fx: { rect: Rect; title: Point; units: LiveFxUnit[] };
+  deck: LiveDeckGeometry[]; mixer: LiveMixerGeometry; fx: LiveFxGeometry;
   /** Under the gear row. */
   lower: Rect; library: Rect; streamPanel: Rect;
 }
@@ -118,7 +123,8 @@ function deckGeometry(rect: Rect, u: number): LiveDeckGeometry {
     wave: { x: rect.x + 8 * u, y: top - 90 * u, w: rect.w - 16 * u, h: 70 * u },
     platter: { c, outer: outer * u },
     info: { x: rect.x + infoX * u, y: top - 236 * u, w: infoW * u, h: 140 * u },
-    bpm: P(infoX + infoW / 2, 108), key: P(infoX + infoW / 2, 134), pitchText: P(infoX + infoW / 2, 158),
+    // The tempo and the key are in the mixer; the pitch reads out under its fader.
+    pitchText: P(pitchX, 258),
     loop: { x: rect.x + infoX * u, y: top - 232 * u, w: infoW * u, h: 52 * u },
     pitch: { x: rect.x + pitchX * u, y: top - 164 * u, travel: 128 * u },
     buttons: { cue: P(8 + 28, 247), play: P(8 + 28 + 60, 247), sync: P(8 + 28 + 120, 247), w: 56 * u, h: 22 * u },
@@ -138,7 +144,7 @@ function mixerGeometry(rect: Rect, u: number): LiveMixerGeometry {
   }));
   return {
     rect,
-    bpm: [P(8, 11), P(w - 8, 11)], phase: { c: P(centre, 11), w: 70 * u },
+    bpm: [P(8, 11), P(w - 8, 11)], key: [P(8, 24), P(w - 8, 24)], phase: { c: P(centre, 11), w: 70 * u },
     strip,
     mid: {
       x: rect.x + centre * u, master: P(centre, 40), masterR: 11 * u,
@@ -149,20 +155,18 @@ function mixerGeometry(rect: Rect, u: number): LiveMixerGeometry {
   };
 }
 
-function fxGeometry(rect: Rect, u: number): LiveGeometry["fx"] {
+function fxGeometry(rect: Rect, u: number): LiveFxGeometry {
   const top = rect.y + rect.h;
-  const units = [0, 1, 2].map((i): LiveFxUnit => {
-    const ux = rect.x + 6 * u, uTop = top - (20 + i * 91) * u, uw = (FX_W - 12) * u, uh = 86 * u;
-    const R = (dx: number, dy: number, w: number, h: number): Rect => ({ x: ux + dx * u, y: uTop - (dy + h) * u, w: w * u, h: h * u });
-    return {
-      rect: { x: ux, y: uTop - uh, w: uw, h: uh },
-      name: R(5, 5, 50, 16), div: R(58, 5, 24, 16), on: R(85, 5, 24, 16),
-      assign: [0, 1, 2].map((k) => R(112 + k * 14, 6, 13, 14)),
-      knob: { x: ux + 24 * u, y: uTop - 52 * u }, knobR: 12 * u,
-      faders: [0, 1, 2, 3].map((k) => ({ x: ux + (58 + k * 25) * u, y: uTop - 54 * u, travel: 36 * u })),
-    };
-  });
-  return { rect, title: { x: rect.x + rect.w / 2, y: top - 11 * u }, units };
+  const P = (dx: number, dy: number): Point => ({ x: rect.x + dx * u, y: top - dy * u });
+  const R = (dx: number, dy: number, w: number, h: number): Rect => ({ x: rect.x + dx * u, y: top - (dy + h) * u, w: w * u, h: h * u });
+  const stepY = [100, 140, 180, 220];
+  return {
+    rect, title: P(FX_W / 2, 11),
+    name: R(6, 22, FX_W - 12, 18), on: R(6, 46, FX_W - 12, 18),
+    // Four faders (the first works now; the others come with their effects), then DIV.
+    faders: [14, 31, 48, 65].map((dx) => ({ x: rect.x + dx * u, y: top - 160 * u, travel: 140 * u })), capW: 13 * u, labelY: top - 246 * u,
+    div: { x: rect.x + 82 * u, labelX: rect.x + 88 * u, steps: stepY.map((dy) => P(82, dy)), touch: stepY.map((dy) => R(74, dy - 20, 38, 40)), labelY: top - 246 * u },
+  };
 }
 
 /** Touch areas for the controls of one deck and the mixer, derived from the geometry (the page registers them as hits). */

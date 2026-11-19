@@ -875,7 +875,7 @@ function labelOf(key: string): string {
   if (t === "fxDiv") return `NOTE ${FX_DIVISIONS[Number(ds)]?.label ?? "(NEXT)"}`;
   const side = ds === "0" ? "LEFT " : ds === "1" ? "RIGHT " : "";
   const names: Record<string, string> = { play: "PLAY", cue: "CUE", sync: "SYNC", phones: "PHONES", pitch: "PITCH", channel: "FADER",
-    filter: "FILTER", trim: "TRIM (GAIN)", master: "MASTER VOLUME", jog: "JOG (THE RECORD)", cross: "CROSSFADER", cueMix: "CUE MIX", phonesLevel: "HEADPHONES LEVEL" };
+    filter: "FILTER", trim: "GAIN", master: "MASTER VOLUME", jog: "JOG (THE RECORD)", cross: "CROSSFADER", cueMix: "CUE MIX", phonesLevel: "HEADPHONES LEVEL" };
   if (t === "eq") return `${side}${["LOW", "MID", "HI"][Number(bs)] ?? "EQ"}`;
   if (t === "nudge") return `${side}NUDGE ${bs === "-1" ? "BACK" : "FORWARD"} (BUTTON)`;
   return `${side}${names[t] ?? t.toUpperCase()}`;

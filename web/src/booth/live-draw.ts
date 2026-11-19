@@ -3,7 +3,7 @@
 // and the mouse reach these controls the same way they reach the game's.
 
 import type { Deck } from "../audio/engine.ts";
-import { FX_DIVISIONS, FX_TYPES } from "../audio/fx.ts";
+import { FX, FX_DIVISIONS, FX_TYPES } from "../audio/fx.ts";
 import { centred, circle, label, picture, roundRect, rgba, tonearm, wavePicture } from "./gear.ts";
 import type { Point, RGB, Rect } from "./gear.ts";
 import type { LiveGeometry } from "./live-geometry.ts";
@@ -17,6 +17,8 @@ export const LIVE = {
   ink: "rgba(236,240,245,0.96)", dim: "rgba(236,240,245,0.46)", dimmer: "rgba(236,240,245,0.24)", off: "rgba(255,255,255,0.075)",
   /** Deck A, deck B. */
   deck: [[38, 198, 240], [255, 172, 40]] as RGB[],
+  /** The FILTER knobs: a blue square round them tells them from the EQ knobs. */
+  filter: [70, 128, 255] as RGB,
   cue: [255, 150, 40] as RGB, play: [74, 226, 142] as RGB, sync: [150, 205, 255] as RGB, warn: [255, 176, 40] as RGB, red: [255, 78, 64] as RGB,
 };
 
@@ -42,7 +44,7 @@ function panel(ctx: Ctx, r: Rect, u: number): void {
 }
 
 /** A rotary knob: a ring of LEDs round a dark cap with one white line. `bipolar`: the ring lights from the middle. */
-function knob(ctx: Ctx, x: number, y: number, r: number, v: number, tint: RGB | null, bipolar: boolean, enabled = true): void {
+function knob(ctx: Ctx, x: number, y: number, r: number, v: number, tint: RGB | null, bipolar: boolean, enabled = true, pointer: RGB | null = null): void {
   const value = clamp01(v);
   const R = r + 3.2 * Math.max(0.8, r / 9);
   const steps = 11;
@@ -66,7 +68,7 @@ function knob(ctx: Ctx, x: number, y: number, r: number, v: number, tint: RGB | 
   ctx.lineWidth = 1;
   ctx.stroke();
   const a = (value - 0.5) * 1.5 * Math.PI;
-  ctx.strokeStyle = enabled ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.22)";
+  ctx.strokeStyle = enabled ? (pointer ? rgba(pointer, 1) : "rgba(255,255,255,0.95)") : "rgba(255,255,255,0.22)";
   ctx.lineWidth = Math.max(1.4, r * 0.16);
   ctx.lineCap = "round";
   ctx.beginPath();
@@ -77,13 +79,13 @@ function knob(ctx: Ctx, x: number, y: number, r: number, v: number, tint: RGB | 
 }
 
 /** A fader: a thin slot with a scale beside it and a dark ridged cap. Vertical runs bottom to top, horizontal left to right. */
-function fader(ctx: Ctx, x: number, y: number, travel: number, v: number, vertical: boolean, capW: number, capH: number, tint: RGB | null, u: number, o: { enabled?: boolean; centreMark?: boolean; oneSide?: boolean } = {}): void {
+function fader(ctx: Ctx, x: number, y: number, travel: number, v: number, vertical: boolean, capW: number, capH: number, tint: RGB | null, u: number, o: { enabled?: boolean; centreMark?: boolean; oneSide?: boolean; noScale?: boolean } = {}): void {
   const enabled = o.enabled ?? true, value = clamp01(v);
   const len = travel + (vertical ? capH : capW);
   const slot: Rect = vertical ? { x: x - 1.6 * u, y: y - len / 2, w: 3.2 * u, h: len } : { x: x - len / 2, y: y - 1.6 * u, w: len, h: 3.2 * u };
   roundRect(ctx, slot, 1.6 * u, "#020304", "rgba(255,255,255,0.07)");
   // The scale: eleven marks, longer at the ends and the middle.
-  for (let i = 0; i <= 10; i++) {
+  for (let i = 0; i <= 10 && !o.noScale; i++) {
     const t = i / 10, long = i === 0 || i === 5 || i === 10, along = (t - 0.5) * travel, off = (Math.max(capW, capH) / 2 + 3 * u);
     ctx.fillStyle = long && o.centreMark && i === 5 && tint ? rgba(tint, 0.9) : LIVE.dimmer;
     const L = (long ? 5 : 3) * u;
@@ -310,33 +312,18 @@ export class LiveRenderer {
     picture(ctx, p, c.x, c.y, G.platter.outer * 2, G.platter.outer * 2, -seconds * TURN);
     tonearm(ctx, v.pivot[d].x, v.pivot[d].y, v.armLength, u, v.armAngle(d), deck.lifted ? 1.05 : 1);
 
-    // The column beside it: tempo, key, pitch; and the panel kept for loops.
-    const loaded = deck.isLoaded;
-    label(ctx, loaded ? deck.bpm.toFixed(1) : "---.-", G.bpm.x, G.bpm.y, { size: 21 * u, color: rgba(tint), mono: true });
-    small(ctx, "BPM", G.bpm.x, G.bpm.y - 14 * u, 6.2 * u);
-    label(ctx, info?.camelot || "--", G.key.x, G.key.y, { size: 13 * u, color: LIVE.ink, mono: true });
-    small(ctx, "KEY", G.key.x, G.key.y - 11 * u, 6.2 * u);
-    const pct = deck.pitch * 100;
-    label(ctx, `${pct >= 0 ? "+" : "−"}${Math.abs(pct).toFixed(1)}%`, G.pitchText.x, G.pitchText.y, { size: 10.5 * u, color: LIVE.ink, mono: true });
-    small(ctx, "PITCH", G.pitchText.x, G.pitchText.y - 10 * u, 6.2 * u);
-    this.loopPanel(ctx, G.loop, u);
-
-    // Pitch fader: up is slower.
+    // Pitch fader: up is slower; the pitch reads out under it (the tempo and the key are in the mixer).
     fader(ctx, G.pitch.x, G.pitch.y, G.pitch.travel, v.pitchFader[d], true, 24 * u, 12 * u, tint, u, { centreMark: true });
     small(ctx, "−", G.pitch.x, G.pitch.y + G.pitch.travel / 2 + 16 * u, 9 * u, { color: LIVE.dim });
     small(ctx, "+", G.pitch.x, G.pitch.y - G.pitch.travel / 2 - 16 * u, 9 * u, { color: LIVE.dim });
+    const pct = deck.pitch * 100;
+    label(ctx, `${pct >= 0 ? "+" : "−"}${Math.abs(pct).toFixed(1)}%`, G.pitchText.x, G.pitchText.y, { size: 9.5 * u, color: LIVE.ink, mono: true });
 
     // Transport.
     const B = G.buttons, cueLit = v.cueDown[d] || (!deck.motorOn && Math.abs(seconds - deck.cuePoint) < 0.02);
     button(ctx, centred(B.cue.x, B.cue.y, B.w, B.h), "CUE", cueLit, LIVE.cue, u);
     button(ctx, centred(B.play.x, B.play.y, B.w, B.h), "PLAY", deck.motorOn && !v.previewing[d], LIVE.play, u);
     button(ctx, centred(B.sync.x, B.sync.y, B.w, B.h), "SYNC", v.sync[d], LIVE.sync, u, { enabled: v.syncAllowed });
-
-    // The pads (hot cues and loops come with the next step).
-    G.pads.forEach((r, i) => {
-      roundRect(ctx, r, 3 * u, "rgba(255,255,255,0.025)", "rgba(255,255,255,0.07)");
-      small(ctx, String(i + 1), r.x + r.w / 2, r.y + r.h / 2, 8 * u, { color: LIVE.dimmer });
-    });
 
     // A message for this deck (a record cannot be changed while it plays).
     const alert = v.alerts[d];
@@ -386,17 +373,6 @@ export class LiveRenderer {
     if (drop !== null) { ctx.fillStyle = rgba(tint); ctx.fillRect(r.x + r.w * drop - 1.25, r.y - 3, 2.5, r.h + 6); }
   }
 
-  private loopPanel(ctx: Ctx, r: Rect, u: number): void {
-    roundRect(ctx, r, 4 * u, "rgba(255,255,255,0.018)", "rgba(255,255,255,0.07)");
-    small(ctx, "LOOP", r.x + r.w / 2, r.y + r.h - 9 * u, 6.4 * u, { color: LIVE.dimmer });
-    const names = ["IN", "OUT", "½", "×2"], w = (r.w - 10 * u - 3 * 3 * u) / 4;
-    names.forEach((n, i) => {
-      const b: Rect = { x: r.x + 5 * u + i * (w + 3 * u), y: r.y + 7 * u, w, h: 20 * u };
-      roundRect(ctx, b, 3 * u, "rgba(255,255,255,0.02)", "rgba(255,255,255,0.06)");
-      small(ctx, n, b.x + b.w / 2, b.y + b.h / 2, 7 * u, { color: LIVE.dimmer });
-    });
-  }
-
   // MARK: The mixer
 
   private mixer(ctx: Ctx, g: LiveGeometry, v: LiveView): void {
@@ -404,19 +380,23 @@ export class LiveRenderer {
     panel(ctx, M.rect, u);
     // Tempos at the top, and where deck B's beat falls against deck A's.
     [0, 1].forEach((d) => label(ctx, v.decks[d].isLoaded ? v.decks[d].bpm.toFixed(1) : "---.-", M.bpm[d].x, M.bpm[d].y, { size: 11 * u, color: rgba(LIVE.deck[d]), mono: true, align: d === 0 ? "left" : "right" }));
+    // The key right under it, in the same size.
+    [0, 1].forEach((d) => label(ctx, v.decks[d].info?.camelot ?? "--", M.key[d].x, M.key[d].y, { size: 11 * u, color: LIVE.ink, mono: true, align: d === 0 ? "left" : "right" }));
     roundRect(ctx, centred(M.phase.c.x, M.phase.c.y, M.phase.w, 3 * u), 1.5 * u, "#020304", "rgba(255,255,255,0.08)");
     ctx.fillStyle = LIVE.dimmer;
     ctx.fillRect(M.phase.c.x - 0.6, M.phase.c.y - 4.5 * u, 1.2, 9 * u);
     if (v.phase !== null) circle(ctx, M.phase.c.x - v.phase * M.phase.w, M.phase.c.y, 3.4 * u, Math.abs(v.phase) < 0.03 ? rgba(LIVE.play) : rgba(LIVE.warn));
     else circle(ctx, M.phase.c.x, M.phase.c.y, 3 * u, "rgba(255,255,255,0.1)");
 
-    const names = ["TRIM", "HI", "MID", "LOW", "FILTER"];
+    const names = ["GAIN", "HI", "MID", "LOW", "FILTER"];
     M.strip.forEach((s, d) => {
       const tint = LIVE.deck[d];
       const values = [(v.trim[d]), v.eq[d][2], v.eq[d][1], v.eq[d][0], v.filter[d]];
       const bipolar = [true, true, true, true, true];
       s.knobY.forEach((y, i) => {
-        knob(ctx, s.x, y, s.knobR, values[i], tint, bipolar[i]);
+        // The gain's pointer is red; the FILTER knob sits in a blue square, so neither is taken for an EQ knob.
+        if (i === 4) roundRect(ctx, centred(s.x, y, 2 * (s.knobR + 6.5 * u), 2 * (s.knobR + 6.5 * u)), 4 * u, rgba(LIVE.filter, 0.07), rgba(LIVE.filter, 0.95), 1.4);
+        knob(ctx, s.x, y, s.knobR, values[i], i === 4 ? LIVE.filter : tint, bipolar[i], true, i === 0 ? LIVE.red : null);
         small(ctx, names[i], s.x + (d === 0 ? 1 : -1) * 15 * u, y, 5.4 * u, { align: d === 0 ? "left" : "right" });
       });
       // The gain, in dB, once it is not at zero.
@@ -448,18 +428,31 @@ export class LiveRenderer {
   private fxModule(ctx: Ctx, g: LiveGeometry, v: LiveView): void {
     const F = g.fx, u = g.u;
     panel(ctx, F.rect, u);
-    small(ctx, "EFFECTS", F.title.x, F.title.y, 7 * u, { color: LIVE.dim });
-    F.units.forEach((un, i) => {
-      const live = i === 0;
-      roundRect(ctx, un.rect, 5 * u, "rgba(255,255,255,0.016)", "rgba(255,255,255,0.065)");
-      button(ctx, un.name, live ? FX_TYPES[v.fx.type] : "—", false, LIVE.deck[0], u, { enabled: live, size: 7.4 * u });
-      button(ctx, un.div, live ? FX_DIVISIONS[v.fx.div].label : "—", false, [236, 240, 245], u, { enabled: live, size: 7 * u });
-      button(ctx, un.on, "ON", live && v.fx.on, LIVE.play, u, { enabled: live, size: 7.4 * u });
-      ["A", "B", "M"].forEach((n, k) => button(ctx, un.assign[k], n, false, LIVE.sync, u, { enabled: false, size: 6.6 * u }));
-      knob(ctx, un.knob.x, un.knob.y, un.knobR, live ? v.fx.amount : 0.5, live ? LIVE.deck[0] : null, false, live);
-      small(ctx, "AMOUNT", un.knob.x, un.knob.y - un.knobR - 8 * u, 5.2 * u, { color: live ? LIVE.dim : LIVE.dimmer });
-      un.faders.forEach((f) => fader(ctx, f.x, f.y, f.travel, 0.5, true, 14 * u, 9 * u, null, u, { enabled: false }));
+    small(ctx, "EFFECT", F.title.x, F.title.y, 7 * u, { color: LIVE.dim });
+    // The effect's name between two arrows (a touch on the left half-third goes back, anywhere else forward).
+    button(ctx, F.name, FX_TYPES[v.fx.type], false, LIVE.deck[0], u, { size: 7.8 * u });
+    small(ctx, "\u2039", F.name.x + 7 * u, F.name.y + F.name.h / 2, 10 * u, { color: LIVE.ink });
+    small(ctx, "\u203a", F.name.x + F.name.w - 7 * u, F.name.y + F.name.h / 2, 10 * u, { color: LIVE.ink });
+    button(ctx, F.on, "ON", v.fx.on, LIVE.play, u, { size: 8 * u });
+    // The first fader works now: how much of the effect there is.
+    const f = F.faders[0];
+    fader(ctx, f.x, f.y, f.travel, v.fx.amount, true, F.capW, 9 * u, LIVE.deck[0], u, { noScale: true });
+    small(ctx, "LEVEL", f.x, F.labelY, 5.2 * u);
+    // DIV: a vertical stepped selector, the note value from 1/4 at the top to 1/32 at the bottom (a reverb has none).
+    const D = F.div, usable = v.fx.type !== FX.reverb;
+    ctx.save();
+    ctx.globalAlpha = usable ? 1 : 0.3;
+    roundRect(ctx, { x: D.x - 1.6 * u, y: D.steps[3].y - 4 * u, w: 3.2 * u, h: D.steps[0].y - D.steps[3].y + 8 * u }, 1.6 * u, "#020304", "rgba(255,255,255,0.07)");
+    D.steps.forEach((p, i) => {
+      const on = i === v.fx.div;
+      circle(ctx, p.x, p.y, 1.6 * u, on ? "rgba(255,255,255,0.9)" : LIVE.dimmer);
+      label(ctx, FX_DIVISIONS[i].label, D.labelX, p.y, { size: 6.6 * u, color: on ? LIVE.ink : LIVE.dim, align: "left", mono: true });
     });
+    const at = D.steps[v.fx.div];
+    roundRect(ctx, centred(at.x, at.y, 13 * u, 8 * u), 2 * u, "#232832", "rgba(255,255,255,0.3)");
+    ctx.fillStyle = rgba(LIVE.deck[0], 0.95);
+    ctx.fillRect(at.x - 5 * u, at.y - 0.7, 10 * u, 1.4);
+    ctx.restore();
+    small(ctx, "DIV", D.x + 3 * u, D.labelY, 5.2 * u);
   }
 }
-

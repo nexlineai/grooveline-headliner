@@ -77,18 +77,47 @@ describe("LIVE layout", () => {
         assert.ok(mid.cross.y < mid.level.y, "the crossfader under the headphone faders");
       });
 
-      test("the FX controller: three units inside it, one under the other, every control inside its unit", () => {
-        const F = g.fx;
-        assert.equal(F.units.length, 3);
-        F.units.forEach((un, i) => {
-          assert.ok(inside(F.rect, un.rect));
-          if (i) assert.ok(F.units[i - 1].rect.y >= un.rect.y + un.rect.h - E, "units do not overlap");
-          for (const r of [un.name, un.div, un.on, ...un.assign]) assert.ok(inside(un.rect, r));
-          assert.ok(inside(un.rect, box(un.knob.x, un.knob.y, un.knobR)));
-          for (const f of un.faders) assert.ok(inside(un.rect, { x: f.x - 8 * g.u, y: f.y - f.travel / 2 - 6 * g.u, w: 16 * g.u, h: f.travel + 12 * g.u }));
-          const row = [un.name, un.div, un.on, ...un.assign];
-          for (let a = 1; a < row.length; a++) assert.ok(apart(row[a - 1], row[a]), "header buttons apart");
-        });
+      test("the FX controller: one narrow unit with its name, ON, four vertical faders and DIV, everything inside it and apart", () => {
+        const F = g.fx, u = g.u;
+        assert.ok(F.rect.w <= 0.14 * g.gear.w + 1, "narrow: the decks get the room");
+        for (const r of [F.name, F.on]) assert.ok(inside(F.rect, r));
+        assert.ok(apart(F.name, F.on));
+        for (const f of F.faders) assert.ok(inside(F.rect, { x: f.x - F.capW / 2, y: f.y - f.travel / 2 - 6 * u, w: F.capW, h: f.travel + 12 * u }));
+        for (let i = 1; i < F.faders.length; i++) assert.ok(F.faders[i].x - F.faders[i - 1].x >= F.capW + 2 * u, "faders apart");
+        assert.ok(F.faders[0].y + F.faders[0].travel / 2 + 6 * u < F.on.y, "the faders under the ON button");
+        const lastFader = F.faders[F.faders.length - 1];
+        assert.ok(lastFader.x + F.capW / 2 + 2 * u < F.div.x - 3 * u, "DIV right of the faders");
+        assert.equal(F.div.steps.length, 4);
+        F.div.steps.forEach((p, i) => { assert.ok(inside(F.rect, box(p.x, p.y, 4 * u))); if (i) assert.ok(F.div.steps[i - 1].y > p.y, "1/4 at the top, 1/32 at the bottom"); });
+        F.div.touch.forEach((r, i) => { assert.ok(inside(F.rect, r), `DIV step ${i}`); if (i) assert.ok(apart(F.div.touch[i - 1], r)); });
+        // The labels under the faders fit between the module's edges.
+        assert.ok(F.labelY - 3 * u > F.rect.y && F.labelY < F.faders[0].y - F.faders[0].travel / 2);
+      });
+
+      test("the readouts: the key sits right under the tempo at the same x, clear of the knobs; the pitch reads out under its fader", () => {
+        const M = g.mixer;
+        for (let d = 0; d < 2; d++) {
+          assert.ok(M.key[d].y < M.bpm[d].y && M.bpm[d].y - M.key[d].y <= 16 * g.u, "key under the tempo");
+          assert.equal(Math.round(M.key[d].x), Math.round(M.bpm[d].x));
+          // The key (about 16 units wide, toward the middle from its corner) must not run into the GAIN knob or its ring beside it.
+          const s = M.strip[d], ring = s.knobR + 3.5 * g.u;
+          const keyBox: Rect = d === 0 ? { x: M.key[d].x, y: M.key[d].y - 5 * g.u, w: 18 * g.u, h: 10 * g.u } : { x: M.key[d].x - 18 * g.u, y: M.key[d].y - 5 * g.u, w: 18 * g.u, h: 10 * g.u };
+          assert.ok(apart(keyBox, box(s.x, s.knobY[0], ring)), "key and the first knob");
+          assert.ok(inside(M.rect, keyBox));
+        }
+        for (const d of g.deck) {
+          assert.ok(d.pitchText.y < d.pitch.y - d.pitch.travel / 2, "pitch % under the fader");
+          assert.ok(inside(d.rect, { x: d.pitchText.x - 16 * g.u, y: d.pitchText.y - 5 * g.u, w: 32 * g.u, h: 10 * g.u }));
+        }
+      });
+
+      test("the FILTER knob's square (a knob and a margin, drawn round it) stays inside the strip and clear of the knob above and the CUE button below", () => {
+        for (const s of g.mixer.strip) {
+          const half = s.knobR + 6.5 * g.u, sq = box(s.x, s.knobY[4], half);
+          assert.ok(inside(g.mixer.rect, sq));
+          assert.ok(s.knobY[3] - s.knobR - 3.5 * g.u > sq.y + sq.h - E, "clear of LOW's ring");
+          assert.ok(sq.y > s.cue.y + s.cueH / 2 - E, "clear of the CUE button");
+        }
       });
 
       test("touch areas: knobs, faders and buttons are big enough for a finger and a mouse, and do not overlap each other", () => {

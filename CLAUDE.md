@@ -341,9 +341,12 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
   the look (graphite, LED-ring knobs, ridged fader caps, LED meters; deck A cyan, deck B amber; no pink; `LIVE` theme tokens) and
   `LiveRenderer` (keeps the platter and waveform pictures). `Booth.buildLive()` registers every control as a `hit` with the SAME `Kind`s,
   so the pointer code, keys, MIDI learn and the wheel work as before; new kinds: `master` (engine.masterVolume; MIDI "MASTER VOLUME")
-  and the cue-mix / phones-level faders are horizontal (`Layout.sliderTravel`). The mixer strip, top to bottom: TRIM, HI, MID, LOW,
-  FILTER, CUE (headphones), channel fader; the middle: MASTER, meters, CUE-MIX and PHONES faders, crossfader. Reserved for later steps
-  and drawn dim: 8 pads per deck (hot cues, loops), a LOOP panel, effect units 2 and 3 with their faders. The stop-the-deck alert:
+  and the cue-mix / phones-level faders are horizontal (`Layout.sliderTravel`). The mixer strip, top to bottom: GAIN (red
+  pointer), HI, MID, LOW, FILTER (in a blue square: not an EQ), CUE (headphones), channel fader; the BPM and, under it in the same size,
+  the key of each deck sit at the top corners (the deck itself shows neither); the middle: MASTER, meters, CUE-MIX and PHONES faders,
+  crossfader. The pitch reads out under each deck's pitch fader. The effects controller is ONE narrow unit (112 units wide): the
+  effect's name between two arrows, ON, four vertical fader columns (the first, LEVEL, works; the others are laid out in the
+  geometry for the new effects) and DIV, a vertical stepped note-value selector. No control is drawn that does not work yet. The stop-the-deck alert:
   `main.ts deckBusy` -> `Booth.alertDeck` (a message over that deck for 3 s; the record stays). Drawing costs about 4 ms a frame
   (the static parts are not cached yet: a hardening item). Smokes: `test/live-geometry.test.ts` and the page checks listed in the vault.
 - **Layout unit (18 Nov, the game's booth):** `u = min(height share / 210, width / 816)` (816u = the iPhone's gear width), the gear sits at the

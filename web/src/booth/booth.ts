@@ -81,7 +81,7 @@ interface Layout {
   channelX: number[]; channelY: number; channelTravel: number;
   phonesY: number; meterX: number[]; meterY: number; meterH: number;
   /** The LIVE booth's geometry (null in the game's booth), and how far a horizontal headphone fader runs. */
-  live: LiveGeometry | null; sliderTravel: number;
+  live: LiveGeometry | null; sliderTravel: number; fxTravel: number;
   crossY: number; crossTravel: number; filterY: number;
 }
 
@@ -449,7 +449,7 @@ export class Booth {
       needleReach: Math.max(20, 20 * u), rowY, titleX, timeX, dotX, wave, buttonW, buttonH, buttonX, buttonY,
       pitchX, pitchY, pitchTravel, bpmX: [mx + 32 * u, mx + mw - 32 * u], topY: my + mh - 15 * u, phaseY: my + mh - 30 * u,
       phaseWidth: Math.min(104 * u, mw * 0.5), knobX, knobY, knobTravel: 90 * u, channelX, channelY, channelTravel,
-      phonesY, meterX: [mid - 9 * u, mid + 9 * u], meterY: channelY, meterH: channelTravel + 8 * u, live: null, sliderTravel: 0, crossY, crossTravel, filterY,
+      phonesY, meterX: [mid - 9 * u, mid + 9 * u], meterY: channelY, meterH: channelTravel + 8 * u, live: null, sliderTravel: 0, fxTravel: 0, crossY, crossTravel, filterY,
     };
     this.platterImg = TINTS.map((t) => platterPicture(r, t, this.dpr));
     this.labelShown = [null, null]; // the next frame draws the covers again
@@ -499,12 +499,13 @@ export class Booth {
     first({ t: "master" }, T.master);
     first({ t: "cueMix" }, T.mix);
     first({ t: "phonesLevel" }, T.level);
-    // The effect controller: the first unit works; the others wait for their effects.
-    const F = g.fx.units[0];
+    // The effect controller: the name (the left third goes to the effect before, the rest to the next), ON, the LEVEL fader, DIV.
+    const F = g.fx, lvl = F.faders[0];
     first({ t: "fxType", d: -1 }, F.name);
-    first({ t: "fxDiv", d: -1 }, F.div);
+    first({ t: "fxType", d: -2 }, { x: F.name.x, y: F.name.y, w: F.name.w * 0.3, h: F.name.h });
     first({ t: "fxOn" }, F.on);
-    first({ t: "fxAmount" }, centred(F.knob.x, F.knob.y, 3 * F.knobR, 3 * F.knobR));
+    first({ t: "fxAmount" }, centred(lvl.x, lvl.y, 26 * u, lvl.travel + 16 * u));
+    F.div.touch.forEach((r, i) => first({ t: "fxDiv", d: i }, r));
 
     this.hits = hits;
     const B0 = g.deck[0].buttons;
@@ -514,7 +515,7 @@ export class Booth {
       pitchX, pitchY, pitchTravel: g.deck[0].pitch.travel, bpmX: [0, 0], topY: 0, phaseY: 0, phaseWidth: 0,
       knobX: M.strip.map((s) => s.x), knobY: M.strip[0].knobY, knobTravel: 90 * u, channelX: M.strip.map((s) => s.fader.x), channelY: M.strip[0].fader.y,
       channelTravel: M.strip[0].fader.travel, phonesY: M.mid.mix.y, meterX: M.mid.meterX, meterY: M.mid.meter.y, meterH: M.mid.meter.h,
-      live: g, sliderTravel: M.mid.mix.w - 12 * u, crossY: M.mid.cross.y, crossTravel: M.mid.cross.travel, filterY: 0,
+      live: g, sliderTravel: M.mid.mix.w - 12 * u, fxTravel: g.fx.faders[0].travel, crossY: M.mid.cross.y, crossTravel: M.mid.cross.travel, filterY: 0,
     };
     this.labelShown = [null, null];
     // Where the page's own parts sit (the library and the stream panel are HTML over the canvas), published as CSS variables.
@@ -855,7 +856,7 @@ export class Booth {
         this.engine.masterVolume = clamp01(grab.startValue + (p.y - grab.start.y) / L.knobTravel);
         break;
       case "fxAmount":
-        this.setFxAmount(grab.startValue + (p.y - grab.start.y) / L.knobTravel);
+        this.setFxAmount(grab.startValue + (p.y - grab.start.y) / (L.live ? L.fxTravel : L.knobTravel));
         break;
       case "eq":
         this.setEQ(k.d, k.band, clamp01(grab.startValue + (p.y - grab.start.y) / L.knobTravel));
@@ -950,7 +951,7 @@ export class Booth {
         decks[k.d].cue = this.phones[k.d];
         break;
       case "fxOn": if (this.mode === "live") this.setFxOn(!this.fx.on); break;
-      case "fxType": if (this.mode === "live") this.setFxType(k.d < 0 ? (this.fx.type + 1) % FX_TYPES.length : k.d); break;
+      case "fxType": if (this.mode === "live") this.setFxType(k.d === -2 ? (this.fx.type + FX_TYPES.length - 1) % FX_TYPES.length : k.d < 0 ? (this.fx.type + 1) % FX_TYPES.length : k.d); break;
       case "fxDiv": if (this.mode === "live") this.setFxDiv(k.d < 0 ? (this.fx.div + 1) % FX_DIVISIONS.length : k.d); break;
       default:
         break;
