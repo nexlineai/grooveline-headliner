@@ -121,6 +121,10 @@ export class MixerShared {
   /** Everything that comes out, 0...1 (turned down a little while a coach talks). */
   master = 1;
   masterNow = 1;
+  /** WEB ONLY (the effect unit, audio/fx.ts; the Swift twin has none): how much of each channel goes to the effect's send bus, after its fader (0 = none,
+   * 1 = all), and the glided value. With both at 0, or no bus given to `renderMix`, the mixer is exactly what it was (test/mixer-golden.test.ts). */
+  fxSend = [0, 0];
+  fxSendNow = [0, 0];
   sampleRate = 48_000;
   /** The far speakers of a big system: the room also hears the music `echoDelay` frames late (a
    * quieter copy); the headphones do not, like a DJ's monitors. 0 = off. The ring buffers
@@ -185,7 +189,8 @@ export interface Scratch { left: Float32Array; right: Float32Array; }
  */
 export function renderMix(decks: DeckShared[], strips: ChannelStrip[], mixer: MixerShared, scratch: Scratch,
                           outL: Float32Array, outR: Float32Array,
-                          phonesLeft: Float32Array | null, phonesRight: Float32Array | null, count: number): void {
+                          phonesLeft: Float32Array | null, phonesRight: Float32Array | null, count: number,
+                          sendLeft: Float32Array | null = null, sendRight: Float32Array | null = null): void {
   const split = mixer.split;
   const cueMix = Math.max(0, Math.min(1, mixer.cueMix));
   const rate = mixer.sampleRate;
@@ -193,9 +198,15 @@ export function renderMix(decks: DeckShared[], strips: ChannelStrip[], mixer: Mi
   for (let i = 0; i < count; i++) { outL[i] = 0; outR[i] = 0; }
   const pl = phonesLeft, pr = phonesRight;
   if (pl && pr) for (let i = 0; i < count; i++) { pl[i] = 0; pr[i] = 0; }
+  const sends = sendLeft !== null && sendRight !== null;
+  if (sends) for (let i = 0; i < count; i++) { sendLeft![i] = 0; sendRight![i] = 0; }
 
   for (let d = 0; d < decks.length; d++) {
     const strip = strips[d];
+    // The effect's send for this channel (web only): taken after the fader, glided so that switching it makes no click.
+    const sendWanted = mixer.fxSend[d] ?? 0;
+    let send = mixer.fxSendNow[d] ?? 0;
+    const sendOn = sends && (sendWanted > 0 || send > 0);
     // The record, before the fader.
     renderVinyl(decks[d], tl, tr, count);
 
@@ -246,6 +257,7 @@ export function renderMix(decks: DeckShared[], strips: ChannelStrip[], mixer: Mi
         const l = tl[i], r = tr[i];
         outL[i] += l * fader;
         outR[i] += r * fader;
+        if (sendOn) { send += (sendWanted - send) * 0.003; sendLeft![i] += l * fader * send; sendRight![i] += r * fader * send; }
         const heard = cue * (1 - cueMix) + fader * cueMix;
         pl[i] += l * heard;
         pr[i] += r * heard;
@@ -257,6 +269,7 @@ export function renderMix(decks: DeckShared[], strips: ChannelStrip[], mixer: Mi
         cue += (cueWanted - cue) * 0.004;
         const mono = (tl[i] + tr[i]) * 0.5;
         const room = mono * fader;
+        if (sendOn) { send += (sendWanted - send) * 0.003; sendLeft![i] += tl[i] * fader * send; sendRight![i] += tr[i] * fader * send; }
         outL[i] += room;
         outR[i] += mono * cue * (1 - cueMix) + room * cueMix;
       }
@@ -266,8 +279,10 @@ export function renderMix(decks: DeckShared[], strips: ChannelStrip[], mixer: Mi
         cue += (cueWanted - cue) * 0.004;
         outL[i] += tl[i] * fader;
         outR[i] += tr[i] * fader;
+        if (sendOn) { send += (sendWanted - send) * 0.003; sendLeft![i] += tl[i] * fader * send; sendRight![i] += tr[i] * fader * send; }
       }
     }
+    if (sendOn) mixer.fxSendNow[d] = Math.abs(send - sendWanted) < 1e-4 ? sendWanted : send;
     strip.faderNow = fader;
     strip.cueNow = cue;
   }

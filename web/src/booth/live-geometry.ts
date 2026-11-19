@@ -17,7 +17,9 @@ import type { Point, Rect } from "./gear.ts";
 
 export const TOP_BAR = 40;
 const GEAR_H = 300;
-const DECK_MIN = 296, MIXER_W = 226, FX_W = 92, GAP = 5.333;
+const DECK_MIN = 296, MIXER_W = 226, GAP = 5.333;
+/** The effects strip above the gear row: its height and the gap under it (units). */
+const FX_STRIP_H = 30, FX_STRIP_GAP = 4;
 /** The knobs of the mixer strips and of the effect unit are all this size (units). */
 export const KNOB_R = 11;
 /** The right of a deck's header (time, lamps, key, tempo) takes this many units; the title stops before it. */
@@ -53,6 +55,8 @@ export interface LiveStrip {
   knobY: number[]; knobR: number;
   /** Where the FILTER's name goes (between the fader and the knob). */
   filterLabelY: number;
+  /** The square FX button beside the FILTER knob (on the outer side: left for channel A, right for B): the effect on this channel. */
+  fxBtn: Rect;
   cue: Point; cueW: number; cueH: number;
   fader: { x: number; y: number; travel: number };
 }
@@ -70,14 +74,14 @@ export interface LiveMixerGeometry {
 
 /** The effect controller: one unit, narrow: the effect's name (arrows either side), ON, four vertical faders for what the effect
  * does, and DIV, a vertical stepped selector for the note value. */
+/** The effects strip, a thin panel across the top of the gear row: the effect's name between two arrows, its four knobs (a little smaller than the
+ * mixer's, each with its name and, for a stepped one, its value to the right) and a short horizontal LEVEL fader. Which channels it works on is
+ * set by the FX buttons in the mixer. */
 export interface LiveFxGeometry {
   rect: Rect; title: Point;
-  name: Rect; on: Rect;
-  /** The four knobs of the effect, one under the other, the size of the mixer's: where each sits, its touch area, where its name and (for a
-   * stepped knob) its value go. */
+  name: Rect;
   knobs: { c: Point; r: number; touch: Rect; name: Point; value: Point }[];
-  /** The long LEVEL fader beside them (how much of the effect there is), the width of its cap, and where its name goes. */
-  level: { x: number; y: number; travel: number; capW: number; labelY: number };
+  level: { x: number; y: number; travel: number; capW: number; capH: number; label: Point; touch: Rect };
 }
 
 export interface LiveGeometry {
@@ -92,28 +96,29 @@ const clamp = (x: number, lo: number, hi: number): number => Math.max(lo, Math.m
 
 export function liveGeometry(W: number, H: number): LiveGeometry {
   const margin = 10;
-  const fixedW = MIXER_W + FX_W + 3 * GAP + 2 * DECK_MIN;
+  const fixedW = MIXER_W + 2 * GAP + 2 * DECK_MIN;
   const uW = (W - 2 * margin) / fixedW;
-  const uH = (H * 0.68 - TOP_BAR - 8) / GEAR_H;
+  const uH = (H * 0.71 - TOP_BAR - 8) / (GEAR_H + FX_STRIP_H + FX_STRIP_GAP);
   const u = clamp(Math.min(uW, uH), 0.5, 3);
   const gearH = GEAR_H * u;
-  const gearTop = H - TOP_BAR - 4;
+  // The effects strip on top, then the gear row.
+  const stripTop = H - TOP_BAR - 4;
+  const stripY = stripTop - FX_STRIP_H * u;
+  const gearTop = stripY - FX_STRIP_GAP * u;
   const gearY = gearTop - gearH;
   // The decks share what is left of the width.
-  const deckW = Math.max(DECK_MIN * u, (W - 2 * margin - (MIXER_W + FX_W + 3 * GAP) * u) / 2);
-  const total = 2 * deckW + (MIXER_W + FX_W + 3 * GAP) * u;
+  const deckW = Math.max(DECK_MIN * u, (W - 2 * margin - (MIXER_W + 2 * GAP) * u) / 2);
+  const total = 2 * deckW + (MIXER_W + 2 * GAP) * u;
   let x = (W - total) / 2;
   const rectA = { x, y: gearY, w: deckW, h: gearH };
   x += deckW + GAP * u;
   const rectM = { x, y: gearY, w: MIXER_W * u, h: gearH };
   x += MIXER_W * u + GAP * u;
-  const rectF = { x, y: gearY, w: FX_W * u, h: gearH };
-  x += FX_W * u + GAP * u;
   const rectB = { x, y: gearY, w: deckW, h: gearH };
 
   const deck = [rectA, rectB].map((rect) => deckGeometry(rect, u));
   const mixer = mixerGeometry(rectM, u);
-  const fx = fxGeometry(rectF, u);
+  const fx = fxGeometry({ x: (W - total) / 2, y: stripY, w: total, h: FX_STRIP_H * u }, u);
 
   const lowerTop = gearY - 8;
   const lower: Rect = { x: margin, y: 6, w: W - 2 * margin, h: Math.max(0, lowerTop - 6) };
@@ -175,6 +180,7 @@ function mixerGeometry(rect: Rect, u: number): LiveMixerGeometry {
   const strip = [43, w - 43].map((cx): LiveStrip => ({
     x: rect.x + cx * u,
     knobY: [24, 58, 92, 126, 282].map((dy) => top - dy * u), knobR: KNOB_R * u, filterLabelY: top - 260 * u,
+    fxBtn: centred(rect.x + (cx + (cx < w / 2 ? -30 : 30)) * u, top - 282 * u, 16 * u, 16 * u),
     cue: P(cx, 162), cueW: 44 * u, cueH: 14 * u,
     fader: { x: rect.x + cx * u, y: top - 212 * u, travel: 64 * u },
   }));
@@ -192,15 +198,25 @@ function mixerGeometry(rect: Rect, u: number): LiveMixerGeometry {
 }
 
 function fxGeometry(rect: Rect, u: number): LiveFxGeometry {
-  const top = rect.y + rect.h;
-  const P = (dx: number, dy: number): Point => ({ x: rect.x + dx * u, y: top - dy * u });
-  const R = (dx: number, dy: number, w: number, h: number): Rect => ({ x: rect.x + dx * u, y: top - (dy + h) * u, w: w * u, h: h * u });
-  const kx = 28, ky = [100, 150, 200, 250];
+  const top = rect.y + rect.h, w = rect.w / u, cy = top - (FX_STRIP_H / 2) * u;
+  // The cluster is centred: the name (100), four knobs (64 each, with their words to the right), then LEVEL (150).
+  const NAME_W = 100, KNOB_PITCH = 64, LEVEL_W = 150, G = 14;
+  const total = NAME_W + G + 4 * KNOB_PITCH + G + LEVEL_W;
+  const x0 = Math.max(60, (w - total) / 2);
+  const at = (dx: number): number => rect.x + dx * u;
+  const knobX = (i: number): number => x0 + NAME_W + G + i * KNOB_PITCH + 9;
+  const lx = x0 + NAME_W + G + 4 * KNOB_PITCH + G;
+  const travel = 92;
   return {
-    rect, title: P(FX_W / 2, 11),
-    name: R(6, 22, FX_W - 12, 20), on: R(6, 47, FX_W - 12, 18),
-    knobs: ky.map((dy) => ({ c: P(kx, dy), r: KNOB_R * u, touch: centred(rect.x + kx * u, top - dy * u, 48 * u, 46 * u), name: P(kx, dy + 20), value: P(kx, dy + 28) })),
-    level: { x: rect.x + 68 * u, y: top - 178 * u, travel: 178 * u, capW: 24 * u, labelY: top - 289 * u },
+    rect, title: { x: at(10), y: cy },
+    name: { x: at(x0), y: cy - 11 * u, w: NAME_W * u, h: 22 * u },
+    knobs: [0, 1, 2, 3].map((i) => ({
+      c: { x: at(knobX(i)), y: cy }, r: 7.5 * u,
+      touch: { x: at(knobX(i) - 10), y: cy - 13 * u, w: 62 * u, h: 26 * u },
+      name: { x: at(knobX(i) + 12), y: cy + 5 * u }, value: { x: at(knobX(i) + 12), y: cy - 5 * u },
+    })),
+    level: { x: at(lx + 44 + travel / 2), y: cy, travel: travel * u, capW: 10 * u, capH: 16 * u, label: { x: at(lx), y: cy },
+             touch: { x: at(lx + 40), y: cy - 13 * u, w: (travel + 14) * u, h: 26 * u } },
   };
 }
 

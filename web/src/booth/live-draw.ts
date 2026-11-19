@@ -51,10 +51,10 @@ function panel(ctx: Ctx, r: Rect, u: number): void {
 }
 
 /** A rotary knob: a ring of LEDs round a dark cap with one white line. `bipolar`: the ring lights from the middle. */
-function knob(ctx: Ctx, x: number, y: number, r: number, v: number, tint: RGB | null, bipolar: boolean, enabled = true, pointer: RGB | null = null): void {
+function knob(ctx: Ctx, x: number, y: number, r: number, v: number, tint: RGB | null, bipolar: boolean, enabled = true, pointer: RGB | null = null, ring = true): void {
   const value = clamp01(v);
   const R = r + 3.2 * Math.max(0.8, r / 9);
-  const steps = 11;
+  const steps = ring ? 11 : 0; // the effect strip's knobs have no ring of dots
   for (let i = 0; i < steps; i++) {
     const t = i / (steps - 1), a = (t - 0.5) * 1.5 * Math.PI;
     const lit = enabled && tint && (bipolar ? (t >= Math.min(0.5, value) - 1e-6 && t <= Math.max(0.5, value) + 1e-6 && Math.abs(value - 0.5) > 0.02 || (i === 5 && Math.abs(value - 0.5) <= 0.02)) : t <= value + 1e-6);
@@ -232,7 +232,7 @@ export interface LiveView {
   pitchFader: number[]; channel: number[]; cross: number; eq: number[][]; filter: number[]; trim: number[]; phones: boolean[]; sync: boolean[];
   cueDown: boolean[]; previewing: boolean[]; meter: number[]; dropAt: (number | null)[];
   cueMix: number; phonesLevel: number; master: number;
-  fx: { type: number; div: number; amount: number; on: boolean; params: number[] };
+  fx: { type: number; div: number; amount: number; on: boolean; params: number[]; send: boolean[] };
   armAngle(d: number): number;
   pivot: Point[]; armLength: number;
   labelArt: ({ id: string; img: CanvasImageSource } | null)[];
@@ -542,7 +542,11 @@ export class LiveRenderer {
         // The gain's pointer is red; the FILTER knob is under the fader (blue ring), so it is not taken for an EQ knob.
         knob(ctx, s.x, y, s.knobR, values[i], rings[i], bipolar[i], true, i === 0 ? LIVE.red : null);
         if (i < 4) small(ctx, names[i], s.x + (d === 0 ? 1 : -1) * 19 * u, y, 5.6 * u, { align: d === 0 ? "left" : "right" });
-        else small(ctx, "FILTER", s.x, s.filterLabelY, 5.6 * u, { color: rgba(LIVE.filter, 0.9) });
+        else {
+          small(ctx, "FILTER", s.x, s.filterLabelY, 5.6 * u, { color: rgba(LIVE.filter, 0.9) });
+          // The effect on this channel: a square button on the outer side of the FILTER knob.
+          button(ctx, s.fxBtn, "FX", v.fx.send[d], LIVE.play, u, { size: 6.2 * u });
+        }
       });
       // The gain, in dB, once it is not at zero.
       const db = Math.round(v.trimDb(d));
@@ -573,22 +577,21 @@ export class LiveRenderer {
   private fxModule(ctx: Ctx, g: LiveGeometry, v: LiveView): void {
     const F = g.fx, u = g.u;
     panel(ctx, F.rect, u);
-    small(ctx, "EFFECT", F.title.x, F.title.y, 6.6 * u, { color: LIVE.dim });
+    small(ctx, "EFFECT", F.title.x, F.title.y, 6.4 * u, { color: LIVE.dim, align: "left" });
     // The effect's name between two arrows (a touch on the left third goes back, anywhere else forward).
-    button(ctx, F.name, FX_TYPES[v.fx.type], false, LIVE.deck[0], u, { size: 7.2 * u });
+    button(ctx, F.name, FX_TYPES[v.fx.type], v.fx.send[0] || v.fx.send[1], LIVE.play, u, { size: 7 * u });
     small(ctx, "\u2039", F.name.x + 7 * u, F.name.y + F.name.h / 2, 10 * u, { color: LIVE.ink });
     small(ctx, "\u203a", F.name.x + F.name.w - 7 * u, F.name.y + F.name.h / 2, 10 * u, { color: LIVE.ink });
-    button(ctx, F.on, "ON", v.fx.on, LIVE.play, u, { size: 8 * u });
-    // The four knobs of this effect, the size of the mixer's: each with its name, and a stepped one with the step it is on.
+    // The four knobs of this effect: no ring of dots, just the pointer; the name and (a stepped knob) the step to the right.
     FX_KNOBS[v.fx.type].forEach((def, i) => {
       const k = F.knobs[i], value = v.fx.params[i] ?? 0;
-      knob(ctx, k.c.x, k.c.y, k.r, value, LIVE.fxRing, false);
-      small(ctx, def.name, k.name.x, k.name.y, 5.6 * u);
-      if (def.steps) small(ctx, def.steps[stepIndex(value, def.steps.length)], k.value.x, k.value.y, 6.2 * u, { color: LIVE.ink, mono: true });
+      knob(ctx, k.c.x, k.c.y, k.r, value, LIVE.fxRing, false, true, null, false);
+      small(ctx, def.name, k.name.x, k.name.y, 5.2 * u, { align: "left" });
+      if (def.steps) small(ctx, def.steps[stepIndex(value, def.steps.length)], k.value.x, k.value.y, 5.8 * u, { color: LIVE.ink, mono: true, align: "left" });
     });
-    // LEVEL: a long fader, how much of the effect there is.
+    // LEVEL: a short horizontal fader, how much of the effect there is.
     const L = F.level;
-    fader(ctx, L.x, L.y, L.travel, v.fx.amount, true, L.capW, 13 * u, LIVE.fxRing, u);
-    small(ctx, "LEVEL", L.x, L.labelY, 5.6 * u);
+    small(ctx, "LEVEL", L.label.x, L.label.y, 5.6 * u, { align: "left" });
+    fader(ctx, L.x, L.y, L.travel, v.fx.amount, false, L.capW, L.capH, LIVE.fxRing, u, { noScale: true });
   }
 }

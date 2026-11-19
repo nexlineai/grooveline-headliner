@@ -17,6 +17,8 @@ class HeadlinerProcessor extends AudioWorkletProcessor {
   private readonly mixer = new MixerShared();
   private readonly master = new MasterSection(sampleRate);
   private readonly fxKnobs = [0.5, 0.5, 0.5, 0.5];
+  private sendL = new Float32Array(128);
+  private sendR = new Float32Array(128);
   private readonly seekSeen: number[] = [];
   private readonly scratch = { left: new Float32Array(128), right: new Float32Array(128) };
   private spareR = new Float32Array(128);
@@ -129,10 +131,14 @@ class HeadlinerProcessor extends AudioWorkletProcessor {
     mixer.split = v[mixerAt(M.split)] !== 0;
     mixer.cueMix = v[mixerAt(M.cueMix)];
     mixer.master = v[mixerAt(M.master)];
+    mixer.fxSend[0] = v[mixerAt(M.fxSend)]; mixer.fxSend[1] = v[mixerAt(M.fxSend + 1)];
     mixer.echoDelay = Math.trunc(v[mixerAt(M.echoDelay)]);
     mixer.echoGain = v[mixerAt(M.echoGain)];
 
-    renderMix(this.decks, this.strips, mixer, this.scratch, left, right, two ? out[2] : null, two ? out[3] : null, count);
+    if (this.sendL.length < count) { this.sendL = new Float32Array(count); this.sendR = new Float32Array(count); }
+    const sending = mixer.fxSend[0] > 0 || mixer.fxSend[1] > 0 || mixer.fxSendNow[0] > 0 || mixer.fxSendNow[1] > 0;
+    renderMix(this.decks, this.strips, mixer, this.scratch, left, right, two ? out[2] : null, two ? out[3] : null, count,
+              sending ? this.sendL : null, sending ? this.sendR : null);
     // The web's master section (the effect, the headphones level): before the second device's ring is filled.
     const m = this.master;
     m.phonesGain = v[mixerAt(M.phonesGain)];
@@ -143,7 +149,8 @@ class HeadlinerProcessor extends AudioWorkletProcessor {
     for (let k = 0; k < 4; k++) this.fxKnobs[k] = v[mixerAt(M.fxKnob + k)];
     m.fxParams = this.fxKnobs;
     m.fxDelaySeconds = v[mixerAt(M.fxDelay)] || 0.5;
-    this.master.process(left, right, two ? out[2] : null, two ? out[3] : null, mixer.split, mixer.cueMix, count);
+    m.fxSendOn = sending;
+    this.master.process(left, right, two ? out[2] : null, two ? out[3] : null, mixer.split, mixer.cueMix, count, sending ? this.sendL : null, sending ? this.sendR : null);
     if (!two) for (let c = 2; c < out.length; c++) out[c].fill(0);
     const ring = this.ring;
     if (two && ring && out.length >= 4) {

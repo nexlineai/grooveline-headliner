@@ -16,11 +16,12 @@ describe("LIVE layout", () => {
       const g = liveGeometry(W, H);
       const window: Rect = { x: 0, y: 0, w: W, h: H };
 
-      test("the four modules sit in one row, in order, inside the window, below the top bar, without touching", () => {
-        const mods = [g.deck[0].rect, g.mixer.rect, g.fx.rect, g.deck[1].rect];
-        for (const m of mods) assert.ok(inside(window, m), JSON.stringify(m));
+      test("the three modules sit in one row, in order, inside the window, with the effects strip above them and below the top bar, without touching", () => {
+        const mods = [g.deck[0].rect, g.mixer.rect, g.deck[1].rect];
+        for (const m of [...mods, g.fx.rect]) assert.ok(inside(window, m), JSON.stringify(m));
         for (let i = 1; i < mods.length; i++) assert.ok(mods[i - 1].x + mods[i - 1].w < mods[i].x, `module ${i - 1} ends before module ${i}`);
-        assert.ok(g.gear.y + g.gear.h <= H - TOP_BAR + E);
+        assert.ok(g.fx.rect.y >= g.gear.y + g.gear.h, "the strip above the gear row");
+        assert.ok(g.fx.rect.y + g.fx.rect.h <= H - TOP_BAR + E, "and below the top bar");
         assert.ok(mods.every((m) => Math.abs(m.y - g.gear.y) < E && Math.abs(m.h - g.gear.h) < E));
       });
 
@@ -28,7 +29,7 @@ describe("LIVE layout", () => {
         assert.ok(inside(window, g.library) && inside(window, g.streamPanel));
         assert.ok(apart(g.library, g.streamPanel));
         assert.ok(g.library.y + g.library.h <= g.gear.y + E);
-        assert.ok(g.library.h >= 0.28 * H, `library height ${g.library.h} of ${H}`);
+        assert.ok(g.library.h >= 0.26 * H, `library height ${g.library.h} of ${H}`);
         assert.ok(g.library.w >= 0.5 * W);
       });
 
@@ -101,30 +102,44 @@ describe("LIVE layout", () => {
         assert.ok(mid.cross.y < mid.level.y, "the crossfader under the headphone faders");
       });
 
-      test("the FX controller: one narrow unit with its name, ON, four knobs the size of the mixer's, and a long LEVEL fader; everything inside it and apart", () => {
+      test("the effects strip: a thin panel across the top of the gear row; the name, four knobs a little smaller than the mixer's, a short horizontal LEVEL fader; all inside it and apart", () => {
         const F = g.fx, u = g.u, M = g.mixer;
-        assert.ok(F.rect.w <= 0.11 * g.gear.w + 1, "narrow: the decks get the room");
-        for (const r of [F.name, F.on]) assert.ok(inside(F.rect, r));
-        assert.ok(apart(F.name, F.on));
+        assert.ok(F.rect.y > g.gear.y + g.gear.h, "above the gear row");
+        assert.ok(F.rect.h <= 31 * u && F.rect.h >= 28 * u, "thin");
+        assert.ok(Math.abs(F.rect.w - g.gear.w) < 1, "as wide as the gear row");
+        assert.ok(inside(F.rect, F.name));
         assert.equal(F.knobs.length, 4);
         F.knobs.forEach((k, i) => {
-          assert.equal(Math.round(k.r * 100), Math.round(M.strip[0].knobR * 100), "the same size as the mixer's knobs");
-          assert.ok(inside(F.rect, box(k.c.x, k.c.y, k.r + 4 * u)), `knob ${i} inside`);
-          assert.ok(inside(F.rect, k.touch), `knob ${i} touch area inside`);
-          assert.ok(k.c.y + k.r + 4 * u < F.on.y, "the knobs under the ON button");
-          assert.ok(k.name.y < k.c.y - k.r && k.value.y < k.name.y, "its name and value under it");
-          assert.ok(inside(F.rect, box(k.name.x, k.name.y, 4 * u)) && inside(F.rect, box(k.value.x, k.value.y, 4 * u)));
-          if (i) { assert.ok(apart(F.knobs[i - 1].touch, k.touch), "touch areas apart"); assert.ok(k.c.y < F.knobs[i - 1].c.y - 2 * k.r - 6 * u, "knobs apart, one under the other"); assert.ok(k.value.y > F.knobs[i - 1].c.y - F.knobs[i - 1].r - 3 * u || true); }
+          assert.ok(k.r < M.strip[0].knobR && k.r >= 0.6 * M.strip[0].knobR, "a bit smaller than the mixer's knobs");
+          assert.ok(inside(F.rect, box(k.c.x, k.c.y, k.r)) && inside(F.rect, k.touch), `knob ${i} inside`);
+          assert.ok(k.name.x > k.c.x + k.r && k.value.x > k.c.x + k.r, "its name and value to the right of it");
+          assert.ok(inside(F.rect, box(k.name.x + 12 * u, k.name.y, 4 * u)) && inside(F.rect, box(k.value.x + 12 * u, k.value.y, 4 * u)));
+          if (i) { assert.ok(apart(F.knobs[i - 1].touch, k.touch), "touch areas apart"); assert.ok(k.c.x > F.knobs[i - 1].c.x + 2 * k.r + 4 * u); }
         });
+        assert.ok(apart(F.name, F.knobs[0].touch), "the name apart from the first knob");
         const L = F.level;
-        assert.ok(inside(F.rect, { x: L.x - L.capW / 2, y: L.y - L.travel / 2 - 7 * u, w: L.capW, h: L.travel + 14 * u }), "the fader inside");
-        assert.ok(L.y + L.travel / 2 + 7 * u < F.on.y, "the fader under the ON button");
-        assert.ok(L.x - L.capW / 2 > F.knobs[0].c.x + F.knobs[0].r + 3.5 * u, "the fader right of the knobs");
-        assert.ok(L.travel >= 1.8 * M.strip[0].fader.travel, "a long fader, not a small one");
-        assert.ok(L.labelY > F.rect.y && L.labelY < L.y - L.travel / 2);
-        // The last knob's name and value fit above the bottom edge.
-        const last = F.knobs[3];
-        assert.ok(last.value.y - 4 * u > F.rect.y);
+        assert.ok(inside(F.rect, { x: L.x - L.travel / 2 - L.capW / 2, y: L.y - L.capH / 2, w: L.travel + L.capW, h: L.capH }), "the fader inside");
+        assert.ok(inside(F.rect, L.touch));
+        assert.ok(L.x - L.travel / 2 - L.capW / 2 > F.knobs[3].touch.x + F.knobs[3].touch.w - 1, "the fader right of the knobs");
+        assert.ok(L.label.x < L.x - L.travel / 2 - L.capW / 2, "its name to the left of it");
+        assert.ok(apart(F.knobs[3].touch, L.touch));
+        // The cluster sits in the middle of the strip, so the sides are free.
+        assert.ok(F.name.x > F.rect.x + 40 * u && L.touch.x + L.touch.w < F.rect.x + F.rect.w - 40 * u);
+      });
+
+      test("the FX buttons: a square one on the OUTER side of each FILTER knob, inside the mixer, clear of the knob and its ring, big enough to touch", () => {
+        const M = g.mixer;
+        M.strip.forEach((s, d) => {
+          const r = s.fxBtn;
+          assert.ok(Math.abs(r.w - r.h) < 1e-6 && r.w >= 15 * g.u, "square");
+          assert.ok(inside(M.rect, r));
+          assert.ok(apart(r, box(s.x, s.knobY[4], s.knobR + 3.5 * g.u)), "clear of the FILTER knob and its ring");
+          const cx = r.x + r.w / 2;
+          if (d === 0) assert.ok(cx < s.x, "channel A: left of its filter"); else assert.ok(cx > s.x, "channel B: right of its filter");
+          assert.ok(Math.abs(r.y + r.h / 2 - s.knobY[4]) < 1e-6, "level with the knob");
+          const fader: Rect = { x: s.fader.x - 12 * g.u, y: s.fader.y - s.fader.travel / 2 - 7 * g.u, w: 24 * g.u, h: s.fader.travel + 14 * g.u };
+          assert.ok(apart(r, fader), "clear of the channel fader");
+        });
       });
 
       test("the deck header, left to right: the title (cut short, never over the rest), the time, the four bar lamps, the key (a smaller type), the tempo at the corner; the pitch reads out under its fader", () => {

@@ -311,3 +311,56 @@ describe("the effect unit", () => {
     }
   });
 });
+
+describe("the effect on the channels that are switched on (the send bus)", () => {
+  const BLOCK = 128;
+  const tone = (hz: number, n: number, amp: number) => { const a = new Float32Array(n); for (let i = 0; i < n; i++) a[i] = amp * Math.sin(2 * Math.PI * hz * i / 48000); return a; };
+  /** The amplitude of `hz` in the last half second of x (a whole number of cycles of the tones used). */
+  const amp = (x: Float32Array, hz: number): number => {
+    let re = 0, im = 0; const from = x.length - 24000;
+    for (let i = from; i < x.length; i++) { const a = 2 * Math.PI * hz * i / 48000; re += x[i] * Math.cos(a); im += x[i] * Math.sin(a); }
+    return 2 * Math.sqrt(re * re + im * im) / 24000;
+  };
+
+  test("nothing switched on: the room is untouched, bit for bit, even with a bus given", () => {
+    const m = new MasterSection();
+    m.fxType = FX.flanger; m.fxAmount = 1;
+    const l = tone(440, BLOCK, 0.3), r = tone(660, BLOCK, 0.3), l0 = l.slice(), r0 = r.slice();
+    m.process(l, r, null, null, false, 0, BLOCK, tone(440, BLOCK, 0.3), tone(660, BLOCK, 0.3));
+    assert.deepEqual(l, l0); assert.deepEqual(r, r0);
+  });
+
+  test("the filter on one channel filters that channel and leaves the other alone (an insert on the bus)", () => {
+    const m = new MasterSection();
+    m.fxType = FX.filter; m.fxSendOn = true; m.fxAmount = 1; m.fxParams = [0.02, 0.2, 0, 1 / 3]; // a low-pass closed far down
+    const n = 48000;
+    const a = tone(8000, n, 0.3), b = tone(200, n, 0.3); // channel A is a high tone (it is switched on), channel B a low one
+    const outL = new Float32Array(n), outR = new Float32Array(n);
+    for (let k = 0; k < n; k += BLOCK) {
+      const sa = a.slice(k, k + BLOCK), sb = b.slice(k, k + BLOCK);
+      const mixL = new Float32Array(BLOCK), mixR = new Float32Array(BLOCK);
+      for (let i = 0; i < BLOCK; i++) { mixL[i] = sa[i] + sb[i]; mixR[i] = sa[i] + sb[i]; }
+      m.process(mixL, mixR, null, null, false, 0, BLOCK, sa, sa.slice());
+      outL.set(mixL, k); outR.set(mixR, k);
+    }
+    assert.ok(amp(outL, 8000) < 0.05, `A's 8 kHz is filtered away: ${amp(outL, 8000)}`);
+    assert.ok(Math.abs(amp(outL, 200) - 0.3) < 0.03, `B's 200 Hz is untouched: ${amp(outL, 200)}`);
+  });
+
+  test("a delay on a channel echoes that channel only", () => {
+    const m = new MasterSection();
+    m.fxType = FX.delay; m.fxSendOn = true; m.fxAmount = 1; m.fxDelaySeconds = 0.05; m.fxParams = [1 / 3, 0.5, 0.9, 0];
+    const n = 48000, clickAt = BLOCK * 200; // the click comes after the unit has opened (its on switch glides for about 10 ms)
+    const outL = new Float32Array(n);
+    // Channel A (the bus) is silent except one click; channel B is a steady tone that must not be echoed.
+    for (let k = 0; k < n; k += BLOCK) {
+      const bus = new Float32Array(BLOCK); if (k === clickAt) bus[0] = 0.8;
+      const mixL = tone(300, n, 0.2).slice(k, k + BLOCK); for (let i = 0; i < BLOCK; i++) mixL[i] += bus[i];
+      m.process(mixL, mixL.slice(), null, null, false, 0, BLOCK, bus, bus.slice());
+      outL.set(mixL, k);
+    }
+    const echoAt = clickAt + Math.round(0.05 * 48000);
+    let peak = 0; for (let i = echoAt - 20; i < echoAt + 20; i++) peak = Math.max(peak, Math.abs(outL[i] - 0.2 * Math.sin(2 * Math.PI * 300 * i / 48000)));
+    assert.ok(peak > 0.3, `the click comes back after 50 ms: ${peak}`);
+  });
+});

@@ -488,7 +488,10 @@ body.live #top .pill { font-size: 9px; letter-spacing: 0.14em; padding: 0.5em 1.
 body.live #top .pill:hover { border-color: rgba(255, 255, 255, 0.4); }
 body.live #top .pill .icon { width: 1.1em; height: 1.1em; margin-right: 0.5em; }
 /* The page's messages sit between the stream bar (its ON AIR time) and the buttons, and never over either. */
-body.live #note { top: 12px; left: 420px; font-size: 12px; max-width: max(140px, calc(100vw - 420px - 540px)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The orange messages: small, under GROOVELINE LIVE, up to two lines, the whole text (and in the tooltip). */
+body.live #livebar { align-items: flex-start; padding-top: 6px; box-sizing: border-box; }
+body.live #note { top: 22px; left: 48px; font-size: 10px; line-height: 11px; max-width: max(180px, calc(100vw - 48px - 540px)); max-height: 22px; overflow: hidden;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; z-index: 4; }
 #deck-tip { position: fixed; z-index: 50; max-width: 70vw; padding: 6px 10px; border-radius: 7px; background: rgba(8, 11, 16, 0.96); border: 1px solid rgba(255, 255, 255, 0.25);
   font: 600 13px system-ui, sans-serif; color: var(--ink); pointer-events: none; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6); }
 #deck-tip[hidden] { display: none; }

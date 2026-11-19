@@ -411,7 +411,10 @@ export class MasterSection {
   // The effect unit, written by the page: which effect, on or off, how much (0...1), the four knobs of the effect (0...1), and the note value
   // in seconds (the page works it out from the tempo and the effect's tempo knob).
   fxType: number = FX.delay;
+  /** ON for the whole room (free play's effect bar): the effect takes the master mix. */
   fxOn = false;
+  /** LIVE: the effect is switched on for some channels (their FX buttons): it takes the send bus the mixer gives, not the master mix. */
+  fxSendOn = false;
   fxAmount = 0.5;
   fxDelaySeconds = 0.5;
   /** The four knobs of the effect, from the page (null: the effect's own defaults, as in the tests). */
@@ -431,6 +434,7 @@ export class MasterSection {
   private wetL = new Float32Array(128);
   private wetR = new Float32Array(128);
   private gate = new Float32Array(128);
+  private sendMono = new Float32Array(128);
   private gL = new Float32Array(128);
   private gR = new Float32Array(128);
 
@@ -455,20 +459,22 @@ export class MasterSection {
    * right is the headphones in mono). `pl`/`pr`: the headphones' own pair (a sound card or a second
    * device), or null. `cueMix`: how much of the room the headphones hear (0 = only the cued decks).
    */
-  process(outL: Float32Array, outR: Float32Array, pl: Float32Array | null, pr: Float32Array | null, split: boolean, cueMix: number, count: number): void {
-    this.runEffect(outL, outR, pl, pr, split, Math.max(0, Math.min(1, cueMix)), count);
+  process(outL: Float32Array, outR: Float32Array, pl: Float32Array | null, pr: Float32Array | null, split: boolean, cueMix: number, count: number,
+          sendL: Float32Array | null = null, sendR: Float32Array | null = null): void {
+    this.runEffect(outL, outR, pl, pr, split, Math.max(0, Math.min(1, cueMix)), count, sendL, sendR);
     this.runRoom(outL, outR, pl, pr, split, count);
     this.runPhones(outL, outR, pl, pr, split, count);
   }
 
   private grow(count: number): void {
     if (this.wetL.length >= count) return;
-    this.wetL = new Float32Array(count); this.wetR = new Float32Array(count); this.gate = new Float32Array(count);
+    this.wetL = new Float32Array(count); this.wetR = new Float32Array(count); this.gate = new Float32Array(count); this.sendMono = new Float32Array(count);
     this.gL = new Float32Array(count); this.gR = new Float32Array(count);
   }
 
-  private runEffect(outL: Float32Array, outR: Float32Array, pl: Float32Array | null, pr: Float32Array | null, split: boolean, cueMix: number, count: number): void {
-    const wantOn = this.fxOn ? 1 : 0;
+  private runEffect(outL: Float32Array, outR: Float32Array, pl: Float32Array | null, pr: Float32Array | null, split: boolean, cueMix: number, count: number,
+                    sendL: Float32Array | null, sendR: Float32Array | null): void {
+    const wantOn = this.fxOn || this.fxSendOn ? 1 : 0;
     if (this.idle && wantOn === 0 && this.sendNow < 1e-4) return; // off and finished ringing: untouched
     this.grow(count);
     const type = Math.max(0, Math.min(FX_TYPES.length - 1, Math.trunc(this.fxType) || 0));
@@ -480,7 +486,12 @@ export class MasterSection {
     this.idle = false;
     const twoOut = !!(pl && pr);
     const mono = split && !twoOut; // the room is the left channel alone
-    const inL = outL, inR = mono ? outL : outR;
+    let inL: Float32Array = outL, inR: Float32Array = mono ? outL : outR;
+    if (!this.fxOn && sendL && sendR) {
+      // The channels that were switched on: their own signal (after their faders), not the whole mix. The wet still goes back into the room.
+      if (mono) { for (let i = 0; i < count; i++) this.sendMono[i] = 0.5 * (sendL[i] + sendR[i]); inL = inR = this.sendMono; }
+      else { inL = sendL; inR = sendR; }
+    }
     const { wetL, wetR, gate, gL, gR } = this;
     // The on switch glides (about 10 ms): the effects with a tail take it at their input, so what is already ringing rings out;
     // the others take it at their output.

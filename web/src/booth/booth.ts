@@ -35,7 +35,7 @@ export type Kind =
   // LIVE only: a pad under the deck (`band` = which one), a loop control (`band` = LOOP_ACTIONS), the zoom buttons (band +1 in, -1 out), and the zoomable waveform.
   | { t: "pad"; d: number; band: number } | { t: "loop"; d: number; band: number } | { t: "zoom"; d: number; band: number } | { t: "zwave"; d: number }
   // The effect unit (free play): `d` is the effect or the note value, -1 = the next one.
-  | { t: "fxOn" } | { t: "fxAmount" } | { t: "fxType"; d: number } | { t: "fxDiv"; d: number } | { t: "fxParam"; d: number };
+  | { t: "fxOn" } | { t: "fxAmount" } | { t: "fxType"; d: number } | { t: "fxDiv"; d: number } | { t: "fxParam"; d: number } | { t: "fxSend"; d: number };
 
 export const keyOf = (k: Kind): string => `${k.t}:${"d" in k ? k.d : ""}:${"band" in k ? k.band : ""}`;
 
@@ -157,7 +157,10 @@ export class Booth {
   private cueDown = [false, false];
   private previewing = [false, false];
   /** The effect unit: which effect, which note value, how much, on or off. Off at every start. */
-  fx = { type: 0, div: 1, amount: 0.5, on: false, params: FX_DEFAULTS[0].slice() };
+  /** `on`: the whole room (free play's bar); `send`: the channels the effect works on (LIVE's FX buttons). */
+  fx = { type: 0, div: 1, amount: 0.5, on: false, params: FX_DEFAULTS[0].slice(), send: [false, false] as boolean[] };
+  /** The channels the G key switches back on. */
+  private lastSend = [true, true];
   /** The four knobs of every effect, kept as you left them (null: the effect's defaults). */
   private fxSaved: (number[] | null)[] = FX_TYPES.map(() => null);
   private fxSent = 0;
@@ -556,13 +559,14 @@ export class Booth {
     first({ t: "master" }, T.master);
     first({ t: "cueMix" }, T.mix);
     first({ t: "phonesLevel" }, T.level);
-    // The effect controller: the name (the left third goes to the effect before, the rest to the next), ON, the LEVEL fader, DIV.
+    // The effects strip: the name (the left third goes to the effect before, the rest to the next), the four knobs, the LEVEL fader. The effect is
+    // switched on for a channel by the FX button beside its FILTER.
     const F = g.fx, lvl = F.level;
     first({ t: "fxType", d: -1 }, F.name);
     first({ t: "fxType", d: -2 }, { x: F.name.x, y: F.name.y, w: F.name.w * 0.3, h: F.name.h });
-    first({ t: "fxOn" }, F.on);
-    first({ t: "fxAmount" }, centred(lvl.x, lvl.y, lvl.capW + 4 * u, lvl.travel + 16 * u));
+    first({ t: "fxAmount" }, lvl.touch);
     F.knobs.forEach((k, i) => first({ t: "fxParam", d: i }, k.touch));
+    M.strip.forEach((s, d) => first({ t: "fxSend", d }, { x: s.fxBtn.x - 3 * u, y: s.fxBtn.y - 3 * u, w: s.fxBtn.w + 6 * u, h: s.fxBtn.h + 6 * u }));
 
     this.hits = hits;
     const B0 = g.deck[0].buttons;
@@ -593,8 +597,8 @@ export class Booth {
     // LIVE has no room: a crowd clip a night left playing would go on decoding behind `display: none`. The game's own `showRoom` plays it again.
     if (mode === "live") for (const v of this.roomVideos) if (v && !v.paused) v.pause();
     for (const d of this.decks) d.smoothSeek = mode === "live"; // a needle drop while the record turns fades across (no click); the game's booth keeps the hard jump
-    // Free play's effect bar offers the first three effects: LIVE's other four are left behind.
-    if (mode === "game" && this.fx.type > 2) this.setFxType(0);
+    // Free play's effect bar offers the first three effects: LIVE's other four are left behind; its channel sends go off.
+    if (mode === "game") { [0, 1].forEach((d) => this.setFxSend(d, false)); if (this.fx.type > 2) this.setFxType(0); }
     // LIVE's master knob (the room only) comes back where it was left; the game's booth runs at the mixer's own level.
     if (mode === "live") this.engine.roomVolume = this.liveMaster;
     else { this.liveMaster = this.engine.roomVolume; this.engine.roomVolume = ROOM_UNITY; }
@@ -1125,10 +1129,11 @@ export class Booth {
         this.phones[k.d] = !this.phones[k.d];
         decks[k.d].cue = this.phones[k.d];
         break;
-      case "fxOn": if (this.mode === "live" || this.L?.fx) this.setFxOn(!this.fx.on); break;
+      case "fxOn": if (this.mode === "live") this.setFxOn(!(this.fx.send[0] || this.fx.send[1])); else if (this.L?.fx) this.setFxOn(!this.fx.on); break;
       case "fxType": if (this.mode === "live" || this.L?.fx) this.setFxType(k.d === -2 ? (this.fx.type + FX_TYPES.length - 1) % FX_TYPES.length : k.d < 0 ? (this.fx.type + 1) % FX_TYPES.length : k.d); break;
       case "fxDiv": if (this.mode === "live" || this.L?.fx) this.setFxDiv(k.d < 0 ? (this.fx.div + 1) % FX_DIVISIONS.length : k.d); break;
       case "fxParam": break; // a knob has no press
+      case "fxSend": if (this.mode === "live") this.setFxSend(k.d, !this.fx.send[k.d]); break;
       default:
         break;
     }
@@ -1136,7 +1141,16 @@ export class Booth {
 
   // MARK: - The effect unit
 
-  private setFxOn(on: boolean): void { this.fx.on = on; this.engine.fxOn = on; }
+  /** G, MIDI: in LIVE all the channels the effect was on for (or both), or none; in free play the whole room. */
+  private setFxOn(on: boolean): void {
+    if (this.mode === "live") {
+      if (on) [0, 1].forEach((d) => this.setFxSend(d, this.lastSend[d] || !(this.lastSend[0] || this.lastSend[1])));
+      else { if (this.fx.send[0] || this.fx.send[1]) this.lastSend = this.fx.send.slice(); [0, 1].forEach((d) => this.setFxSend(d, false)); }
+      return;
+    }
+    this.fx.on = on; this.engine.fxOn = on;
+  }
+  private setFxSend(d: number, on: boolean): void { this.fx.send[d] = on; this.engine.setFxSend(d, on); }
   /** Another effect: its four knobs come back as you left them. */
   private setFxType(i: number): void {
     this.fxSaved[this.fx.type] = this.fx.params.slice();
@@ -1178,9 +1192,12 @@ export class Booth {
    * all the time). */
   private updateFxTime(): void {
     if (this.mode !== "live" && !this.L?.fx) return;
+    // The tempo of the record the effect works on: of the channels it is switched on for (LIVE), the louder playing one; with none, or in free play, of both.
+    const assigned = this.mode === "live" ? [0, 1].filter((d) => this.fx.send[d]) : [];
+    const pool = assigned.length ? assigned : [0, 1];
     let best = -1, loudest = 0;
-    this.decks.forEach((deck, d) => { if (deck.isLoaded && deck.motorOn && deck.rate > 0.3 && deck.volume > loudest) { best = d; loudest = deck.volume; } });
-    const seconds = beatDelaySeconds(this.decks[best >= 0 ? best : 0].bpm, this.fx.div);
+    for (const d of pool) { const deck = this.decks[d]; if (deck.isLoaded && deck.motorOn && deck.rate > 0.3 && deck.volume > loudest) { best = d; loudest = deck.volume; } }
+    const seconds = beatDelaySeconds(this.decks[best >= 0 ? best : pool[0]].bpm, this.fx.div);
     if (Math.abs(seconds - this.fxSent) > 0.0002) { this.fxSent = seconds; this.engine.fxDelaySeconds = seconds; }
   }
 
@@ -1435,7 +1452,7 @@ export class Booth {
     if (h === null) return false;
     switch (k.t) {
       case "cross": return this.channel[h] > 0.04;
-      case "phones": case "cueMix": case "phonesLevel": case "master": case "fxOn": case "fxAmount": case "fxType": case "fxDiv": case "fxParam": return false;
+      case "phones": case "cueMix": case "phonesLevel": case "master": case "fxOn": case "fxAmount": case "fxType": case "fxDiv": case "fxParam": case "fxSend": return false;
       default: return "d" in k && k.d === h;
     }
   }

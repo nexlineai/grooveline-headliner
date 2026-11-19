@@ -390,6 +390,15 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
   until the page is opened again). **SHARE** (`share.ts`, `#share-button`, LIVE only): link, COPY LINK, the system share sheet when there is one, six networks; the link is
   `SHARE_URL` (the radio) until a DJ has a page of their own. The list lights the record on a deck in that deck's colour (`.l-row.on.ona/.onb`). The page's message (`#note`)
   sits between the stream bar and the buttons in LIVE.
+- **Effects strip on top and FX per channel (19 Nov, night).** The effects unit left the gear row: it is a thin strip (30 units) ABOVE the row (`fxGeometry`): the effect's
+  name between two arrows (lit green while the effect is on for a channel), four small knobs with NO ring of dots (`knob(..., ring=false)`) each with its name and step to the
+  right, a short horizontal LEVEL fader; no ON button. The gear row is three modules now (deck A | mixer | deck B), so the decks are about 20 % wider (breathing space; `u` is
+  height-bound, 1.49 at 1440x770; the gear row gets 71 % of the height, the library about 28 %). The effect is switched on PER CHANNEL by a square FX button on the outer side of
+  each channel's FILTER knob (`Kind fxSend`, `LiveStrip.fxBtn`; the G key and MIDI `fxOn` toggle both). DSP: `core/mixer.ts renderMix` has an optional send bus (`MixerShared.fxSend`
+  per channel, glided, taken AFTER the fader; web only; with it off the mixer is bit for bit what it was: `test/mixer-golden.test.ts` pins three fingerprints), `M.fxSend` slots,
+  `MasterSection.fxSendOn` + the bus as the effect's input (insert effects replace the channel's own signal, tail effects echo only that channel); the wet returns to the room and,
+  by the cue mix, the headphones. The delay's tempo follows the channel(s) the effect is on for. Free play's bar is unchanged (the whole room: `engine.fxOn`).
+  The orange page messages (`#note`) sit under GROOVELINE LIVE in the bar, small, up to two lines, full text in the tooltip.
 - **The effects unit (19 Nov):** `audio/fx.ts`: seven effects (`FX_TYPES`), four knobs each (`FX_KNOBS`: name, steps; `FX_DEFAULTS`; the `tempo` knob picks the note value, the
   page turns it into `fxDelaySeconds`), `M.fxKnob..+3` in the shared mixer slots; knobs glide (30 ms), NaN/runaway output is dropped and the effect restarts, off = bit-identical
   (tests: every knob changes the sound, extremes stay finite and inside full scale). Delay/reverb/DLY+FLT have a tail and take the sound at their input; the others at their output.

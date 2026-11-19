@@ -40,7 +40,9 @@ export const M = { split: 0, cueMix: 1, master: 2, echoDelay: 3, echoGain: 4, tw
   /** LIVE's master knob (0...1, audio/fx.ts `roomGainFor`): it turns down the ROOM only, never the headphones. */
   roomMaster: 11,
   /** The four knobs of the effect (0...1): fxKnob, fxKnob + 1, fxKnob + 2, fxKnob + 3. */
-  fxKnob: 12 } as const;
+  fxKnob: 12,
+  /** The effect's send for each channel (0 or 1; LIVE's FX buttons): fxSend, fxSend + 1. */
+  fxSend: 16 } as const;
 
 export const DECK_BASE = 0;
 export const STRIP_BASE = DECK_BASE + DECKS * D.stride;
