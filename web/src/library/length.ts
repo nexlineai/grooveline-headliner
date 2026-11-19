@@ -141,14 +141,19 @@ async function mp3Seconds(src: Source, head: Uint8Array): Promise<number | undef
   if (ascii(head, 0, 3) === "ID3") start = 10 + (((head[6] & 0x7f) << 21) | ((head[7] & 0x7f) << 14) | ((head[8] & 0x7f) << 7) | (head[9] & 0x7f)) + ((head[5] & 0x10) ? 10 : 0);
   let end = src.size;
   if (src.size > 128 && ascii(await src.read(src.size - 128, 3), 0, 3) === "TAG") end -= 128;
-  const b = await src.read(start, 70_000);
-  // The first frame: a header that is followed by another one where its length says, so padding and pictures are not taken for audio.
+  // The first frame: a header that is followed by another one where its length says, so padding and pictures are not taken for audio. Usually it
+  // sits right at the start, so 8 KB is read first and the wider 70 KB only when no frame turns up there.
+  let b: Uint8Array = new Uint8Array(0);
   let frame: Frame | null = null;
-  for (let i = 0; i + 4 < b.length && i < 65_536; i++) {
-    const f = frameAt(b, i);
-    if (!f) continue;
-    const next = frameAt(b, i + f.length);
-    if (next || i + f.length + 4 > b.length) { frame = f; break; }
+  for (const want of [8_192, 70_000]) {
+    b = await src.read(start, want);
+    for (let i = 0; i + 4 < b.length && i < 65_536; i++) {
+      const f = frameAt(b, i);
+      if (!f) continue;
+      const next = frameAt(b, i + f.length);
+      if (next || (i + f.length + 4 > b.length && b.length < want)) { frame = f; break; }
+    }
+    if (frame || b.length < want) break;
   }
   if (!frame) return undefined;
   // A VBR file says how many frames it has (Xing or Info; VBRI from Fraunhofer).
@@ -174,15 +179,19 @@ async function mp3Seconds(src: Source, head: Uint8Array): Promise<number | undef
 
 /** The mean bitrate (kbit/s) of the frames at several places in [from, end): every frame lasts the same, so a plain mean over frames is the time-weighted one. */
 async function averageBitrate(src: Source, from: number, end: number, first: Frame): Promise<number> {
-  const PLACES = 8, CHUNK = 24_000;
-  let sum = first.bitrate, count = 1;
+  const PLACES = 8, CHUNK = 12_000;
+  let sum = first.bitrate, count = 1, differs = false;
   if (end - from < PLACES * CHUNK * 2) return first.bitrate; // a short file: its first frame will do (a short file is rarely variable)
-  for (let k = 0; k < PLACES; k++) {
+  // Three places first: if every frame there has the first one's bitrate the file is constant (no more reading); else the other five too.
+  const order = [3, 5, 7, 1, 0, 2, 4, 6];
+  for (let n = 0; n < PLACES; n++) {
+    if (n === 3 && !differs) return first.bitrate;
+    const k = order[n];
     const at = Math.floor(from + (end - from - CHUNK) * (k + 0.5) / PLACES);
     const b = await src.read(at, CHUNK + 4);
     let i = 0, f: Frame | null = null;
     for (; i + 4 < b.length && i < 4_000; i++) { f = frameAt(b, i); if (f && frameAt(b, i + f.length)) break; f = null; }
-    while (f) { sum += f.bitrate; count++; const next = frameAt(b, f.at + f.length); f = next && next.at + next.length <= b.length ? next : null; if (count > 4000) break; }
+    while (f) { sum += f.bitrate; count++; if (f.bitrate !== first.bitrate) differs = true; const next = frameAt(b, f.at + f.length); f = next && next.at + next.length <= b.length ? next : null; if (count > 4000) break; }
   }
   return sum / count;
 }

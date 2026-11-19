@@ -53,16 +53,23 @@ export class Library {
     await this.playlists.load().catch(() => {});
     await this.checkAccess();
     this.notify();
-    // Tracks an older tag reader read (no length yet, say) are read again in the background, once, when the browser lets us without asking.
-    this.refreshOld().catch(() => {});
+    // Tracks an older tag reader read (no length yet, say) are read again in the background, once, a little after the page has settled and when the
+    // browser lets us without asking (else after RECONNECT, or the first record you open): about 7 ms a file, a minute or two for ten thousand.
+    this.refreshLater(15_000);
   }
 
-  /** Looks again through every folder that holds tracks read by an older version of the tag reader. */
-  async refreshOld(): Promise<void> {
+  private refreshTimer: ReturnType<typeof setTimeout> | null = null;
+  private refreshLater(ms: number): void {
+    if (this.refreshTimer) clearTimeout(this.refreshTimer);
+    this.refreshTimer = setTimeout(() => { this.refreshTimer = null; this.refreshOld(3).catch(() => {}); }, ms);
+  }
+
+  /** Looks again through every folder that holds tracks read by an older version of the tag reader (gently: `concurrency` files at a time). */
+  async refreshOld(concurrency = 6): Promise<void> {
     for (const f of [...this.folders]) {
       if (!f.handle || this.needsAccess.has(f.id)) continue;
       if (!this.tracks.some((t) => t.folder === f.id && (t.v ?? 1) < TAGS_VERSION)) continue;
-      await this.rescan(f);
+      await this.rescan(f, concurrency);
     }
   }
 
@@ -139,7 +146,7 @@ export class Library {
   }
 
   /** Looks through a folder again: new files are read, changed ones again, gone ones dropped. */
-  async rescan(folder: LibraryFolder): Promise<void> {
+  async rescan(folder: LibraryFolder, concurrency = 6): Promise<void> {
     if (this.scan || !folder.handle) return;
     try { await this.ensureAccess(folder); } catch { this.notify(); return; }
     this.abort = new AbortController();
@@ -147,10 +154,10 @@ export class Library {
     this.notify();
     const entries = await listFolder(folder.handle, this.abort.signal, (n) => { if (this.scan) { this.scan.found = n; this.notify(); } });
     this.scan = null;
-    await this.readEntries(folder, entries);
+    await this.readEntries(folder, entries, concurrency);
   }
 
-  private async readEntries(folder: LibraryFolder, entries: Entry[]): Promise<void> {
+  private async readEntries(folder: LibraryFolder, entries: Entry[], concurrency = 6): Promise<void> {
     this.abort ??= new AbortController();
     this.scan = { folder: folder.id, name: folder.name, phase: "reading", found: entries.length, done: 0, total: entries.length };
     this.notify();
@@ -170,7 +177,7 @@ export class Library {
         this.scan.done = done; this.scan.total = total;
         if (done - last >= 25 || done === total) { last = done; this.notify(); }
       },
-    });
+    }, concurrency);
     if (result.complete) {
       const gone = [...existing.keys()].filter((k) => !result.seen.has(k));
       if (gone.length) { if (persist) await this.store.deleteTracks(gone); for (const k of gone) this.byKey.delete(k); }
@@ -207,7 +214,7 @@ export class Library {
 
   /** The "RECONNECT" button of a folder. */
   async reconnect(folder: LibraryFolder): Promise<void> {
-    try { await this.ensureAccess(folder); } catch { /* still not given */ }
+    try { await this.ensureAccess(folder); this.refreshLater(3_000); } catch { /* still not given */ }
     this.notify();
   }
 
@@ -221,6 +228,7 @@ export class Library {
     const folder = this.folders.find((f) => f.id === track.folder);
     if (!folder?.handle) throw new Error("its folder is no longer in the library");
     await this.ensureAccess(folder);
+    this.refreshLater(20_000); // the folder is readable now: whatever an older reader left gets read again, later
     try {
       let dir = folder.handle;
       for (const part of track.path.slice(0, -1)) dir = await dir.getDirectoryHandle(part);

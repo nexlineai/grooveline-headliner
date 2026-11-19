@@ -402,7 +402,8 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
 - **List columns and playlists (19 Nov, night).** The LIST has TIME, TYPE and DATE (all sortable; DATE newest first; the file's modification date). `library/length.ts` reads the
   length from the header at the scan (mp3: Xing/Info/VBRI frame count, else the size over the bitrate sampled along the file; FLAC STREAMINFO; WAV; AIFF; M4A mvhd; Ogg not read);
   checked against 150 real files (FLAC and M4A exact, mp3 111/113 within 1 s of ffprobe, Mixxx's own stored durations were stale for some). `TAGS_VERSION` 3: entries from an older
-  reader are read again in the background by `Library.refreshOld` (and the wall has RESCAN); a rescan now keeps EVERY user field (`USER_FIELDS`: grid, analysis, cues, loops, fav,
+  reader are read again by `Library.refreshOld` (15 s after the library opens, 3 files at a time; also after RECONNECT or the first record you open, since the browser often
+  asks permission again after a reload; measured on 500 real files: 5.9 ms a file before, 7.6 ms with the length, so about 1.3 min for 10,282; the wall has RESCAN too); a rescan now keeps EVERY user field (`USER_FIELDS`: grid, analysis, cues, loops, fav,
   plays; it used to keep only the first two). PLAYLISTS is the wall's third view (`library/playlistview.ts`; data `playlist.ts`, manager `playlists.ts`, store: IndexedDB version 2,
   `playlists`; the upgrade is safe and an old tab lets go of the database: `onversionchange`, `onBlocked` says "close the other tab"). Entries hold the folder NAME + the path inside it
   (not the folder id) + title/artist/length. Add from the which-deck popup (ADD TO PLAYLIST, own music only); NEW, RENAME, reorder, take out, DELETE (asks twice). EXPORT writes an
