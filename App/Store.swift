@@ -7,10 +7,9 @@ import StoreKit
 ///
 /// Who may play the paid chapters (`careerOpen`):
 ///  - the player bought it (or got it with an offer code, or through Family Sharing);
-///  - the hidden logo unlock (hold the title's logo 3 s) in TestFlight builds and in Zé's own
-///    (sideloaded with iloader, the simulator). Never in the App Store build: there the hold
-///    does nothing (Zé, 18 Nov: TestFlight first). App Review also runs a sandbox receipt, so
-///    take this off before the first build that goes to review (`devUnlockAllowed`);
+///  - the hidden logo unlock (hold the title's logo 3 s) in Zé's own copies only (sideloaded
+///    with iloader, the simulator). Not in TestFlight (since v0.1.0-4: the sandbox purchase is
+///    free), not in App Review, never in the App Store (`devUnlockAllowed`);
 ///  - a TestFlight or App Review build whose product could not be loaded (the IAP may not exist
 ///    in App Store Connect yet), so testers are never stuck at a wall. Never the App Store.
 final class Store: ObservableObject {
@@ -61,11 +60,12 @@ final class Store: ObservableObject {
 
     // MARK: access
 
-    /// Zé's hidden unlock: TestFlight (sandbox receipt) and copies without a receipt (sideload,
-    /// simulator); never the App Store. The screenshot run's `-unlockAll` on the command line
-    /// also counts (a player cannot pass it).
+    /// Zé's hidden unlock: only copies without a receipt (sideload with iloader, the simulator).
+    /// Not TestFlight, not App Review (both have a sandbox receipt: the purchase there is free),
+    /// not the App Store. The screenshot run's `-unlockAll` on the command line also counts
+    /// (a player cannot pass it).
     var devUnlockAllowed: Bool {
-        Store.receipt != .production || ProcessInfo.processInfo.arguments.contains("-unlockAll")
+        Store.receipt == .none || ProcessInfo.processInfo.arguments.contains("-unlockAll")
     }
 
     /// May the player play chapters from `firstPaidChapter` on?
