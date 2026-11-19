@@ -349,6 +349,20 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
   geometry for the new effects) and DIV, a vertical stepped note-value selector. No control is drawn that does not work yet. The stop-the-deck alert:
   `main.ts deckBusy` -> `Booth.alertDeck` (a message over that deck for 3 s; the record stays). Drawing costs about 4 ms a frame
   (the static parts are not cached yet: a hardening item). Smokes: `test/live-geometry.test.ts` and the page checks listed in the vault.
+- **LIVE hot cues, loops and the zoomable waveform (web only, 19 Nov; step L2).** Under each deck: eight PADS, and in the column beside the
+  platter CUES | LOOPS (what the pads are), IN | OUT, 1/2 | x2, LOOP (on/off) and auto loops of 1, 2, 4, 8 beats. A CUES pad: empty = set at the
+  needle, set = jump there; a LOOPS pad: empty = keep the loop that is set, set = make it the loop and start it. Shift, alt or right-click on a pad
+  clears it. While the record turns, a new mark goes on the nearest beat and a jump keeps the beat PHASE (`Deck.landing`); standing still, a mark is
+  exactly where the needle is. Marks live on the `Deck` (`hotCues`, `loopSlots`, `loopStart/loopEnd`, `marks()/setMarks()/onMarks`) and are kept per
+  library track (`LibraryTrack.cues/loops`, saved through `library.update`); a record of the game keeps none. The audio thread loops in
+  `core/vinyl.ts` (`D.loopStart/loopEnd` in file frames, 0 = off; the seam is a short crossfade, no click) and, in LIVE only, a needle drop while
+  the record turns crossfades (`D.smoothSeek`, 64 frames; `Deck.smoothSeek`; the game's booth keeps the hard jump). Both are BIT-IDENTICAL when
+  off: `test/vinyl-golden.test.ts` holds the fingerprint of the record reader with loops off, so any change to that path must keep it. The big
+  waveform (`live-draw.ts zoomWave`) scrolls under a fixed needle; zoom levels `ZOOM_SECONDS` (whole record, 60, 30, 15, 8, 4, 2 s), kept in
+  localStorage `headliner.zoom`; buttons over its corner, the wheel over it, a drag moves the needle (dropped on release). The strip of the WHOLE record
+  under it is still the `wave` hit (a touch drops the needle) and shows the cues, the loop and the window the big one shows. `audio/peaks.ts`
+  builds the loudness pyramid (4x per level) once at load. New Kinds `pad`, `loop` (`LOOP_ACTIONS`), `zoom`, `zwave` (MIDI-learnable; labels in
+  `main.ts labelOf`). Tests: `test/marks.test.ts`, `test/loop.test.ts`, `test/live-geometry.test.ts`, page test in the vault (`marks-e2e`).
 - **Layout unit (18 Nov, the game's booth):** `u = min(height share / 210, width / 816)` (816u = the iPhone's gear width), the gear sits at the
   bottom and the room takes the rest; `build()` publishes `--gear-h` (the gear's height in px) and the overlays (lesson, night,
   studio grid) size themselves from it, so fullscreen 16:9 no longer overlaps. FULLSCREEN button in the top bar (hidden where

@@ -4,6 +4,7 @@
 
 import type { Deck } from "../audio/engine.ts";
 import { FX, FX_DIVISIONS, FX_TYPES } from "../audio/fx.ts";
+import { levelFor, peakBetween } from "../audio/peaks.ts";
 import { centred, circle, label, picture, roundRect, rgba, tonearm, wavePicture } from "./gear.ts";
 import type { Point, RGB, Rect } from "./gear.ts";
 import type { LiveGeometry } from "./live-geometry.ts";
@@ -19,6 +20,8 @@ export const LIVE = {
   deck: [[38, 198, 240], [255, 172, 40]] as RGB[],
   /** The FILTER knobs: a blue square round them tells them from the EQ knobs. */
   filter: [70, 128, 255] as RGB,
+  /** The eight pads: hot cues and saved loops. No pink. */
+  pad: [[38, 198, 240], [74, 226, 142], [255, 172, 40], [255, 112, 60], [90, 140, 255], [172, 112, 255], [200, 232, 70], [236, 240, 245]] as RGB[],
   cue: [255, 150, 40] as RGB, play: [74, 226, 142] as RGB, sync: [150, 205, 255] as RGB, warn: [255, 176, 40] as RGB, red: [255, 78, 64] as RGB,
 };
 
@@ -233,6 +236,9 @@ export interface LiveView {
   /** Deck B's beat against deck A's, -0.5...0.5, or null when they are not both turning. */
   phase: number | null;
   syncAllowed: boolean;
+  /** What the pads under each deck are, and how far each deck's big waveform is zoomed (level 0 = the whole record). */
+  padMode: ("cues" | "loops")[];
+  zoom: { level: number; seconds: number }[];
 }
 
 const clock = (seconds: number): string => {
@@ -305,7 +311,8 @@ export class LiveRenderer {
     const beatNow = deck.grid.beatInBar(seconds), flash = 1 - deck.grid.phase(seconds);
     for (let i = 0; i < 4; i++) circle(ctx, G.lamps[i].x, G.lamps[i].y, 2.5 * u, rgba(tint, moving && i === beatNow ? 0.35 + 0.65 * flash : 0.16));
 
-    this.waveform(ctx, g, v, d);
+    this.zoomWave(ctx, g, v, d);
+    this.overviewStrip(ctx, g, v, d);
 
     // The platter, the sheen on the grooves, the arm.
     const c = G.platter.c, p = this.platterFor(d, g, v);
@@ -324,12 +331,14 @@ export class LiveRenderer {
     button(ctx, centred(B.cue.x, B.cue.y, B.w, B.h), "CUE", cueLit, LIVE.cue, u);
     button(ctx, centred(B.play.x, B.play.y, B.w, B.h), "PLAY", deck.motorOn && !v.previewing[d], LIVE.play, u);
     button(ctx, centred(B.sync.x, B.sync.y, B.w, B.h), "SYNC", v.sync[d], LIVE.sync, u, { enabled: v.syncAllowed });
+    this.loopColumn(ctx, g, v, d);
+    this.pads(ctx, g, v, d);
 
     // A message for this deck (a record cannot be changed while it plays).
     const alert = v.alerts[d];
     if (alert && alert.until > v.now) {
       const k = Math.min(1, (alert.until - v.now) / 400);
-      const r: Rect = { x: G.wave.x, y: G.wave.y + G.wave.h * 0.18, w: G.wave.w, h: G.wave.h * 0.64 };
+      const r: Rect = { x: G.zoom.x, y: G.zoom.y + G.zoom.h * 0.18, w: G.zoom.w, h: G.zoom.h * 0.64 };
       ctx.save();
       ctx.globalAlpha = k;
       roundRect(ctx, r, 4 * u, "rgba(20,12,4,0.94)", rgba(LIVE.warn, 0.95), 1.5);
@@ -338,7 +347,7 @@ export class LiveRenderer {
     }
   }
 
-  private waveform(ctx: Ctx, g: LiveGeometry, v: LiveView, d: number): void {
+  private overviewStrip(ctx: Ctx, g: LiveGeometry, v: LiveView, d: number): void {
     const r = g.deck[d].wave, deck = v.decks[d], tint = LIVE.deck[d];
     roundRect(ctx, { x: r.x - 1.5, y: r.y - 1.5, w: r.w + 3, h: r.h + 3 }, 3 * g.u, "#020304", "rgba(255,255,255,0.08)");
     const key = `${deck.info?.id ?? ""}:${deck.duration}:${r.w.toFixed(0)}x${r.h.toFixed(0)}:${deck.grid.bpm}:${deck.grid.firstBeat}:${v.dpr}`;
@@ -371,6 +380,133 @@ export class LiveRenderer {
     ctx.fillRect(at - 0.75, r.y - 2, 1.5, r.h + 4);
     const drop = v.dropAt[d];
     if (drop !== null) { ctx.fillStyle = rgba(tint); ctx.fillRect(r.x + r.w * drop - 1.25, r.y - 3, 2.5, r.h + 6); }
+    if (deck.isLoaded && deck.duration > 0) {
+      const X = (sec: number) => r.x + r.w * Math.max(0, Math.min(1, sec / deck.duration));
+      // The saved marks, a loop, and which part of the record the big waveform is showing.
+      deck.hotCues.forEach((c, i) => { if (c !== null) { ctx.fillStyle = rgba(LIVE.pad[i]); ctx.fillRect(X(c) - 0.75, r.y, 1.5, r.h); } });
+      if (deck.loopEnd > deck.loopStart) { ctx.fillStyle = deck.loopOn ? rgba(LIVE.play, 0.35) : "rgba(255,255,255,0.12)"; ctx.fillRect(X(deck.loopStart), r.y, Math.max(1, X(deck.loopEnd) - X(deck.loopStart)), r.h); }
+      const z = v.zoom[d];
+      if (z.level > 0 && z.seconds < deck.duration) {
+        const centre = drop !== null ? drop * deck.duration : deck.seconds, x0 = X(centre - z.seconds / 2), x1 = X(centre + z.seconds / 2);
+        roundRect(ctx, { x: x0, y: r.y - 1, w: Math.max(3, x1 - x0), h: r.h + 2 }, 2, null, "rgba(255,255,255,0.5)", 1);
+      }
+    }
+  }
+
+  // MARK: The big waveform
+
+  /** The record scrolling under a fixed needle, as far in as the zoom says; the beat grid, the cue, the hot cues and the loop on it. */
+  private zoomWave(ctx: Ctx, g: LiveGeometry, v: LiveView, d: number): void {
+    const G = g.deck[d], r = G.zoom, deck = v.decks[d], u = g.u, tint = LIVE.deck[d];
+    roundRect(ctx, { x: r.x - 1.5, y: r.y - 1.5, w: r.w + 3, h: r.h + 3 }, 3 * u, "#020304", "rgba(255,255,255,0.08)");
+    const mid = r.y + r.h / 2;
+    ctx.fillStyle = "rgba(255,255,255,0.07)";
+    ctx.fillRect(r.x, mid - 0.5, r.w, 1);
+    const peaks = deck.peaks;
+    if (!deck.isLoaded || !peaks) { small(ctx, "NO RECORD", r.x + r.w / 2, mid, 8 * u, { color: LIVE.dimmer }); return; }
+    const win = v.zoom[d].seconds, whole = v.zoom[d].level === 0 || win >= deck.duration;
+    const drop = v.dropAt[d];
+    const centre = whole ? deck.duration / 2 : drop !== null ? drop * deck.duration : deck.seconds;
+    const secPerPx = win / r.w, t0 = centre - win / 2, rate = deck.fileRate;
+    const lv = levelFor(peaks, secPerPx * rate).level;
+    const playX = whole ? r.x + r.w * (deck.seconds / deck.duration) : r.x + r.w / 2;
+    const amp = r.h / 2 - 2;
+    const cols = Math.floor(r.w);
+    // One closed shape (the top edge, then the bottom edge back), filled dim where the record has played and bright where it is to come.
+    const shape = new Path2D();
+    shape.moveTo(r.x, mid);
+    const heights: number[] = new Array(cols);
+    for (let x = 0; x < cols; x++) {
+      const p = peakBetween(peaks, lv, (t0 + x * secPerPx) * rate, (t0 + (x + 1) * secPerPx) * rate);
+      heights[x] = p > 0 ? Math.max(0.6, amp * Math.min(1, Math.pow(p, 0.8))) : 0;
+      shape.lineTo(r.x + x, mid + heights[x]);
+    }
+    shape.lineTo(r.x + cols, mid);
+    for (let x = cols - 1; x >= 0; x--) shape.lineTo(r.x + x, mid - heights[x]);
+    shape.closePath();
+    ctx.save();
+    ctx.beginPath(); ctx.rect(r.x, r.y, Math.max(0, playX - r.x), r.h); ctx.clip();
+    ctx.fillStyle = rgba(tint, 0.3);
+    ctx.fill(shape);
+    ctx.restore();
+    ctx.save();
+    ctx.beginPath(); ctx.rect(playX, r.y, r.x + r.w - playX, r.h); ctx.clip();
+    ctx.fillStyle = rgba(tint, 0.9);
+    ctx.fill(shape);
+    ctx.restore();
+
+    // The beat grid, where the beats are far enough apart to tell (bars brighter).
+    const pxPerBeat = deck.grid.beatLength / secPerPx;
+    if (pxPerBeat >= 6) {
+      const b0 = Math.ceil(deck.grid.beat(t0)), b1 = Math.floor(deck.grid.beat(t0 + win));
+      for (let b = b0; b <= b1 && b - b0 < 600; b++) {
+        const x = r.x + (deck.grid.secondsAtBeat(b) - t0) / secPerPx, bar = b % 4 === 0;
+        ctx.fillStyle = bar ? "rgba(255,255,255,0.4)" : "rgba(255,255,255,0.16)";
+        ctx.fillRect(x - 0.5, bar ? r.y : r.y + r.h * 0.3, 1, bar ? r.h : r.h * 0.4);
+      }
+    }
+    const X = (sec: number) => r.x + (sec - t0) / secPerPx;
+    const inside = (x: number) => x >= r.x - 1 && x <= r.x + r.w + 1;
+    // The loop.
+    if (deck.loopEnd > deck.loopStart) {
+      const a = Math.max(r.x, X(deck.loopStart)), b = Math.min(r.x + r.w, X(deck.loopEnd));
+      if (b > a) { ctx.fillStyle = deck.loopOn ? rgba(LIVE.play, 0.17) : "rgba(255,255,255,0.06)"; ctx.fillRect(a, r.y, b - a, r.h); }
+      for (const sec of [deck.loopStart, deck.loopEnd]) if (inside(X(sec))) { ctx.fillStyle = deck.loopOn ? rgba(LIVE.play, 0.95) : "rgba(255,255,255,0.4)"; ctx.fillRect(X(sec) - 0.75, r.y, 1.5, r.h); }
+    }
+    // The cue mark (orange) and the hot cues (their pad's colour, numbered).
+    const flag = (sec: number, colour: RGB, text?: string): void => {
+      const x = X(sec);
+      if (!inside(x)) return;
+      ctx.fillStyle = rgba(colour);
+      ctx.fillRect(x - 0.75, r.y, 1.5, r.h);
+      ctx.beginPath(); ctx.moveTo(x - 4.5 * u, r.y + r.h); ctx.lineTo(x + 4.5 * u, r.y + r.h); ctx.lineTo(x, r.y + r.h - 6 * u); ctx.closePath(); ctx.fill();
+      if (text) label(ctx, text, x + 8 * u, r.y + r.h - 5 * u, { size: 6.4 * u, color: rgba(colour), mono: true, align: "left" });
+    };
+    flag(deck.cuePoint, LIVE.cue);
+    deck.hotCues.forEach((c, i) => { if (c !== null) flag(c, LIVE.pad[i], String(i + 1)); });
+    // The needle (white), and the place a drag will drop it (deck colour).
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(playX - 0.75, r.y - 2, 1.5, r.h + 4);
+    if (drop !== null) { ctx.fillStyle = rgba(tint); ctx.fillRect((whole ? r.x + r.w * drop : r.x + r.w / 2) - 1.25, r.y - 3, 2.5, r.h + 6); }
+    // The zoom: what the picture shows, and the two buttons over its corner.
+    small(ctx, whole ? "WHOLE" : `${win} S`, r.x + 6 * u, r.y + r.h - 7 * u, 6 * u, { align: "left", color: LIVE.dim, mono: true });
+    button(ctx, G.zoomOut, "\u2212", false, LIVE.sync, u, { size: 9 * u, enabled: v.zoom[d].level > 0 });
+    button(ctx, G.zoomIn, "+", false, LIVE.sync, u, { size: 9 * u, enabled: v.zoom[d].level < 6 });
+  }
+
+  // MARK: Loops and pads
+
+  /** The column beside the platter: what the pads are, IN and OUT, half and double, the loop on or off, an automatic loop. */
+  private loopColumn(ctx: Ctx, g: LiveGeometry, v: LiveView, d: number): void {
+    const L = g.deck[d].loopUi, u = g.u, deck = v.decks[d], tint = LIVE.deck[d];
+    const mode = v.padMode[d], has = deck.loopEnd > deck.loopStart, loaded = deck.isLoaded;
+    button(ctx, L.mode[0], "CUES", mode === "cues", tint, u, { size: 7 * u });
+    button(ctx, L.mode[1], "LOOPS", mode === "loops", tint, u, { size: 7 * u });
+    button(ctx, L.io[0], "IN", false, LIVE.play, u, { enabled: loaded, size: 7.6 * u });
+    button(ctx, L.io[1], "OUT", false, LIVE.play, u, { enabled: loaded, size: 7.6 * u });
+    button(ctx, L.scale[0], "\u00bd", false, LIVE.sync, u, { enabled: has, size: 9 * u });
+    button(ctx, L.scale[1], "\u00d72", false, LIVE.sync, u, { enabled: has, size: 8.4 * u });
+    button(ctx, L.toggle, "LOOP", deck.loopOn, LIVE.play, u, { enabled: has, size: 8 * u });
+    const beats = has && deck.grid.beatLength > 0 ? (deck.loopEnd - deck.loopStart) / deck.grid.beatLength : 0;
+    [1, 2, 4, 8].forEach((n, i) => button(ctx, L.auto[i], String(n), deck.loopOn && Math.abs(beats - n) < 0.04 * n, LIVE.play, u, { enabled: loaded, size: 7.6 * u }));
+    small(ctx, "SHIFT-CLICK A PAD: CLEAR", L.hint.x, L.hint.y, 4.8 * u, { color: LIVE.dimmer });
+  }
+
+  /** Eight pads under the transport: the hot cues (a set one shows its time), or the saved loops (a set one shows its length in beats). */
+  private pads(ctx: Ctx, g: LiveGeometry, v: LiveView, d: number): void {
+    const G = g.deck[d], u = g.u, deck = v.decks[d], loops = v.padMode[d] === "loops";
+    G.pads.forEach((r, i) => {
+      const colour = LIVE.pad[i];
+      const cue = deck.hotCues[i], slot = deck.loopSlots[i];
+      const set = loops ? slot !== null : cue !== null;
+      const current = loops && slot !== null && deck.loopOn && Math.abs(slot.start - deck.loopStart) < 1e-6 && Math.abs(slot.end - deck.loopEnd) < 1e-6;
+      roundRect(ctx, r, 3 * u, set ? rgba(colour, 0.2) : "rgba(255,255,255,0.025)", set ? rgba(current ? LIVE.play : colour, 0.95) : "rgba(255,255,255,0.09)", current ? 1.8 : 1);
+      small(ctx, String(i + 1), r.x + 7 * u, r.y + r.h / 2, 7.6 * u, { color: set ? rgba(colour) : LIVE.dimmer, mono: true, align: "left" });
+      if (set) {
+        const text = loops ? (() => { const b = (slot!.end - slot!.start) / Math.max(0.001, deck.grid.beatLength); return `${b >= 1 ? Math.round(b * 4) / 4 : Math.round(b * 8) / 8}B`; })() : clock(cue!);
+        small(ctx, text, r.x + r.w - 5 * u, r.y + r.h / 2, 6.6 * u, { color: LIVE.ink, mono: true, align: "right" });
+      }
+    });
   }
 
   // MARK: The mixer

@@ -40,6 +40,9 @@ export interface LibraryTrack {
   analysis?: { bpm: number; firstBeat: number; confidence: number };
   /** Your corrections: they win over the analysis. */
   grid?: { bpm: number; firstBeat: number };
+  /** The hot cues (seconds, null = empty) and the saved loops of LIVE's pads: kept with the track. */
+  cues?: (number | null)[];
+  loops?: ({ start: number; end: number } | null)[];
 }
 
 export interface LibraryStore {

@@ -21,7 +21,11 @@ export const D = {
   gain: 8,
   peak: 9,
   frames: 10,
-  stride: 12,
+  /** WEB ONLY: a loop (file frames; on when end > start) and the smooth-seek crossfade (output frames), written by the page. */
+  loopStart: 12,
+  loopEnd: 13,
+  smoothSeek: 14,
+  stride: 16,
 } as const;
 
 /** Per mixer channel (all written by the page). */

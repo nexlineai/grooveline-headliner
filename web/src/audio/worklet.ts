@@ -109,6 +109,9 @@ class HeadlinerProcessor extends AudioWorkletProcessor {
       s.glide = v[deckAt(d, D.glide)];
       s.step = v[deckAt(d, D.step)] || 1;
       s.targetGain = v[deckAt(d, D.targetGain)];
+      s.loopStart = v[deckAt(d, D.loopStart)];
+      s.loopEnd = v[deckAt(d, D.loopEnd)];
+      s.smoothSeek = v[deckAt(d, D.smoothSeek)];
       const seq = v[deckAt(d, D.seekSeq)];
       if (seq !== this.seekSeen[d]) {
         this.seekSeen[d] = seq;

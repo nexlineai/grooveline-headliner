@@ -32,6 +32,25 @@ describe("LIVE layout", () => {
         assert.ok(g.library.w >= 0.5 * W);
       });
 
+      test("the waveforms: the big one, the strip of the whole record under it, the zoom buttons over its corner; the big one is big", () => {
+        for (const d of g.deck) {
+          assert.ok(inside(d.rect, d.zoom) && inside(d.rect, d.wave));
+          assert.ok(apart(d.zoom, d.wave) && d.wave.y + d.wave.h <= d.zoom.y + E, "the strip under the big waveform");
+          assert.ok(inside(d.zoom, d.zoomIn) && inside(d.zoom, d.zoomOut) && apart(d.zoomIn, d.zoomOut));
+          assert.ok(d.zoom.h >= 40 * g.u && d.zoom.w >= 270 * g.u, "a waveform worth zooming");
+          assert.ok(d.zoom.y >= d.platter.c.y + d.platter.outer - E, "the waveforms above the platter");
+        }
+      });
+
+      test("the loop controls: five rows in the column beside the platter, inside it, apart, big enough to touch", () => {
+        for (const d of g.deck) {
+          const L = d.loopUi, all = [...L.mode, ...L.io, ...L.scale, L.toggle, ...L.auto];
+          for (const r of all) { assert.ok(inside(d.rect, r)); assert.ok(r.w >= 14 * g.u && r.h >= 16 * g.u); assert.ok(r.x >= d.platter.c.x + d.platter.outer + 4 * g.u, "right of the platter"); assert.ok(r.x + r.w < d.pitch.x - 12 * g.u, "left of the pitch fader"); }
+          for (let a = 0; a < all.length; a++) for (let b = a + 1; b < all.length; b++) assert.ok(apart(all[a], all[b]), `controls ${a} and ${b}`);
+          assert.ok(d.loopUi.hint.y > d.rect.y);
+        }
+      });
+
       test("every part of a deck stays inside it: waveform, platter, readouts, pitch fader, transport, pads", () => {
         for (const d of g.deck) {
           assert.ok(inside(d.rect, d.wave));

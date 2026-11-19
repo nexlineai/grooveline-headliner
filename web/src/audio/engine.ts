@@ -6,6 +6,8 @@ import { BeatGrid } from "../core/beatgrid.ts";
 import type { TrackInfo } from "../core/beatgrid.ts";
 import { eqDecibels } from "../core/mixjudge.ts";
 import { RoomAlignment, rampSeconds } from "./align.ts";
+import { buildPeaks } from "./peaks.ts";
+import type { Peaks } from "./peaks.ts";
 import { PHONES_UNITY, phonesGainFor, trimGainFor } from "./fx.ts";
 import { isAiff, parseAiff } from "../library/aiff.ts";
 import { firstOnset, overview } from "../core/vinyl.ts";
@@ -156,6 +158,140 @@ export class Deck {
   /** What the audio thread's needle gain glides to: silent while the needle is lifted, else the trim. */
   private pushGain(): void { this.shared.set(deckAt(this.index, D.targetGain), this._lifted ? 0 : trimGainFor(this._trim)); }
 
+  // MARK: - Hot cues, loops and the fine waveform (LIVE, web only)
+
+  /** The record's loudness at several zoom levels (audio/peaks.ts), for the zoomable waveform. */
+  peaks: Peaks | null = null;
+  /** Eight hot cues, in seconds (null: empty), and eight saved loops. They belong to the record; the page keeps them with a library track. */
+  hotCues: (number | null)[] = Array.from({ length: 8 }, () => null);
+  loopSlots: ({ start: number; end: number } | null)[] = Array.from({ length: 8 }, () => null);
+  /** The loop now, in seconds: set by IN and OUT, an auto loop or a saved loop; `loopOn` says whether the needle follows it. */
+  loopStart = 0;
+  loopEnd = 0;
+  private _loopOn = false;
+  /** IN was pressed (or a loop was made another way): OUT has a start to close. */
+  private loopArmed = false;
+  /** Set and jump on the beat while the record turns (standing still, a mark goes exactly where the needle is). */
+  quantize = true;
+  /** The marks changed (the page saves them). */
+  onMarks: () => void = () => {};
+
+  get loopOn(): boolean { return this._loopOn && this.loopEnd > this.loopStart; }
+  /** A needle drop while the record turns crossfades (no click). LIVE switches it on; the game's booth never does. */
+  set smoothSeek(on: boolean) { this.shared.set(deckAt(this.index, D.smoothSeek), on ? 64 : 0); }
+
+  /** Forgets every mark (a new record on the deck). */
+  resetMarks(): void {
+    this.hotCues = this.hotCues.map(() => null);
+    this.loopSlots = this.loopSlots.map(() => null);
+    this.loopStart = this.loopEnd = 0;
+    this._loopOn = false;
+    this.loopArmed = false;
+    this.pushLoop();
+  }
+
+  /** The marks as they are kept with a library track, and the other way round. */
+  marks(): { cues: (number | null)[]; loops: ({ start: number; end: number } | null)[] } {
+    return { cues: this.hotCues.slice(), loops: this.loopSlots.map((l) => (l ? { ...l } : null)) };
+  }
+  setMarks(m: { cues?: (number | null)[]; loops?: ({ start: number; end: number } | null)[] }): void {
+    const ok = (x: unknown): x is number => typeof x === "number" && Number.isFinite(x) && x >= 0 && x <= this.duration;
+    this.hotCues = this.hotCues.map((_, i) => (ok(m.cues?.[i]) ? (m.cues![i] as number) : null));
+    this.loopSlots = this.loopSlots.map((_, i) => { const l = m.loops?.[i]; return l && ok(l.start) && ok(l.end) && l.end > l.start ? { start: l.start, end: l.end } : null; });
+  }
+
+  private pushLoop(): void {
+    const on = this.loopOn, rate = this.fileRate;
+    this.shared.set(deckAt(this.index, D.loopStart), on ? this.loopStart * rate : 0);
+    this.shared.set(deckAt(this.index, D.loopEnd), on ? this.loopEnd * rate : 0);
+  }
+
+  /** The nearest beat of the grid. */
+  private onBeat(seconds: number): number { return this.grid.secondsAtBeat(Math.round(this.grid.beat(seconds))); }
+  /** While the record turns a mark is set on the beat; standing still it goes exactly where the needle is. */
+  private snapped(seconds: number): number { return this.quantize && Math.abs(this.rate) > 0.3 && this.grid.beatLength > 0 ? Math.max(0, Math.min(this.duration, this.onBeat(seconds))) : seconds; }
+
+  /** Where a jump to `target` lands: while the record turns, on the same beat phase as now, so the beats keep lining up. */
+  private landing(target: number): number {
+    if (!this.quantize || Math.abs(this.rate) < 0.3 || !(this.grid.beatLength > 0)) return target;
+    const here = this.grid.beat(this.seconds);
+    return Math.max(0, Math.min(this.duration, this.grid.secondsAtBeat(Math.round(this.grid.beat(target)) + (here - Math.floor(here)))));
+  }
+
+  /** Puts the needle at `seconds`; a loop the needle is no longer in is left. */
+  jumpTo(seconds: number): void {
+    if (this.loopOn && (seconds < this.loopStart - 1e-6 || seconds >= this.loopEnd)) { this._loopOn = false; this.pushLoop(); }
+    this.seek(seconds);
+  }
+
+  /** A hot cue pad: an empty one is set where the needle is, a set one jumps there. */
+  hotCuePress(i: number): void {
+    if (!this.isLoaded) return;
+    const cue = this.hotCues[i];
+    if (cue === null) { this.hotCues[i] = this.snapped(this.seconds); this.onMarks(); }
+    else this.jumpTo(this.landing(cue));
+  }
+  clearHotCue(i: number): void { if (this.hotCues[i] !== null) { this.hotCues[i] = null; this.onMarks(); } }
+
+  /** LOOP IN: the loop starts here (the loop is off until OUT is pressed). */
+  loopIn(): void {
+    if (!this.isLoaded) return;
+    this.loopStart = this.snapped(this.seconds);
+    this.loopArmed = true;
+    if (this.loopEnd <= this.loopStart + 0.02) this.loopEnd = 0;
+    this._loopOn = this.loopEnd > this.loopStart && this._loopOn;
+    this.pushLoop();
+  }
+  /** LOOP OUT: the loop ends here and begins to turn. */
+  loopOut(): void {
+    if (!this.isLoaded || !this.loopArmed) return;
+    const end = this.snapped(this.seconds);
+    if (end <= this.loopStart + 0.02) return;
+    this.loopEnd = end;
+    this._loopOn = true;
+    this.pushLoop();
+  }
+  /** The loop on or off (off: the needle runs on past it; on again: it goes back into it). */
+  toggleLoop(): void {
+    if (this.loopOn) { this._loopOn = false; this.pushLoop(); return; }
+    if (!(this.loopEnd > this.loopStart)) return;
+    this._loopOn = true;
+    this.pushLoop();
+    const s = this.seconds;
+    if (s < this.loopStart || s >= this.loopEnd) this.seek(this.landing(this.loopStart));
+  }
+  /** A loop of this many beats from the beat the needle is on. */
+  autoLoop(beats: number): void {
+    if (!this.isLoaded || !(this.grid.beatLength > 0)) return;
+    const start = this.onBeat(this.seconds), end = Math.min(this.duration - 0.05, start + beats * this.grid.beatLength);
+    if (end <= start + 0.02) return;
+    this.loopStart = Math.max(0, start); this.loopEnd = end; this._loopOn = true; this.loopArmed = true;
+    this.pushLoop();
+  }
+  /** Half the loop, or twice it (from its start). */
+  loopScale(factor: number): void {
+    if (!(this.loopEnd > this.loopStart)) return;
+    const end = Math.min(this.duration - 0.05, this.loopStart + (this.loopEnd - this.loopStart) * factor);
+    if (end <= this.loopStart + 0.02) return;
+    this.loopEnd = end;
+    this.pushLoop();
+  }
+  /** A loop pad: an empty one keeps the loop that is set, a full one makes that the loop and starts it. */
+  loopSlotPress(i: number): void {
+    const slot = this.loopSlots[i];
+    if (slot === null) {
+      if (!(this.loopEnd > this.loopStart)) return;
+      this.loopSlots[i] = { start: this.loopStart, end: this.loopEnd };
+      this.onMarks();
+      return;
+    }
+    this.loopStart = slot.start; this.loopEnd = slot.end; this._loopOn = true; this.loopArmed = true;
+    this.pushLoop();
+    const s = this.seconds;
+    if (s < slot.start || s >= slot.end) this.seek(this.landing(slot.start));
+  }
+  clearLoopSlot(i: number): void { if (this.loopSlots[i] !== null) { this.loopSlots[i] = null; this.onMarks(); } }
+
   private apply(): void {
     let target: number, seconds: number; // time for the platter to cover most of the gap
     if (this._held) {
@@ -188,6 +324,8 @@ export class Deck {
     this.grid = grid ? new BeatGrid(grid.bpm, grid.firstBeat) : new BeatGrid(track.bpm, onset / this.fileRate);
     this.cuePoint = this.grid.firstBeat;
     this.overview = overview(left, frames, 240);
+    this.peaks = buildPeaks(left, right, frames);
+    this.resetMarks();
     this.info = track;
     this.frames = frames;
     this.cancelPark();
@@ -214,6 +352,8 @@ export class Deck {
     const frames = Math.min(left.length, right.length);
     const swapInPlace = keepPlace && this.isLoaded && this.frames === frames && this.fileRate === sampleRate;
     this.overview = overview(left, frames, 240);
+    if (!swapInPlace) this.resetMarks();
+    this.peaks = buildPeaks(left, right, frames);
     this.info = track;
     if (!swapInPlace) {
       this.cancelPark();

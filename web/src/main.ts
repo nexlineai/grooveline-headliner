@@ -34,7 +34,7 @@ import { monoForAnalysis } from "./library/beats.ts";
 import { trackId } from "./library/search.ts";
 import { probeDuration } from "./library/duration.ts";
 import type { LibraryTrack } from "./library/store.ts";
-import { keyOf } from "./booth/booth.ts";
+import { LOOP_ACTIONS, keyOf } from "./booth/booth.ts";
 import type { Kind } from "./booth/booth.ts";
 import { KEYS, attachKeys } from "./input/keys.ts";
 import { MidiInput } from "./input/midi.ts";
@@ -81,6 +81,7 @@ function deckBusy(d: number): boolean {
 async function loadRecord(d: number, track: TrackInfo): Promise<void> {
   const deck = engine.decks[d];
   if (deckBusy(d)) return;
+  deck.onMarks = () => {}; // a record of the game keeps no marks
   if (track.id === "your-dubplate") {
     // On the big system (the DUBPLATE night) the cut booms until its low comes down.
     loadCut(cutPattern ?? DrumPattern.track, deck, booth.night?.info.mixdownCheck ?? false);
@@ -157,6 +158,9 @@ async function loadUserTrack(d: number, t: LibraryTrack): Promise<void> {
     };
     deck.loadDecoded(info, audio, grid ?? undefined);
     userOnDeck[d] = t;
+    // Its hot cues and saved loops come back, and what is set or cleared from now on is kept with the track.
+    deck.setMarks({ cues: t.cues, loops: t.loops });
+    deck.onMarks = () => { const m = deck.marks(); t.cues = m.cues; t.loops = m.loops; library.update(t).catch(() => {}); };
     // Its cover on the record's label, when the picture is read (the booth shows it only while this very record is on the deck).
     booth.setLabelArt(d, null, null);
     sleeves.request(t, (s) => { if (s instanceof HTMLCanvasElement && userOnDeck[d] === t) booth.setLabelArt(d, info.id, s); });
@@ -846,6 +850,7 @@ function kindFromKey(key: string): Kind | null {
     case "play": case "cue": case "sync": case "phones": case "pitch": case "channel": case "filter": case "trim": case "jog":
       return { t, d } as Kind;
     case "master": return { t: "master" };
+    case "pad": case "loop": case "zoom": return { t, d, band } as Kind;
     case "eq": return { t: "eq", d, band };
     case "cross": return { t: "cross" };
     case "cueMix": return { t: "cueMix" };
@@ -859,7 +864,7 @@ function kindFromKey(key: string): Kind | null {
 
 function targetKind(key: string): TargetKind | null {
   const t = key.split(":")[0];
-  if (["play", "sync", "phones", "fxOn", "fxType", "fxDiv"].includes(t)) return "button";
+  if (["play", "sync", "phones", "fxOn", "fxType", "fxDiv", "pad", "loop", "zoom"].includes(t)) return "button";
   if (t === "jog") return "relative";
   if (t === "nudge" || t === "cue") return "hold"; // held down: a nudge pushes, CUE plays from its mark
   if (["pitch", "channel", "cross", "eq", "filter", "trim", "master", "cueMix", "phonesLevel", "fxAmount"].includes(t)) return "absolute";
@@ -877,6 +882,9 @@ function labelOf(key: string): string {
   const names: Record<string, string> = { play: "PLAY", cue: "CUE", sync: "SYNC", phones: "PHONES", pitch: "PITCH", channel: "FADER",
     filter: "FILTER", trim: "GAIN", master: "MASTER VOLUME", jog: "JOG (THE RECORD)", cross: "CROSSFADER", cueMix: "CUE MIX", phonesLevel: "HEADPHONES LEVEL" };
   if (t === "eq") return `${side}${["LOW", "MID", "HI"][Number(bs)] ?? "EQ"}`;
+  if (t === "pad") return `${side}PAD ${Number(bs) + 1}`;
+  if (t === "loop") return `${side}LOOP: ${({ cues: "PADS = CUES", loops: "PADS = LOOPS", in: "IN", out: "OUT", half: "HALF", double: "DOUBLE", toggle: "ON/OFF", auto1: "1 BEAT", auto2: "2 BEATS", auto4: "4 BEATS", auto8: "8 BEATS" } as Record<string, string>)[LOOP_ACTIONS[Number(bs)]] ?? ""}`;
+  if (t === "zoom") return `${side}WAVEFORM ZOOM ${bs === "-1" ? "OUT" : "IN"}`;
   if (t === "nudge") return `${side}NUDGE ${bs === "-1" ? "BACK" : "FORWARD"} (BUTTON)`;
   return `${side}${names[t] ?? t.toUpperCase()}`;
 }

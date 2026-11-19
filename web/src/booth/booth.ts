@@ -32,6 +32,8 @@ export type Kind =
   | { t: "cueMix" } | { t: "phonesLevel" } | { t: "filter"; d: number }
   // LIVE only: the channel's gain (TRIM) and the master volume.
   | { t: "trim"; d: number } | { t: "master" }
+  // LIVE only: a pad under the deck (`band` = which one), a loop control (`band` = LOOP_ACTIONS), the zoom buttons (band +1 in, -1 out), and the zoomable waveform.
+  | { t: "pad"; d: number; band: number } | { t: "loop"; d: number; band: number } | { t: "zoom"; d: number; band: number } | { t: "zwave"; d: number }
   // The effect unit (free play): `d` is the effect or the note value, -1 = the next one.
   | { t: "fxOn" } | { t: "fxAmount" } | { t: "fxType"; d: number } | { t: "fxDiv"; d: number };
 
@@ -61,6 +63,10 @@ const TURN = 2 * Math.PI * (100 / 3) / 60;
 const PITCH_RANGE = 0.08;
 /** The cue mix and headphones level knobs sit this far (in units) either side of the mixer's middle. */
 const KNOB_GAP = 11;
+/** What the loop buttons do (`Kind.band` of a "loop"). */
+export const LOOP_ACTIONS = ["cues", "loops", "in", "out", "half", "double", "toggle", "auto1", "auto2", "auto4", "auto8"] as const;
+/** How many seconds the big waveform shows at each zoom level (0 = the whole record). */
+export const ZOOM_SECONDS = [0, 60, 30, 15, 8, 4, 2];
 const MOODS = ["waiting", "nodding", "dancing", "nuts"];
 /** Extra lift of a room's picture, as a part of its height, for rooms whose people stand low. */
 const ROOM_LIFT: Record<string, number> = { field: 0.28, forest: 0.32, festival: 0.2, tent: 0.2, meridian: 0.15 };
@@ -187,6 +193,11 @@ export class Booth {
   mode: "game" | "live" = "game";
   private live: LiveGeometry | null = null;
   private readonly liveRenderer = new LiveRenderer();
+  /** What the pads under each deck are: the hot cues, or the saved loops. */
+  private padMode: ("cues" | "loops")[] = ["cues", "cues"];
+  /** The zoom of each deck's big waveform (an index into ZOOM_SECONDS), kept between visits. */
+  private zoomLevel: number[] = (() => { try { const z = JSON.parse(localStorage.getItem("headliner.zoom") ?? "[]"); return [0, 1].map((d) => (Number.isInteger(z[d]) && z[d] >= 0 && z[d] < ZOOM_SECONDS.length ? z[d] : 3)); } catch { return [3, 3]; } })();
+  private lastWheelZoom = 0;
   /** A message over a deck (a record cannot be changed while it plays), and until when. */
   private alerts: ({ text: string; until: number } | null)[] = [null, null];
   private lastTime = 0;
@@ -479,7 +490,14 @@ export class Booth {
       armPivotAngle = Math.atan2(c.y - p.y, c.x - p.x);
       rowY.push(G.title.y); titleX.push(G.title.x); timeX.push(G.time.x); dotX.push(G.lamps.map((l) => l.x));
       wave.push(G.wave);
+      // The strip of the whole record drops the needle; the big waveform scrolls with a drag; the zoom buttons sit over its corner.
       first({ t: "wave", d }, { x: G.wave.x - 4, y: G.wave.y - 4, w: G.wave.w + 8, h: G.wave.h + 8 });
+      first({ t: "zwave", d }, G.zoom);
+      first({ t: "zoom", d, band: -1 }, G.zoomOut);
+      first({ t: "zoom", d, band: 1 }, G.zoomIn);
+      const LU = G.loopUi;
+      [...LU.mode, ...LU.io, ...LU.scale, LU.toggle, ...LU.auto].forEach((r, i) => first({ t: "loop", d, band: i }, r)); // the eleven controls come in the order of LOOP_ACTIONS
+      G.pads.forEach((r, i) => first({ t: "pad", d, band: i }, r));
       buttonY.push(B.cue.y); buttonX.push([B.cue.x, B.play.x, B.sync.x]);
       ([{ t: "cue", d }, { t: "play", d }, { t: "sync", d }] as Kind[]).forEach((k, i) => first(k, centred([B.cue, B.play, B.sync][i].x, B.cue.y, B.w + 6, B.h + 8)));
       pitchX.push(G.pitch.x); pitchY.push(G.pitch.y);
@@ -535,6 +553,8 @@ export class Booth {
     document.body.classList.toggle("live", mode === "live");
     // LIVE has no room: a crowd clip a night left playing would go on decoding behind `display: none`. The game's own `showRoom` plays it again.
     if (mode === "live") for (const v of this.roomVideos) if (v && !v.paused) v.pause();
+    for (const d of this.decks) d.smoothSeek = mode === "live"; // a needle drop while the record turns fades across (no click); the game's booth keeps the hard jump
+    this.padMode = ["cues", "cues"];
     this.L = null;
   }
 
@@ -551,6 +571,7 @@ export class Booth {
       armAngle: (d) => this.armAngle(d), pivot: L.pivot, armLength: L.armLength, labelArt: this.labelArt, alerts: this.alerts,
       trimDb: (d) => trimDecibels(this.trimSetting[d]), now: performance.now(), dpr: this.dpr,
       phase: both ? phaseOffset(this.decks[0].beat, this.decks[1].beat) : null, syncAllowed: this.syncAllowed,
+      padMode: this.padMode, zoom: this.zoomLevel.map((_, d) => ({ level: this.zoomLevel[d], seconds: this.windowSeconds(d) })),
     };
   }
 
@@ -757,6 +778,19 @@ export class Booth {
         decks[kind.d].lifted = true;
         this.dropAt[kind.d] = this.waveProgress(p, kind.d);
         break;
+      case "zwave":
+        // The big waveform is dragged like a record: the needle is lifted and carried, and drops where the picture is let go.
+        decks[kind.d].lifted = true;
+        grab.startValue = decks[kind.d].seconds;
+        this.dropAt[kind.d] = decks[kind.d].progress;
+        break;
+      case "pad":
+        this.padDown(kind.d, kind.band, e.shiftKey || e.altKey || e.button === 2);
+        break;
+      case "loop":
+      case "zoom":
+        this.press(kind);
+        break;
       case "play":
       case "cue":
       case "sync":
@@ -827,6 +861,13 @@ export class Booth {
       case "wave":
         this.dropAt[k.d] = this.waveProgress(p, k.d);
         break;
+      case "zwave": {
+        const deck = this.decks[k.d], r = L.live!.deck[k.d].zoom;
+        // Dragging the picture to the right shows what came before: the needle goes back by as many seconds as the picture moved.
+        const t = grab.startValue - (p.x - grab.start.x) * (this.windowSeconds(k.d) / r.w);
+        this.dropAt[k.d] = deck.duration > 0 ? clamp01(t / deck.duration) : 0;
+        break;
+      }
       case "pitch": {
         // Fine mode: with the finger well to the side of the fader it moves four times slower,
         // step by step from the last position, so switching modes mid-drag does not jump.
@@ -886,7 +927,8 @@ export class Booth {
         break;
       case "needle":
       case "wave":
-        if (!this.holds("needle", k.d) && !this.holds("wave", k.d)) this.dropNeedle(k.d);
+      case "zwave":
+        if (!this.holds("needle", k.d) && !this.holds("wave", k.d) && !this.holds("zwave", k.d)) this.dropNeedle(k.d);
         break;
       case "cue":
         if (!this.holds("cue", k.d)) this.release(k);
@@ -894,6 +936,45 @@ export class Booth {
       default:
         break;
     }
+  }
+
+  // MARK: - Pads, loops and zoom (LIVE)
+
+  /** How many seconds the big waveform shows across now (the whole record at level 0, or when it is shorter than the level). */
+  windowSeconds(d: number): number {
+    const deck = this.decks[d], level = this.zoomLevel[d], dur = Math.max(1, deck.duration);
+    return level === 0 || ZOOM_SECONDS[level] >= dur ? dur : ZOOM_SECONDS[level];
+  }
+
+  private zoomBy(d: number, by: number): void {
+    this.zoomLevel[d] = Math.max(0, Math.min(ZOOM_SECONDS.length - 1, this.zoomLevel[d] + (by > 0 ? 1 : -1)));
+    try { localStorage.setItem("headliner.zoom", JSON.stringify(this.zoomLevel)); } catch { /* private window */ }
+  }
+
+  /** A pad: with the cues showing, an empty one is set and a set one jumps; with the loops showing, an empty one keeps the loop and a full one starts it. */
+  private padPress(d: number, i: number): void {
+    const deck = this.decks[d];
+    if (this.mode !== "live" || !deck.isLoaded) return;
+    if (this.padMode[d] === "cues") deck.hotCuePress(i); else deck.loopSlotPress(i);
+  }
+
+  /** The pointer on a pad: shift, alt or the right button clears it. */
+  private padDown(d: number, i: number, clear: boolean): void {
+    if (!clear) { this.padPress(d, i); return; }
+    if (this.padMode[d] === "cues") this.decks[d].clearHotCue(i); else this.decks[d].clearLoopSlot(i);
+  }
+
+  private loopAction(d: number, action: number): void {
+    const deck = this.decks[d], a = LOOP_ACTIONS[action];
+    if (this.mode !== "live" || !a) return;
+    if (a === "cues" || a === "loops") { this.padMode[d] = a; return; }
+    if (!deck.isLoaded) return;
+    if (a === "in") deck.loopIn();
+    else if (a === "out") deck.loopOut();
+    else if (a === "half") deck.loopScale(0.5);
+    else if (a === "double") deck.loopScale(2);
+    else if (a === "toggle") deck.toggleLoop();
+    else deck.autoLoop(Number(a.slice(4)));
   }
 
   /** The mouse wheel turns knobs and moves faders (laptops): one notch is a small step. */
@@ -910,6 +991,12 @@ export class Booth {
       case "eq": this.setEQ(kind.d, kind.band, clamp01(this.eq[kind.d][kind.band] + step)); break;
       case "filter": this.setFilter(kind.d, clamp01(this.filterSetting[kind.d] + step)); break;
       case "trim": this.setTrim(kind.d, clamp01(this.trimSetting[kind.d] + step)); break;
+      case "zwave": case "wave": case "zoom": {
+        // The wheel over a waveform zooms it (one level for each little burst of the wheel).
+        const now = performance.now();
+        if (now - this.lastWheelZoom > 90) { this.lastWheelZoom = now; this.zoomBy(kind.d, e.deltaY < 0 ? 1 : -1); }
+        break;
+      }
       case "master": this.engine.masterVolume = clamp01(this.engine.masterVolume + step); break;
       case "cueMix": this.engine.cueMix = clamp01(this.engine.cueMix + step); break;
       case "phonesLevel": this.engine.phonesLevel = clamp01(this.engine.phonesLevel + step); break;
@@ -925,6 +1012,9 @@ export class Booth {
     if (this.partnerHolds(k)) { this.stepOn(); return; }
     const decks = this.decks;
     switch (k.t) {
+      case "pad": this.padPress(k.d, k.band); break;
+      case "loop": this.loopAction(k.d, k.band); break;
+      case "zoom": this.zoomBy(k.d, k.band); break;
       case "play": {
         const deck = decks[k.d];
         deck.finishPark();

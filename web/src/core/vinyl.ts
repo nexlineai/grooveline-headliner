@@ -25,12 +25,22 @@ export interface DeckShared {
   targetGain: number;
   /** Loudest sample since the game last read it. */
   peak: number;
+  // WEB ONLY (the LIVE booth; the Swift twin does not have these). All zero = exactly the old behaviour, bit for bit (test/vinyl-golden).
+  /** A loop in file frames: it is on when `loopEnd > loopStart`. At its end the needle goes back to its start, to the sample. */
+  loopStart: number;
+  loopEnd: number;
+  /** Frames over which a needle drop WHILE THE RECORD TURNS crossfades from where it was (no click); 0 = a hard jump. */
+  smoothSeek: number;
+  /** The crossfade in progress (frames left, frames in all, the old needle's place). */
+  xfade: number;
+  xfadeTotal: number;
+  oldPos: number;
 }
 
 export function newDeckShared(): DeckShared {
   return {
     left: null, right: null, frames: 0, step: 1, position: 1, rate: 0, targetRate: 0, glide: 1,
-    seekTo: -1, gain: 0, targetGain: 1, peak: 0,
+    seekTo: -1, gain: 0, targetGain: 1, peak: 0, loopStart: 0, loopEnd: 0, smoothSeek: 0, xfade: 0, xfadeTotal: 0, oldPos: 0,
   };
 }
 
@@ -59,6 +69,8 @@ export function renderVinyl(s: DeckShared, outL: Float32Array, outR: Float32Arra
   let pos = s.position;
   const seek = s.seekTo;
   if (seek >= 0) {
+    // A drop while the record turns fades from the old place (so a hot cue does not click); standing still it is a plain jump.
+    if (s.smoothSeek > 0 && Math.abs(s.rate) > 0.05) { s.xfade = s.xfadeTotal = s.smoothSeek; s.oldPos = pos; }
     pos = seek;
     s.seekTo = -1;
   }
@@ -70,11 +82,22 @@ export function renderVinyl(s: DeckShared, outL: Float32Array, outR: Float32Arra
   const step = s.step;
   const first = 1, last = frames - 3;
   let peak = 0;
+  // The loop (off: loopEnd 0), and how long its seam is crossfaded (a few milliseconds, so it does not click).
+  const loopStart = s.loopStart, loopEnd = Math.min(s.loopEnd, last);
+  const looping = loopEnd > loopStart + 16 && loopStart >= 1;
+  const loopLen = loopEnd - loopStart;
+  const seam = looping ? Math.max(0, Math.min(96, Math.floor(loopLen / 4), Math.floor(loopStart) - 3)) : 0;
+  let xfade = s.xfade, oldPos = s.oldPos;
 
   for (let n = 0; n < count; n++) {
     rate += (target - rate) * glide;
     gain += (targetGain - gain) * 0.004;
     pos += rate * step;
+    if (looping) {
+      // Past the end the needle goes back by the loop's length (past the start, backwards, forward by it): to the sample.
+      if (pos >= loopEnd && rate > 0) pos = loopStart + ((pos - loopStart) % loopLen);
+      else if (pos < loopStart && rate < 0 && pos > loopStart - loopLen * 4) pos = loopEnd - ((loopEnd - pos) % loopLen);
+    }
     let edge = false;
     if (pos < first) { pos = first; edge = true; } else if (pos > last) { pos = last; edge = true; }
     // A record that is not moving makes no sound; fade over the last few percent of speed.
@@ -82,8 +105,23 @@ export function renderVinyl(s: DeckShared, outL: Float32Array, outR: Float32Arra
     const a = edge ? 0 : gain * moving;
     const i = Math.trunc(pos);
     const f = pos - i;
-    const yl = hermite(l, i, f) * a;
-    const yr = hermite(r, i, f) * a;
+    let yl = hermite(l, i, f) * a;
+    let yr = hermite(r, i, f) * a;
+    if (seam > 0 && rate > 0 && pos > loopEnd - seam && pos < loopEnd) {
+      // The last few milliseconds before the loop's end blend into what comes before its start: at the end the two are the same sample.
+      const w = (pos - (loopEnd - seam)) / seam, p2 = pos - loopLen, i2 = Math.trunc(p2), f2 = p2 - i2;
+      yl = yl * (1 - w) + hermite(l, i2, f2) * a * w;
+      yr = yr * (1 - w) + hermite(r, i2, f2) * a * w;
+    }
+    if (xfade > 0) {
+      const w = xfade / s.xfadeTotal;
+      oldPos += rate * step;
+      if (oldPos < first) oldPos = first; else if (oldPos > last) oldPos = last;
+      const io = Math.trunc(oldPos), fo = oldPos - io;
+      yl = yl * (1 - w) + hermite(l, io, fo) * a * w;
+      yr = yr * (1 - w) + hermite(r, io, fo) * a * w;
+      xfade--;
+    }
     outL[n] = yl;
     outR[n] = yr;
     const m = Math.max(Math.abs(yl), Math.abs(yr));
@@ -92,6 +130,8 @@ export function renderVinyl(s: DeckShared, outL: Float32Array, outR: Float32Arra
   s.position = pos;
   s.rate = rate;
   s.gain = gain;
+  s.xfade = xfade;
+  s.oldPos = oldPos;
   if (peak > s.peak) s.peak = peak;
 }
 

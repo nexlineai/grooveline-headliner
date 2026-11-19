@@ -25,11 +25,15 @@ export interface LiveDeckGeometry {
   title: Point; titleMax: number;
   /** Remaining time (right aligned) and the four beat lamps. */
   time: Point; lamps: Point[];
-  /** The big waveform (L2 makes it scroll and zoom). */
-  wave: Rect;
+  /** The zoomable waveform (it scrolls with the record), the strip of the WHOLE record under it (a touch there drops the needle),
+   * and the two zoom buttons over the corner of the big one. */
+  zoom: Rect; wave: Rect; zoomIn: Rect; zoomOut: Rect;
   platter: { c: Point; outer: number };
   /** The column between the platter and the pitch fader: tempo, key, pitch; and a reserved panel for loops (L2). */
   info: Rect; pitchText: Point; loop: Rect;
+  /** The loop controls, in the column beside the platter: what the pads do (cues or saved loops), IN and OUT, half and double, the loop on or
+   * off, an automatic loop of 1, 2, 4 or 8 beats, and a line of help. */
+  loopUi: { mode: Rect[]; io: Rect[]; scale: Rect[]; toggle: Rect; auto: Rect[]; hint: Point };
   pitch: { x: number; y: number; travel: number };
   buttons: { cue: Point; play: Point; sync: Point; w: number; h: number };
   /** Eight pads under the transport (hot cues and loops: L2). */
@@ -120,15 +124,35 @@ function deckGeometry(rect: Rect, u: number): LiveDeckGeometry {
     rect,
     title: P(8, 11), titleMax: (w - 8 - 58 - 14) * u,
     time: P(w - 52, 11), lamps: [0, 1, 2, 3].map((i) => P(w - 36 + i * 9, 11)),
-    wave: { x: rect.x + 8 * u, y: top - 90 * u, w: rect.w - 16 * u, h: 70 * u },
+    zoom: { x: rect.x + 8 * u, y: top - 76 * u, w: rect.w - 16 * u, h: 56 * u },
+    wave: { x: rect.x + 8 * u, y: top - 90 * u, w: rect.w - 16 * u, h: 11 * u },
+    zoomOut: { x: rect.x + (w - 8 - 31) * u, y: top - 33 * u, w: 14 * u, h: 12 * u },
+    zoomIn: { x: rect.x + (w - 8 - 16) * u, y: top - 33 * u, w: 14 * u, h: 12 * u },
     platter: { c, outer: outer * u },
     info: { x: rect.x + infoX * u, y: top - 236 * u, w: infoW * u, h: 140 * u },
     // The tempo and the key are in the mixer; the pitch reads out under its fader.
     pitchText: P(pitchX, 258),
     loop: { x: rect.x + infoX * u, y: top - 232 * u, w: infoW * u, h: 52 * u },
+    loopUi: loopControls(rect, u, infoX, infoW),
     pitch: { x: rect.x + pitchX * u, y: top - 164 * u, travel: 128 * u },
     buttons: { cue: P(8 + 28, 247), play: P(8 + 28 + 60, 247), sync: P(8 + 28 + 120, 247), w: 56 * u, h: 22 * u },
     pads: Array.from({ length: 8 }, (_, i) => ({ x: rect.x + (8 + i * (padW + 3)) * u, y: top - 288 * u, w: padW * u, h: 24 * u })),
+  };
+}
+
+/** Five rows in the column between the platter and the pitch fader: 18 units high, 6 apart. */
+function loopControls(rect: Rect, u: number, infoX: number, infoW: number): LiveDeckGeometry["loopUi"] {
+  const top = rect.y + rect.h;
+  const row = (i: number): number => 100 + i * 24;
+  const R = (dx: number, dy: number, w: number): Rect => ({ x: rect.x + (infoX + dx) * u, y: top - (dy + 18) * u, w: w * u, h: 18 * u });
+  const half = (infoW - 3) / 2, quarter = (infoW - 9) / 4;
+  return {
+    mode: [R(0, row(0), half), R(half + 3, row(0), half)],
+    io: [R(0, row(1), half), R(half + 3, row(1), half)],
+    scale: [R(0, row(2), half), R(half + 3, row(2), half)],
+    toggle: R(0, row(3), infoW),
+    auto: [0, 1, 2, 3].map((i) => R(i * (quarter + 3), row(4), quarter)),
+    hint: { x: rect.x + (infoX + infoW / 2) * u, y: top - (row(4) + 18 + 9) * u },
   };
 }
 
