@@ -1,0 +1,88 @@
+// The question a click on a record asks: on which deck? One popup next to the record, the same on the wall's shelf, on the front record of an
+// open crate and on a row of the list. The left deck is cyan and the right one amber, as in the booth. A deck that is playing says so
+// (the page refuses the load and puts its own message over that deck).
+
+import type { WallItem } from "./crates.ts";
+
+export interface LoadPopHooks {
+  /** Puts the record on a deck (the page keeps the rules). */
+  load(deck: number, item: WallItem): void;
+  /** True while a deck plays and cannot take a record. */
+  busy?(deck: number): boolean;
+}
+
+export interface LoadPop {
+  /** Opens it next to `anchor` (a rectangle in window coordinates), for this record. */
+  show(item: WallItem, anchor: { x: number; y: number; w: number; h: number }): void;
+  hide(): void;
+  readonly open: boolean;
+}
+
+interface Box { x: number; y: number; w: number; h: number }
+
+/** Where the popup goes: centred over the record and above it, or under it when there is no room above; always inside the window. */
+export function popPosition(anchor: Box, size: { w: number; h: number }, view: { w: number; h: number }, gap = 8, margin = 6): { x: number; y: number } {
+  const x = Math.max(margin, Math.min(view.w - size.w - margin, anchor.x + anchor.w / 2 - size.w / 2));
+  const above = anchor.y - gap - size.h;
+  const y = above >= margin ? above : Math.max(margin, Math.min(view.h - size.h - margin, anchor.y + anchor.h + gap));
+  return { x, y };
+}
+
+export function createLoadPop(hooks: LoadPopHooks): LoadPop {
+  const el = document.createElement("div");
+  el.className = "load-pop";
+  el.setAttribute("role", "dialog");
+  el.setAttribute("aria-label", "Load this record on a deck");
+  const title = document.createElement("b");
+  const artist = document.createElement("i");
+  const head = document.createElement("div");
+  head.className = "lp-title";
+  head.append(title, artist);
+  const ask = document.createElement("p");
+  ask.className = "lp-ask";
+  ask.textContent = "LOAD ON";
+  const decks = document.createElement("div");
+  decks.className = "lp-decks";
+  const buttons = [0, 1].map((d) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = d === 0 ? "left" : "right";
+    const name = document.createElement("b");
+    name.textContent = d === 0 ? "LEFT" : "RIGHT";
+    const sub = document.createElement("i");
+    b.append(name, sub);
+    decks.append(b);
+    return { b, sub };
+  });
+  el.append(head, ask, decks);
+  el.hidden = true;
+  document.body.append(el);
+
+  let item: WallItem | null = null;
+  let isOpen = false;
+  const hide = (): void => { if (!isOpen) return; isOpen = false; el.classList.remove("open"); el.hidden = true; item = null; };
+  buttons.forEach(({ b }, d) => b.addEventListener("click", (e) => { e.stopPropagation(); const it = item; hide(); if (it) hooks.load(d, it); }));
+  document.addEventListener("pointerdown", (e) => { if (isOpen && !el.contains(e.target as Node)) hide(); }, true);
+  document.addEventListener("keydown", (e) => { if (isOpen && e.key === "Escape") { e.preventDefault(); hide(); } });
+  window.addEventListener("resize", hide);
+  window.addEventListener("blur", hide);
+
+  return {
+    show(it, anchor): void {
+      item = it;
+      title.textContent = it.title;
+      artist.textContent = it.artist || it.sub || "";
+      buttons.forEach(({ b, sub }, d) => { const busy = hooks.busy?.(d) ?? false; b.classList.toggle("busy", busy); sub.textContent = busy ? "PLAYING" : d === 0 ? "DECK A" : "DECK B"; });
+      el.hidden = false;
+      isOpen = true;
+      const box = el.getBoundingClientRect();
+      const at = popPosition(anchor, { w: box.width, h: box.height }, { w: window.innerWidth, h: window.innerHeight });
+      el.style.left = `${Math.round(at.x)}px`;
+      el.style.top = `${Math.round(at.y)}px`;
+      el.classList.add("open");
+      buttons[0].b.focus({ preventScroll: true });
+    },
+    hide,
+    get open(): boolean { return isOpen; },
+  };
+}

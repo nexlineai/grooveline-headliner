@@ -10,6 +10,17 @@
 /** Knob position at which the headphones are as loud as before the knob existed (unity gain). */
 export const PHONES_UNITY = 0.7;
 
+/** The master knob (LIVE) at which the room is as loud as the mixer makes it (unity). The knob rests here, a quarter of the way down from the top,
+ * with 6 dB of headroom above it for a quiet system, as a mixer's master has its 0 dB mark. */
+export const ROOM_UNITY = 0.75;
+
+/** Master knob 0...1 -> the room's gain: a straight line from silence up to unity at 0.75 (so the knob at 0.375 is -6 dB), then up to +6 dB at the top. */
+export function roomGainFor(knob: number): number {
+  const x = Math.max(0, Math.min(1, knob));
+  if (x === ROOM_UNITY) return 1;
+  return x < ROOM_UNITY ? x / ROOM_UNITY : Math.pow(10, 6 * (x - ROOM_UNITY) / (1 - ROOM_UNITY) / 20);
+}
+
 /** Headphones level, knob 0...1 -> gain: -60 dB at the bottom (silent from 2 %), unity at 0.7, +6 dB at the top. */
 export function phonesGainFor(knob: number): number {
   const x = Math.max(0, Math.min(1, knob));
@@ -203,6 +214,9 @@ export class MasterSection {
   /** Wanted headphones gain (linear), written by the page. */
   phonesGain = 1;
   private phonesNow = 1;
+  /** LIVE's master knob, 0...1 (`roomGainFor`): it scales the ROOM and nothing else. */
+  roomKnob = ROOM_UNITY;
+  private roomNow = 1;
   // The effect unit, written by the page: which effect, on or off, how much (0...1), and the delay
   // time in seconds (the page works it out from the tempo and the note value).
   fxType: number = FX.delay;
@@ -239,6 +253,7 @@ export class MasterSection {
    */
   process(outL: Float32Array, outR: Float32Array, pl: Float32Array | null, pr: Float32Array | null, split: boolean, cueMix: number, count: number): void {
     this.runEffect(outL, outR, pl, pr, split, Math.max(0, Math.min(1, cueMix)), count);
+    this.runRoom(outL, outR, pl, pr, split, count);
     this.runPhones(outL, outR, pl, pr, split, count);
   }
 
@@ -298,6 +313,21 @@ export class MasterSection {
     } else {
       this.quiet = 0;
     }
+  }
+
+  /** The master knob: the room, with the effect return in it. The headphones never feel it: their main-mix share (the cue mix) is taken before the master, as on a mixer. */
+  private runRoom(outL: Float32Array, outR: Float32Array, pl: Float32Array | null, pr: Float32Array | null, split: boolean, count: number): void {
+    const wanted = roomGainFor(this.roomKnob);
+    if (this.roomNow === 1 && wanted === 1) return; // at its mark: untouched, bit for bit
+    const scaleRight = !(split && !(pl && pr)); // split on one cable: the left is the room, the right is the headphones
+    let g = this.roomNow;
+    const boost = wanted > 1 || g > 1;
+    for (let i = 0; i < count; i++) {
+      g += (wanted - g) * 0.002;
+      outL[i] = boost ? softClip(outL[i] * g) : outL[i] * g;
+      if (scaleRight) outR[i] = boost ? softClip(outR[i] * g) : outR[i] * g;
+    }
+    this.roomNow = Math.abs(g - wanted) < 1e-4 ? wanted : g;
   }
 
   private runPhones(outL: Float32Array, outR: Float32Array, pl: Float32Array | null, pr: Float32Array | null, split: boolean, count: number): void {

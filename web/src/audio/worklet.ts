@@ -135,6 +135,7 @@ class HeadlinerProcessor extends AudioWorkletProcessor {
     // The web's master section (the effect, the headphones level): before the second device's ring is filled.
     const m = this.master;
     m.phonesGain = v[mixerAt(M.phonesGain)];
+    m.roomKnob = v[mixerAt(M.roomMaster)];
     m.fxType = Math.trunc(v[mixerAt(M.fxType)]);
     m.fxOn = v[mixerAt(M.fxOn)] !== 0;
     m.fxAmount = v[mixerAt(M.fxAmount)];

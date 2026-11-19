@@ -36,12 +36,14 @@ export const M = { split: 0, cueMix: 1, master: 2, echoDelay: 3, echoGain: 4, tw
   /** Web only (audio/fx.ts): the headphones' gain, linear. */
   phonesGain: 6,
   /** The effect unit (audio/fx.ts): which effect, on, amount 0...1, the delay time in seconds. */
-  fxType: 7, fxOn: 8, fxAmount: 9, fxDelay: 10 } as const;
+  fxType: 7, fxOn: 8, fxAmount: 9, fxDelay: 10,
+  /** LIVE's master knob (0...1, audio/fx.ts `roomGainFor`): it turns down the ROOM only, never the headphones. */
+  roomMaster: 11 } as const;
 
 export const DECK_BASE = 0;
 export const STRIP_BASE = DECK_BASE + DECKS * D.stride;
 export const MIXER_BASE = STRIP_BASE + DECKS * S.stride;
-export const SIZE = MIXER_BASE + 16;
+export const SIZE = MIXER_BASE + 24;
 
 export const deckAt = (d: number, field: number): number => DECK_BASE + d * D.stride + field;
 export const stripAt = (d: number, field: number): number => STRIP_BASE + d * S.stride + field;

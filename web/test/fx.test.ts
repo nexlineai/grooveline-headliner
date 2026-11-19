@@ -1,7 +1,7 @@
 // The web's master section (audio/fx.ts): headphones level now, the effects below as they come.
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { FX, FX_DIVISIONS, MasterSection, PHONES_UNITY, beatDelaySeconds, phonesGainFor, softClip } from "../src/audio/fx.ts";
+import { FX, FX_DIVISIONS, MasterSection, PHONES_UNITY, ROOM_UNITY, beatDelaySeconds, phonesGainFor, roomGainFor, softClip } from "../src/audio/fx.ts";
 
 const buf = (n: number, v: number) => new Float32Array(n).fill(v);
 const db = (g: number) => 20 * Math.log10(g);
@@ -95,6 +95,82 @@ function run(m: MasterSection, blocks: number, feed: (frame: number) => number, 
 let seed = 7;
 const noise = (amp: number) => () => { seed = (seed * 1664525 + 1013904223) >>> 0; return ((seed / 4294967296) * 2 - 1) * amp; };
 const energy = (a: Float32Array, from: number, to: number) => { let e = 0; for (let i = from; i < to; i++) e += a[i] * a[i]; return e; };
+
+describe("the master knob (LIVE): the room only", () => {
+  /** Runs the section until its glide has settled, and gives back the last block. */
+  function settle(m: MasterSection, l: Float32Array, r: Float32Array, pl: Float32Array | null, pr: Float32Array | null, split: boolean, cueMix = 0.5): void {
+    const n = l.length, il = l.slice(), ir = r.slice(), ipl = pl?.slice() ?? null, ipr = pr?.slice() ?? null;
+    for (let k = 0; k < 40; k++) {
+      l.set(il); r.set(ir); pl?.set(ipl!); pr?.set(ipr!);
+      m.process(l, r, pl, pr, split, cueMix, n);
+    }
+  }
+
+  test("the knob's taper: unity at 75 %, a straight line down to silence, +6 dB at the top", () => {
+    assert.equal(roomGainFor(ROOM_UNITY), 1);
+    assert.equal(roomGainFor(0), 0);
+    assert.ok(Math.abs(db(roomGainFor(0.375)) + 6.02) < 0.01);
+    assert.ok(Math.abs(db(roomGainFor(1)) - 6) < 1e-9);
+    assert.ok(roomGainFor(0.5) < roomGainFor(0.74) && roomGainFor(0.74) < 1 && 1 < roomGainFor(0.76));
+  });
+
+  test("at its mark nothing is touched, bit for bit (the default sound does not change)", () => {
+    const m = new MasterSection();
+    const l = buf(128, 0.5), r = buf(128, 0.25), pl = buf(128, 0.3), pr = buf(128, 0.2);
+    const l0 = l.slice(), r0 = r.slice(), pl0 = pl.slice(), pr0 = pr.slice();
+    m.process(l, r, pl, pr, false, 0.5, 128);
+    assert.deepEqual(l, l0); assert.deepEqual(r, r0); assert.deepEqual(pl, pl0); assert.deepEqual(pr, pr0);
+  });
+
+  test("a sound card on the headphones (two outputs): the room comes down, the headphones do not move", () => {
+    const m = new MasterSection();
+    m.roomKnob = 0.1875; // -12 dB
+    const l = buf(128, 0.5), r = buf(128, 0.4), pl = buf(128, 0.3), pr = buf(128, 0.2);
+    settle(m, l, r, pl, pr, false);
+    assert.ok(Math.abs(db(l[127] / 0.5) + 12.04) < 0.05, `room ${db(l[127] / 0.5)}`);
+    assert.ok(Math.abs(db(r[127] / 0.4) + 12.04) < 0.05);
+    assert.equal(pl[127], Math.fround(0.3)); assert.equal(pr[127], Math.fround(0.2));
+  });
+
+  test("split on one cable: the left is the room and comes down, the right is the headphones and stays", () => {
+    const m = new MasterSection();
+    m.roomKnob = 0.375;
+    const l = buf(128, 0.5), r = buf(128, 0.4);
+    settle(m, l, r, null, null, true);
+    assert.ok(Math.abs(db(l[127] / 0.5) + 6.02) < 0.05);
+    assert.equal(r[127], Math.fround(0.4));
+  });
+
+  test("no headphones output: the master turns the whole (stereo) room down", () => {
+    const m = new MasterSection();
+    m.roomKnob = 0.375;
+    const l = buf(128, 0.5), r = buf(128, 0.4);
+    settle(m, l, r, null, null, false);
+    assert.ok(Math.abs(db(l[127] / 0.5) + 6.02) < 0.05 && Math.abs(db(r[127] / 0.4) + 6.02) < 0.05);
+  });
+
+  test("the effect's return is in the room, so the master turns it down with the rest; the headphones keep their share", () => {
+    const m = new MasterSection();
+    m.fxOn = true; m.fxType = FX.flanger; m.fxAmount = 1; m.fxDelaySeconds = 0.25;
+    m.roomKnob = 0.0001;
+    const n = 128, noise = (): Float32Array => { const a = new Float32Array(n); for (let i = 0; i < n; i++) a[i] = (Math.sin(i * 12.9898) * 43758.5453 % 1) * 0.3; return a; };
+    let heard = 0;
+    for (let k = 0; k < 200; k++) {
+      const l = noise(), r = noise(), pl = noise(), pr = noise();
+      m.process(l, r, pl, pr, false, 1, n);
+      if (k > 150) for (let i = 0; i < n; i++) heard = Math.max(heard, Math.abs(l[i]), Math.abs(r[i]));
+    }
+    assert.ok(heard < 0.01, `the room is almost silent: ${heard}`);
+  });
+
+  test("boosted above the mark, the room soft-clips instead of going past full scale", () => {
+    const m = new MasterSection();
+    m.roomKnob = 1;
+    const l = buf(128, 0.9), r = buf(128, -0.9);
+    settle(m, l, r, null, null, false);
+    assert.ok(Math.abs(l[127]) <= 1 && Math.abs(r[127]) <= 1 && l[127] > 0.9);
+  });
+});
 
 describe("the effect unit", () => {
   test("note values: 1/4 is one beat, and a 1/32 is an eighth of that", () => {

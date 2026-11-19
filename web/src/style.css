@@ -477,7 +477,11 @@ button.mini.on { border-color: var(--orange); color: var(--orange); }
 /* LIVE: the DJ's booth (free play). The canvas draws the gear row; the library and the stream panel are HTML under it. */
 body.live #room { display: none; }
 body.live #back { top: 5px; left: 8px; width: 30px; height: 30px; font-size: 20px; }
-body.live #top { top: 6px; right: 10px; }
+body.live #top { top: 9px; right: 10px; gap: 6px; }
+/* In LIVE the bar's buttons match the small caps of the rest of the booth: still glass, a tiny smaller. */
+body.live #top .pill { font-size: 9px; letter-spacing: 0.14em; padding: 0.5em 1.05em; line-height: 1.15; background: rgba(12, 16, 22, 0.55); border-color: rgba(255, 255, 255, 0.2); backdrop-filter: blur(6px); }
+body.live #top .pill:hover { border-color: rgba(255, 255, 255, 0.4); }
+body.live #top .pill .icon { width: 1.1em; height: 1.1em; margin-right: 0.5em; }
 body.live #note { top: 12px; left: 330px; font-size: 12px; max-width: 34vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #livebar { position: fixed; z-index: 3; top: 0; left: 48px; height: var(--bar-h, 40px); display: flex; align-items: center; gap: 18px; pointer-events: none; }
 #livebar[hidden] { display: none; }
@@ -538,3 +542,22 @@ body.live #wall .d-left { padding-left: 18px; }
 #wall .l-count { flex: none; padding: 6px 8px 0; color: var(--dim); font-size: calc(var(--ws) * 11px); }
 #wall .w-floor { justify-content: safe center; }
 #wall.listing .w-group, #wall.listing .w-shuffle { display: none; }
+
+/* The question a click on a record asks: on which deck? (library/loadpop.ts) Left is cyan, right is amber, as in the booth. */
+.load-pop { position: fixed; z-index: 40; width: 244px; padding: 13px 13px 14px; border-radius: 12px; color: var(--ink);
+  background: linear-gradient(#1b212b, #0e1217); border: 1px solid rgba(255, 255, 255, 0.22); box-shadow: 0 16px 44px rgba(0, 0, 0, 0.75); }
+.load-pop[hidden] { display: none; }
+.load-pop .lp-title b { display: block; font: 700 13px system-ui, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.load-pop .lp-title i { display: block; font: 500 11px system-ui, sans-serif; font-style: normal; color: rgba(236, 240, 245, 0.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.load-pop .lp-ask { margin: 11px 0 7px; font: 700 9px "Orbitron", sans-serif; letter-spacing: 0.2em; color: rgba(236, 240, 245, 0.46); }
+.load-pop .lp-decks { display: flex; gap: 8px; }
+.load-pop .lp-decks button { flex: 1; padding: 9px 0 8px; border-radius: 9px; background: #0a0d11; border: 1.5px solid; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.load-pop .lp-decks button b { font: 800 13px "Orbitron", sans-serif; letter-spacing: 0.14em; }
+.load-pop .lp-decks button i { font: 600 9px system-ui, sans-serif; font-style: normal; letter-spacing: 0.14em; opacity: 0.7; }
+.load-pop .lp-decks .left { color: #26c6f0; border-color: #26c6f0; }
+.load-pop .lp-decks .right { color: #ffac28; border-color: #ffac28; }
+.load-pop .lp-decks .left:hover, .load-pop .lp-decks .left:focus-visible { background: rgba(38, 198, 240, 0.16); outline: none; }
+.load-pop .lp-decks .right:hover, .load-pop .lp-decks .right:focus-visible { background: rgba(255, 172, 40, 0.16); outline: none; }
+.load-pop .lp-decks button.busy { border-color: rgba(255, 255, 255, 0.25); color: rgba(236, 240, 245, 0.5); }
+.load-pop .lp-decks button.busy i { color: #ffb02a; opacity: 1; }
+#wall .l-row, #wall .w-pick { cursor: pointer; }

@@ -55,6 +55,8 @@ export function sortItems(items: WallItem[], by: SortKey, descending = false): W
 export interface ListHooks {
   load(deck: number, item: WallItem): void;
   onDeck(item: WallItem): number[];
+  /** A click on the row itself (not on its A or B button): the page asks on which deck. */
+  ask?(item: WallItem, anchor: { x: number; y: number; w: number; h: number }): void;
 }
 
 export interface ListView {
@@ -145,6 +147,11 @@ export function buildList(host: HTMLElement, hooks: ListHooks): ListView {
         buttons.append(b);
       }
       row.append(buttons);
+      row.addEventListener("click", (e) => {
+        if ((e.target as HTMLElement).closest("button")) return;
+        const r = row.getBoundingClientRect();
+        hooks.ask?.(item, { x: r.x, y: r.y, w: r.width, h: r.height });
+      });
       frag.append(row);
     }
     scroller.append(frag);

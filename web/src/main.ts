@@ -119,6 +119,7 @@ const wall = buildWall($("wall"), library, bigSleeves, {
   onDeck: (item) => [0, 1].filter((d) => engine.decks[d].info?.id === item.id),
   openFolder: openMusicFolder,
   game: () => gameRecords,
+  busy: (d) => booth.mode === "live" && engine.decks[d].motorOn && Math.abs(engine.decks[d].rate) > 0.1,
 });
 /** The library track on each deck (null: a record of the game, or nothing). */
 const userOnDeck: (LibraryTrack | null)[] = [null, null];
@@ -883,7 +884,7 @@ function labelOf(key: string): string {
     filter: "FILTER", trim: "GAIN", master: "MASTER VOLUME", jog: "JOG (THE RECORD)", cross: "CROSSFADER", cueMix: "CUE MIX", phonesLevel: "HEADPHONES LEVEL" };
   if (t === "eq") return `${side}${["LOW", "MID", "HI"][Number(bs)] ?? "EQ"}`;
   if (t === "pad") return `${side}PAD ${Number(bs) + 1}`;
-  if (t === "loop") return `${side}LOOP: ${({ cues: "PADS = CUES", loops: "PADS = LOOPS", in: "IN", out: "OUT", half: "HALF", double: "DOUBLE", toggle: "ON/OFF", auto1: "1 BEAT", auto2: "2 BEATS", auto4: "4 BEATS", auto8: "8 BEATS" } as Record<string, string>)[LOOP_ACTIONS[Number(bs)]] ?? ""}`;
+  if (t === "loop") return `${side}LOOP: ${({ cues: "PADS = CUES", loops: "PADS = LOOPS", in: "IN", out: "OUT", half: "HALF", double: "DOUBLE", toggle: "ON/OFF", auto4: "4 BEATS", auto8: "8 BEATS", auto16: "16 BEATS", auto32: "32 BEATS" } as Record<string, string>)[LOOP_ACTIONS[Number(bs)]] ?? ""}`;
   if (t === "zoom") return `${side}WAVEFORM ZOOM ${bs === "-1" ? "OUT" : "IN"}`;
   if (t === "nudge") return `${side}NUDGE ${bs === "-1" ? "BACK" : "FORWARD"} (BUTTON)`;
   return `${side}${names[t] ?? t.toUpperCase()}`;

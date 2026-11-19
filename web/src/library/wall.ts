@@ -6,6 +6,7 @@
 import type { TrackInfo } from "../core/beatgrid.ts";
 import { buildList } from "./browse.ts";
 import { groupCrates, itemOfGame, itemOfTrack, pickRandom } from "./crates.ts";
+import { createLoadPop } from "./loadpop.ts";
 import type { Crate, Grouping, WallItem } from "./crates.ts";
 import type { Library } from "./library.ts";
 import { Sleeves, paintGenerated, paintSleeve } from "./sleeves.ts";
@@ -19,6 +20,8 @@ export interface WallHooks {
   openFolder(): void;
   /** The game's records you can play now. */
   game(): TrackInfo[];
+  /** True while a deck plays and cannot take a record (the popup says so). */
+  busy?(deck: number): boolean;
 }
 
 export interface Wall {
@@ -61,7 +64,6 @@ export function buildWall(root: HTMLElement, lib: Library, sleeves: Sleeves, hoo
   let crates: Crate[] = [];
   let picks: WallItem[] = [];
   let shown = MAX_PICKS;
-  let openPop: HTMLElement | null = null;
   /** Covers waiting to be read for what is on the wall now: dropped when the wall is drawn again. */
   let pending: (() => void)[] = [];
   const lastIndex = new Map<string, number>();
@@ -85,7 +87,9 @@ export function buildWall(root: HTMLElement, lib: Library, sleeves: Sleeves, hoo
   const viewWall = pill("WALL", "mini", () => setView("wall"), "Covers on a shelf and in crates");
   const viewList = pill("LIST", "mini", () => setView("list"), "One line for each record, with the search and sorting");
   topRight.append(search, viewWall, viewList);
-  const list = buildList(listHost, { load: (d, item) => hooks.load(d, item), onDeck: (item) => hooks.onDeck(item) });
+  // A click on a record asks "on which deck?" with one popup, wherever the record is (shelf, open crate, list).
+  const pop = createLoadPop({ load: (d, item) => { hooks.load(d, item); if (current) renderInfo(); }, busy: hooks.busy });
+  const list = buildList(listHost, { load: (d, item) => hooks.load(d, item), onDeck: (item) => hooks.onDeck(item), ask: (item, anchor) => pop.show(item, anchor) });
   function setView(v: "wall" | "list"): void {
     view = v;
     try { localStorage.setItem(VIEW_KEY, v); } catch { /* private window */ }
@@ -147,7 +151,6 @@ export function buildWall(root: HTMLElement, lib: Library, sleeves: Sleeves, hoo
   function draw(): void {
     for (const cancel of pending) cancel();
     pending = [];
-    openPop = null;
     drawTop();
     drawShelf();
     drawFloor();
@@ -180,7 +183,6 @@ export function buildWall(root: HTMLElement, lib: Library, sleeves: Sleeves, hoo
 
   function drawShelf(): void {
     shelf.replaceChildren();
-    openPop = null;
     const row = make("div", "w-row");
     for (const item of picks.slice(0, shown)) row.append(pickTile(item));
     shelf.append(row, make("div", "w-board"));
@@ -191,12 +193,10 @@ export function buildWall(root: HTMLElement, lib: Library, sleeves: Sleeves, hoo
     const tile = make("div", "w-pick");
     tile.tabIndex = 0;
     tile.title = `${item.artist ? item.artist + " · " : ""}${item.title}`;
-    const pop = make("div", "w-pop");
-    pop.append(make("b", "", item.title), deckButtons(item));
-    tile.append(cover(item, 192), pop);
-    const toggle = () => { openPop?.classList.remove("open"); openPop = openPop === tile ? null : tile; openPop?.classList.add("open"); };
-    tile.addEventListener("click", (e) => { if (!(e.target as HTMLElement).closest("button")) toggle(); });
-    tile.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
+    tile.append(cover(item, 192));
+    const ask = () => { const r = tile.getBoundingClientRect(); pop.show(item, { x: r.x, y: r.y, w: r.width, h: r.height }); };
+    tile.addEventListener("click", ask);
+    tile.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ask(); } });
     return tile;
   }
 
@@ -313,7 +313,12 @@ export function buildWall(root: HTMLElement, lib: Library, sleeves: Sleeves, hoo
         const before = pending.length;
         el.append(cover(c.crate.items[i], 320), make("span", "d-shade"));
         const mine = pending.splice(before); // these belong to the record, not to the wall
-        el.addEventListener("click", () => { if (current && i !== current.index) go(i); });
+        el.addEventListener("click", () => {
+          if (!current) return;
+          if (i !== current.index) { go(i); return; }
+          const r = el.getBoundingClientRect(); // the front record: which deck?
+          pop.show(current.crate.items[i], { x: r.x, y: r.y, w: r.width, h: r.height });
+        });
         nd = { el, cancel: () => { for (const f of mine) f(); } };
         c.nodes.set(i, nd);
         stage.append(el);

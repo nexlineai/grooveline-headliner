@@ -352,7 +352,8 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
 - **LIVE hot cues, loops and the zoomable waveform (web only, 19 Nov; step L2).** Under each deck: eight PADS, and in the column beside the
   platter CUES | LOOPS (what the pads are), IN | OUT, 1/2 | x2, LOOP (on/off) and auto loops of 1, 2, 4, 8 beats. A CUES pad: empty = set at the
   needle, set = jump there; a LOOPS pad: empty = keep the loop that is set, set = make it the loop and start it. Shift, alt or right-click on a pad
-  clears it. While the record turns, a new mark goes on the nearest beat and a jump keeps the beat PHASE (`Deck.landing`); standing still, a mark is
+  clears it. Layout (19 Nov, after Zé's feedback): the CUES | LOOPS tabs are two slim tabs right above the pads; the loop controls are three short rows
+  on a four-column grid beside the platter (IN, OUT, LOOP; 1/2, x2; auto loops of 4, 8, 16 and 32 beats: nobody cues 1- or 2-beat loops), never wide. While the record turns, a new mark goes on the nearest beat and a jump keeps the beat PHASE (`Deck.landing`); standing still, a mark is
   exactly where the needle is. Marks live on the `Deck` (`hotCues`, `loopSlots`, `loopStart/loopEnd`, `marks()/setMarks()/onMarks`) and are kept per
   library track (`LibraryTrack.cues/loops`, saved through `library.update`); a record of the game keeps none. The audio thread loops in
   `core/vinyl.ts` (`D.loopStart/loopEnd` in file frames, 0 = off; the seam is a short crossfade, no click) and, in LIVE only, a needle drop while
@@ -363,6 +364,17 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
   under it is still the `wave` hit (a touch drops the needle) and shows the cues, the loop and the window the big one shows. `audio/peaks.ts`
   builds the loudness pyramid (4x per level) once at load. New Kinds `pad`, `loop` (`LOOP_ACTIONS`), `zoom`, `zwave` (MIDI-learnable; labels in
   `main.ts labelOf`). Tests: `test/marks.test.ts`, `test/loop.test.ts`, `test/live-geometry.test.ts`, page test in the vault (`marks-e2e`).
+- **LIVE master knob = the ROOM only (web only, 19 Nov).** The core's `mixer.master` (a Swift twin; the game's lessons and nights duck the music with it,
+  and it scales the headphones too) is untouched. LIVE's knob is `engine.roomVolume` -> `M.roomMaster` -> `MasterSection.runRoom` in `audio/fx.ts`:
+  after the effect, on the room bus only (both channels with no phones, the left channel alone in split, the stereo pair with a sound card on the
+  phones), so the headphone cue never comes down. Taper `roomGainFor`: unity at 75 % (`ROOM_UNITY`, the knob's default and its double-tap), a straight
+  line down to silence, +6 dB (soft-clipped) at the top; exactly unity = untouched, bit for bit. The game's booth forces 75 % (`Booth.setMode` keeps
+  LIVE's value for the way back).
+- **The "which deck?" popup (19 Nov).** `library/loadpop.ts`: a click on a record (a shelf pick, the front record of an open crate, a list row; the A and
+  B buttons of a row still load at once) opens ONE popup beside it: the title, LEFT (cyan) and RIGHT (amber), 104 x 48 px buttons; a deck that plays is
+  marked PLAYING and choosing it gives the stop-the-deck message. Esc or a click elsewhere closes it. `WallHooks.busy` comes from main.ts.
+- **LIVE knob colours:** the lit ring of a knob is per TYPE, the same on both channels (GAIN red, HI yellow, MID orange, LOW brown, FILTER blue; the FILTER
+  also sits in a thin blue outline with no fill). Faders, pads and the deck title keep the deck colours (A cyan, B amber).
 - **Layout unit (18 Nov, the game's booth):** `u = min(height share / 210, width / 816)` (816u = the iPhone's gear width), the gear sits at the
   bottom and the room takes the rest; `build()` publishes `--gear-h` (the gear's height in px) and the overlays (lesson, night,
   studio grid) size themselves from it, so fullscreen 16:9 no longer overlaps. FULLSCREEN button in the top bar (hidden where

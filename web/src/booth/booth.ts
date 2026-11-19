@@ -22,7 +22,7 @@ import type { NightRunner } from "../game/night.ts";
 import type { NightInfo } from "../game/content.ts";
 import type { LessonRunner } from "../game/lesson.ts";
 import { PHRASE } from "../game/lesson.ts";
-import { FX, FX_DIVISIONS, FX_TYPES, PHONES_UNITY, beatDelaySeconds, trimDecibels } from "../audio/fx.ts";
+import { FX, FX_DIVISIONS, FX_TYPES, PHONES_UNITY, ROOM_UNITY, beatDelaySeconds, trimDecibels } from "../audio/fx.ts";
 
 export type Kind =
   | { t: "jog"; d: number }
@@ -64,7 +64,7 @@ const PITCH_RANGE = 0.08;
 /** The cue mix and headphones level knobs sit this far (in units) either side of the mixer's middle. */
 const KNOB_GAP = 11;
 /** What the loop buttons do (`Kind.band` of a "loop"). */
-export const LOOP_ACTIONS = ["cues", "loops", "in", "out", "half", "double", "toggle", "auto1", "auto2", "auto4", "auto8"] as const;
+export const LOOP_ACTIONS = ["cues", "loops", "in", "out", "half", "double", "toggle", "auto4", "auto8", "auto16", "auto32"] as const;
 /** How many seconds the big waveform shows at each zoom level (0 = the whole record). */
 export const ZOOM_SECONDS = [0, 60, 30, 15, 8, 4, 2];
 const MOODS = ["waiting", "nodding", "dancing", "nuts"];
@@ -193,6 +193,8 @@ export class Booth {
   mode: "game" | "live" = "game";
   private live: LiveGeometry | null = null;
   private readonly liveRenderer = new LiveRenderer();
+  /** LIVE's master knob while the game's booth is showing. */
+  private liveMaster = ROOM_UNITY;
   /** What the pads under each deck are: the hot cues, or the saved loops. */
   private padMode: ("cues" | "loops")[] = ["cues", "cues"];
   /** The zoom of each deck's big waveform (an index into ZOOM_SECONDS), kept between visits. */
@@ -496,7 +498,7 @@ export class Booth {
       first({ t: "zoom", d, band: -1 }, G.zoomOut);
       first({ t: "zoom", d, band: 1 }, G.zoomIn);
       const LU = G.loopUi;
-      [...LU.mode, ...LU.io, ...LU.scale, LU.toggle, ...LU.auto].forEach((r, i) => first({ t: "loop", d, band: i }, r)); // the eleven controls come in the order of LOOP_ACTIONS
+      [...G.modeTabs, ...LU.io, ...LU.scale, LU.toggle, ...LU.auto].forEach((r, i) => first({ t: "loop", d, band: i }, r)); // the eleven controls come in the order of LOOP_ACTIONS
       G.pads.forEach((r, i) => first({ t: "pad", d, band: i }, r));
       buttonY.push(B.cue.y); buttonX.push([B.cue.x, B.play.x, B.sync.x]);
       ([{ t: "cue", d }, { t: "play", d }, { t: "sync", d }] as Kind[]).forEach((k, i) => first(k, centred([B.cue, B.play, B.sync][i].x, B.cue.y, B.w + 6, B.h + 8)));
@@ -554,6 +556,9 @@ export class Booth {
     // LIVE has no room: a crowd clip a night left playing would go on decoding behind `display: none`. The game's own `showRoom` plays it again.
     if (mode === "live") for (const v of this.roomVideos) if (v && !v.paused) v.pause();
     for (const d of this.decks) d.smoothSeek = mode === "live"; // a needle drop while the record turns fades across (no click); the game's booth keeps the hard jump
+    // LIVE's master knob (the room only) comes back where it was left; the game's booth runs at the mixer's own level.
+    if (mode === "live") this.engine.roomVolume = this.liveMaster;
+    else { this.liveMaster = this.engine.roomVolume; this.engine.roomVolume = ROOM_UNITY; }
     this.padMode = ["cues", "cues"];
     this.L = null;
   }
@@ -567,7 +572,7 @@ export class Booth {
     return {
       decks: this.decks, pitchFader: this.pitchFader, channel: this.channel, cross: this.cross, eq: this.eq, filter: this.filterSetting, trim: this.trimSetting,
       phones: this.phones, sync: this.sync, cueDown: this.cueDown, previewing: this.previewing, meter: this.meterLevel, dropAt: this.dropAt,
-      cueMix: this.engine.cueMix, phonesLevel: this.engine.phonesLevel, master: this.engine.masterVolume, fx: this.fx,
+      cueMix: this.engine.cueMix, phonesLevel: this.engine.phonesLevel, master: this.engine.roomVolume, fx: this.fx,
       armAngle: (d) => this.armAngle(d), pivot: L.pivot, armLength: L.armLength, labelArt: this.labelArt, alerts: this.alerts,
       trimDb: (d) => trimDecibels(this.trimSetting[d]), now: performance.now(), dpr: this.dpr,
       phase: both ? phaseOffset(this.decks[0].beat, this.decks[1].beat) : null, syncAllowed: this.syncAllowed,
@@ -710,7 +715,7 @@ export class Booth {
       case "eq": return this.eq[k.d][k.band];
       case "filter": return this.filterSetting[k.d];
       case "trim": return this.trimSetting[k.d];
-      case "master": return this.engine.masterVolume;
+      case "master": return this.engine.roomVolume;
       case "cueMix": return this.engine.cueMix;
       case "phonesLevel": return this.engine.phonesLevel;
       case "fxAmount": return this.fx.amount;
@@ -814,7 +819,7 @@ export class Booth {
         if (doubleTap) { this.setTrim(kind.d, 0.5); grab.startValue = 0.5; }
         break;
       case "master":
-        if (doubleTap) { this.engine.masterVolume = 1; grab.startValue = 1; }
+        if (doubleTap) { this.engine.roomVolume = ROOM_UNITY; grab.startValue = ROOM_UNITY; }
         break;
       case "phonesLevel":
         // The headphones level's default is unity: as loud as before the knob.
@@ -894,7 +899,7 @@ export class Booth {
         this.engine.phonesLevel = clamp01(grab.startValue + (L.live ? (p.x - grab.start.x) / L.sliderTravel : (p.y - grab.start.y) / L.knobTravel));
         break;
       case "master":
-        this.engine.masterVolume = clamp01(grab.startValue + (p.y - grab.start.y) / L.knobTravel);
+        this.engine.roomVolume = clamp01(grab.startValue + (p.y - grab.start.y) / L.knobTravel);
         break;
       case "fxAmount":
         this.setFxAmount(grab.startValue + (p.y - grab.start.y) / (L.live ? L.fxTravel : L.knobTravel));
@@ -997,7 +1002,7 @@ export class Booth {
         if (now - this.lastWheelZoom > 90) { this.lastWheelZoom = now; this.zoomBy(kind.d, e.deltaY < 0 ? 1 : -1); }
         break;
       }
-      case "master": this.engine.masterVolume = clamp01(this.engine.masterVolume + step); break;
+      case "master": this.engine.roomVolume = clamp01(this.engine.roomVolume + step); break;
       case "cueMix": this.engine.cueMix = clamp01(this.engine.cueMix + step); break;
       case "phonesLevel": this.engine.phonesLevel = clamp01(this.engine.phonesLevel + step); break;
       case "fxAmount": this.setFxAmount(this.fx.amount + step); break;
@@ -1087,7 +1092,7 @@ export class Booth {
       case "eq": this.setEQ(k.d, k.band, x); break;
       case "filter": this.setFilter(k.d, x); break;
       case "trim": this.setTrim(k.d, x); break;
-      case "master": this.engine.masterVolume = x; break;
+      case "master": this.engine.roomVolume = x; break;
       case "cueMix": this.engine.cueMix = x; break;
       case "phonesLevel": this.engine.phonesLevel = x; break;
       case "fxAmount": this.setFxAmount(x); break;

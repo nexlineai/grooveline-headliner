@@ -42,12 +42,14 @@ describe("LIVE layout", () => {
         }
       });
 
-      test("the loop controls: five rows in the column beside the platter, inside it, apart, big enough to touch", () => {
+      test("the loop controls: three short rows beside the platter, inside the deck, apart, big enough to touch; the mode tabs sit right above the pads", () => {
         for (const d of g.deck) {
-          const L = d.loopUi, all = [...L.mode, ...L.io, ...L.scale, L.toggle, ...L.auto];
-          for (const r of all) { assert.ok(inside(d.rect, r)); assert.ok(r.w >= 14 * g.u && r.h >= 16 * g.u); assert.ok(r.x >= d.platter.c.x + d.platter.outer + 4 * g.u, "right of the platter"); assert.ok(r.x + r.w < d.pitch.x - 12 * g.u, "left of the pitch fader"); }
+          const L = d.loopUi, all = [...L.io, L.toggle, ...L.scale, ...L.auto];
+          for (const r of all) { assert.ok(inside(d.rect, r)); assert.ok(r.w >= 14 * g.u && r.h >= 15 * g.u); assert.ok(r.x >= d.platter.c.x + d.platter.outer + 4 * g.u, "right of the platter"); assert.ok(r.x + r.w < d.pitch.x - 12 * g.u, "left of the pitch fader"); }
           for (let a = 0; a < all.length; a++) for (let b = a + 1; b < all.length; b++) assert.ok(apart(all[a], all[b]), `controls ${a} and ${b}`);
-          assert.ok(d.loopUi.hint.y > d.rect.y);
+          assert.ok(Math.max(...all.map((r) => r.w)) <= 50 * g.u, "no wide buttons");
+          for (const t of d.modeTabs) { assert.ok(inside(d.rect, t) && apart(t, d.pads[0]) && t.h >= 11 * g.u); assert.ok(t.y >= d.pads[0].y + d.pads[0].h && t.y - (d.pads[0].y + d.pads[0].h) < 8 * g.u, "right above the pads"); }
+          assert.ok(apart(d.modeTabs[0], d.modeTabs[1]));
         }
       });
 

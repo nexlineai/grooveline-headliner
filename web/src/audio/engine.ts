@@ -8,7 +8,7 @@ import { eqDecibels } from "../core/mixjudge.ts";
 import { RoomAlignment, rampSeconds } from "./align.ts";
 import { buildPeaks } from "./peaks.ts";
 import type { Peaks } from "./peaks.ts";
-import { PHONES_UNITY, phonesGainFor, trimGainFor } from "./fx.ts";
+import { PHONES_UNITY, ROOM_UNITY, phonesGainFor, trimGainFor } from "./fx.ts";
 import { isAiff, parseAiff } from "../library/aiff.ts";
 import { firstOnset, overview } from "../core/vinyl.ts";
 import { AUDIO_FIELDS, D, DECKS, M, S, SIZE, deckAt, mixerAt, stripAt } from "./layout.ts";
@@ -514,6 +514,7 @@ export class DeckEngine {
   constructor() {
     this.decks = [new Deck(this.shared, 0), new Deck(this.shared, 1)];
     this.shared.set(mixerAt(M.master), 1);
+    this.shared.set(mixerAt(M.roomMaster), ROOM_UNITY);
     this.shared.set(mixerAt(M.echoGain), 0.5);
     let saved = PHONES_UNITY;
     try { const s = localStorage.getItem("headliner.phonesLevel"); if (s !== null && Number.isFinite(Number(s))) saved = Number(s); } catch { /* private window */ }
@@ -598,6 +599,9 @@ export class DeckEngine {
   }
 
   /** Everything the mixer puts out, 0...1. Turned down a little while a coach talks over the music. */
+  /** LIVE's master knob (0...1; ROOM_UNITY = the mixer's own level): the room only, the headphones are left alone (audio/fx.ts). */
+  get roomVolume(): number { return this.shared.get(mixerAt(M.roomMaster)); }
+  set roomVolume(v: number) { this.shared.set(mixerAt(M.roomMaster), Math.max(0, Math.min(1, v))); }
   get masterVolume(): number { return this.shared.get(mixerAt(M.master)); }
   set masterVolume(v: number) { this.shared.set(mixerAt(M.master), Math.max(0, Math.min(1, v))); }
 

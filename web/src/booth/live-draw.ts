@@ -18,8 +18,10 @@ export const LIVE = {
   ink: "rgba(236,240,245,0.96)", dim: "rgba(236,240,245,0.46)", dimmer: "rgba(236,240,245,0.24)", off: "rgba(255,255,255,0.075)",
   /** Deck A, deck B. */
   deck: [[38, 198, 240], [255, 172, 40]] as RGB[],
-  /** The FILTER knobs: a blue square round them tells them from the EQ knobs. */
+  /** The knobs' lit rings, the same on both channels: the GAIN red, the highs yellow, the mids orange, the bass brown, and blue for the FILTER only
+   * (which also sits in a thin blue outline, so it is not taken for an EQ knob). */
   filter: [70, 128, 255] as RGB,
+  eqHigh: [255, 212, 60] as RGB, eqMid: [255, 142, 30] as RGB, eqLow: [168, 106, 58] as RGB,
   /** The eight pads: hot cues and saved loops. No pink. */
   pad: [[38, 198, 240], [74, 226, 142], [255, 172, 40], [255, 112, 60], [90, 140, 255], [172, 112, 255], [200, 232, 70], [236, 240, 245]] as RGB[],
   cue: [255, 150, 40] as RGB, play: [74, 226, 142] as RGB, sync: [150, 205, 255] as RGB, warn: [255, 176, 40] as RGB, red: [255, 78, 64] as RGB,
@@ -478,18 +480,18 @@ export class LiveRenderer {
 
   /** The column beside the platter: what the pads are, IN and OUT, half and double, the loop on or off, an automatic loop. */
   private loopColumn(ctx: Ctx, g: LiveGeometry, v: LiveView, d: number): void {
-    const L = g.deck[d].loopUi, u = g.u, deck = v.decks[d], tint = LIVE.deck[d];
+    const G = g.deck[d], L = G.loopUi, u = g.u, deck = v.decks[d], tint = LIVE.deck[d];
     const mode = v.padMode[d], has = deck.loopEnd > deck.loopStart, loaded = deck.isLoaded;
-    button(ctx, L.mode[0], "CUES", mode === "cues", tint, u, { size: 7 * u });
-    button(ctx, L.mode[1], "LOOPS", mode === "loops", tint, u, { size: 7 * u });
-    button(ctx, L.io[0], "IN", false, LIVE.play, u, { enabled: loaded, size: 7.6 * u });
-    button(ctx, L.io[1], "OUT", false, LIVE.play, u, { enabled: loaded, size: 7.6 * u });
-    button(ctx, L.scale[0], "\u00bd", false, LIVE.sync, u, { enabled: has, size: 9 * u });
-    button(ctx, L.scale[1], "\u00d72", false, LIVE.sync, u, { enabled: has, size: 8.4 * u });
-    button(ctx, L.toggle, "LOOP", deck.loopOn, LIVE.play, u, { enabled: has, size: 8 * u });
+    // What the eight pads are: two slim tabs right above them.
+    button(ctx, G.modeTabs[0], "CUES", mode === "cues", tint, u, { size: 6.2 * u });
+    button(ctx, G.modeTabs[1], "LOOPS", mode === "loops", tint, u, { size: 6.2 * u });
+    button(ctx, L.io[0], "IN", false, LIVE.play, u, { enabled: loaded, size: 6.8 * u });
+    button(ctx, L.io[1], "OUT", false, LIVE.play, u, { enabled: loaded, size: 6.8 * u });
+    button(ctx, L.toggle, "LOOP", deck.loopOn, LIVE.play, u, { enabled: has, size: 6.8 * u });
+    button(ctx, L.scale[0], "\u00bd", false, LIVE.sync, u, { enabled: has, size: 8 * u });
+    button(ctx, L.scale[1], "\u00d72", false, LIVE.sync, u, { enabled: has, size: 7.4 * u });
     const beats = has && deck.grid.beatLength > 0 ? (deck.loopEnd - deck.loopStart) / deck.grid.beatLength : 0;
-    [1, 2, 4, 8].forEach((n, i) => button(ctx, L.auto[i], String(n), deck.loopOn && Math.abs(beats - n) < 0.04 * n, LIVE.play, u, { enabled: loaded, size: 7.6 * u }));
-    small(ctx, "SHIFT-CLICK A PAD: CLEAR", L.hint.x, L.hint.y, 4.8 * u, { color: LIVE.dimmer });
+    [4, 8, 16, 32].forEach((n, i) => button(ctx, L.auto[i], String(n), deck.loopOn && Math.abs(beats - n) < 0.04 * n, LIVE.play, u, { enabled: loaded, size: 6.6 * u }));
   }
 
   /** Eight pads under the transport: the hot cues (a set one shows its time), or the saved loops (a set one shows its length in beats). */
@@ -501,10 +503,11 @@ export class LiveRenderer {
       const set = loops ? slot !== null : cue !== null;
       const current = loops && slot !== null && deck.loopOn && Math.abs(slot.start - deck.loopStart) < 1e-6 && Math.abs(slot.end - deck.loopEnd) < 1e-6;
       roundRect(ctx, r, 3 * u, set ? rgba(colour, 0.2) : "rgba(255,255,255,0.025)", set ? rgba(current ? LIVE.play : colour, 0.95) : "rgba(255,255,255,0.09)", current ? 1.8 : 1);
-      small(ctx, String(i + 1), r.x + 7 * u, r.y + r.h / 2, 7.6 * u, { color: set ? rgba(colour) : LIVE.dimmer, mono: true, align: "left" });
+      // The number on top, what the pad holds under it (the time of a cue, the length of a saved loop).
+      small(ctx, String(i + 1), r.x + 6 * u, r.y + r.h * (set ? 0.7 : 0.5), 7.2 * u, { color: set ? rgba(colour) : LIVE.dimmer, mono: true, align: "left" });
       if (set) {
         const text = loops ? (() => { const b = (slot!.end - slot!.start) / Math.max(0.001, deck.grid.beatLength); return `${b >= 1 ? Math.round(b * 4) / 4 : Math.round(b * 8) / 8}B`; })() : clock(cue!);
-        small(ctx, text, r.x + r.w - 5 * u, r.y + r.h / 2, 6.6 * u, { color: LIVE.ink, mono: true, align: "right" });
+        small(ctx, text, r.x + r.w - 5 * u, r.y + r.h * 0.3, 6.6 * u, { color: LIVE.ink, mono: true, align: "right" });
       }
     });
   }
@@ -527,17 +530,18 @@ export class LiveRenderer {
     const names = ["GAIN", "HI", "MID", "LOW", "FILTER"];
     M.strip.forEach((s, d) => {
       const tint = LIVE.deck[d];
+      const rings = [LIVE.red, LIVE.eqHigh, LIVE.eqMid, LIVE.eqLow, LIVE.filter];
       const values = [(v.trim[d]), v.eq[d][2], v.eq[d][1], v.eq[d][0], v.filter[d]];
       const bipolar = [true, true, true, true, true];
       s.knobY.forEach((y, i) => {
-        // The gain's pointer is red; the FILTER knob sits in a blue square, so neither is taken for an EQ knob.
-        if (i === 4) roundRect(ctx, centred(s.x, y, 2 * (s.knobR + 6.5 * u), 2 * (s.knobR + 6.5 * u)), 4 * u, rgba(LIVE.filter, 0.07), rgba(LIVE.filter, 0.95), 1.4);
-        knob(ctx, s.x, y, s.knobR, values[i], i === 4 ? LIVE.filter : tint, bipolar[i], true, i === 0 ? LIVE.red : null);
+        // The gain's pointer is red; the FILTER knob sits in a thin blue outline (no fill), so neither is taken for an EQ knob.
+        if (i === 4) roundRect(ctx, centred(s.x, y, 2 * (s.knobR + 6.5 * u), 2 * (s.knobR + 6.5 * u)), 4 * u, null, rgba(LIVE.filter, 0.4), 1);
+        knob(ctx, s.x, y, s.knobR, values[i], rings[i], bipolar[i], true, i === 0 ? LIVE.red : null);
         small(ctx, names[i], s.x + (d === 0 ? 1 : -1) * 15 * u, y, 5.4 * u, { align: d === 0 ? "left" : "right" });
       });
       // The gain, in dB, once it is not at zero.
       const db = Math.round(v.trimDb(d));
-      if (db !== 0) small(ctx, `${db > 0 ? "+" : "−"}${Math.abs(db)} dB`, s.x + (d === 0 ? 1 : -1) * 15 * u, s.knobY[0] - 8 * u, 5 * u, { align: d === 0 ? "left" : "right", color: rgba(tint) });
+      if (db !== 0) small(ctx, `${db > 0 ? "+" : "−"}${Math.abs(db)} dB`, s.x + (d === 0 ? 1 : -1) * 15 * u, s.knobY[0] - 8 * u, 5 * u, { align: d === 0 ? "left" : "right", color: rgba(LIVE.red) });
       button(ctx, centred(s.cue.x, s.cue.y, s.cueW, s.cueH), "CUE", v.phones[d], LIVE.cue, u, { size: 7.4 * u });
       fader(ctx, s.fader.x, s.fader.y, s.fader.travel, v.channel[d], true, 24 * u, 13 * u, tint, u);
     });

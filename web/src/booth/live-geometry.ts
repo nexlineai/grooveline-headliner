@@ -31,9 +31,11 @@ export interface LiveDeckGeometry {
   platter: { c: Point; outer: number };
   /** The column between the platter and the pitch fader: tempo, key, pitch; and a reserved panel for loops (L2). */
   info: Rect; pitchText: Point; loop: Rect;
-  /** The loop controls, in the column beside the platter: what the pads do (cues or saved loops), IN and OUT, half and double, the loop on or
-   * off, an automatic loop of 1, 2, 4 or 8 beats, and a line of help. */
-  loopUi: { mode: Rect[]; io: Rect[]; scale: Rect[]; toggle: Rect; auto: Rect[]; hint: Point };
+  /** What the eight pads are (CUES | LOOPS): two small tabs right above them. */
+  modeTabs: Rect[];
+  /** The loop controls, in the column beside the platter, on a grid of four columns: IN, OUT and LOOP (on/off, two columns wide) on the first
+   * row, half and double on the second, an automatic loop of 4, 8, 16 or 32 beats on the third. */
+  loopUi: { io: Rect[]; toggle: Rect; scale: Rect[]; auto: Rect[] };
   pitch: { x: number; y: number; travel: number };
   buttons: { cue: Point; play: Point; sync: Point; w: number; h: number };
   /** Eight pads under the transport (hot cues and loops: L2). */
@@ -115,8 +117,8 @@ export function liveGeometry(W: number, H: number): LiveGeometry {
 function deckGeometry(rect: Rect, u: number): LiveDeckGeometry {
   const top = rect.y + rect.h, w = rect.w / u;
   const P = (dx: number, dy: number): Point => ({ x: rect.x + dx * u, y: top - dy * u });
-  const outer = 68;
-  const c = P(8 + outer, 96 + outer);
+  const outer = 64;
+  const c = P(8 + outer, 92 + outer);
   const infoX = 8 + 2 * outer + 22, pitchX = w - 22;
   const infoW = pitchX - 22 - infoX;
   const padW = (w - 16 - 7 * 3) / 8;
@@ -131,28 +133,29 @@ function deckGeometry(rect: Rect, u: number): LiveDeckGeometry {
     platter: { c, outer: outer * u },
     info: { x: rect.x + infoX * u, y: top - 236 * u, w: infoW * u, h: 140 * u },
     // The tempo and the key are in the mixer; the pitch reads out under its fader.
-    pitchText: P(pitchX, 258),
+    pitchText: P(pitchX, 255),
+    modeTabs: [0, 1].map((i) => ({ x: rect.x + (8 + i * 47) * u, y: top - (249 + 12) * u, w: 44 * u, h: 12 * u })),
     loop: { x: rect.x + infoX * u, y: top - 232 * u, w: infoW * u, h: 52 * u },
     loopUi: loopControls(rect, u, infoX, infoW),
     pitch: { x: rect.x + pitchX * u, y: top - 164 * u, travel: 128 * u },
-    buttons: { cue: P(8 + 28, 247), play: P(8 + 28 + 60, 247), sync: P(8 + 28 + 120, 247), w: 56 * u, h: 22 * u },
+    buttons: { cue: P(8 + 28, 236), play: P(8 + 28 + 60, 236), sync: P(8 + 28 + 120, 236), w: 56 * u, h: 22 * u },
     pads: Array.from({ length: 8 }, (_, i) => ({ x: rect.x + (8 + i * (padW + 3)) * u, y: top - 288 * u, w: padW * u, h: 24 * u })),
   };
 }
 
-/** Five rows in the column between the platter and the pitch fader: 18 units high, 6 apart. */
+/** Three short rows on a grid of four columns in the column between the platter and the pitch fader (16 units high, 6 apart). */
 function loopControls(rect: Rect, u: number, infoX: number, infoW: number): LiveDeckGeometry["loopUi"] {
   const top = rect.y + rect.h;
-  const row = (i: number): number => 100 + i * 24;
-  const R = (dx: number, dy: number, w: number): Rect => ({ x: rect.x + (infoX + dx) * u, y: top - (dy + 18) * u, w: w * u, h: 18 * u });
-  const half = (infoW - 3) / 2, quarter = (infoW - 9) / 4;
+  // The buttons stay small however wide the deck is: the grid is centred in the column.
+  const col = Math.min(21.5, (infoW - 3 * 3) / 4), x0 = infoX + (infoW - (4 * col + 9)) / 2;
+  const R = (row: number, from: number, span: number): Rect => ({
+    x: rect.x + (x0 + from * (col + 3)) * u, y: top - (118 + row * 22 + 16) * u, w: (span * col + (span - 1) * 3) * u, h: 16 * u,
+  });
   return {
-    mode: [R(0, row(0), half), R(half + 3, row(0), half)],
-    io: [R(0, row(1), half), R(half + 3, row(1), half)],
-    scale: [R(0, row(2), half), R(half + 3, row(2), half)],
-    toggle: R(0, row(3), infoW),
-    auto: [0, 1, 2, 3].map((i) => R(i * (quarter + 3), row(4), quarter)),
-    hint: { x: rect.x + (infoX + infoW / 2) * u, y: top - (row(4) + 18 + 9) * u },
+    io: [R(0, 0, 1), R(0, 1, 1)],
+    toggle: R(0, 2, 2),
+    scale: [R(1, 0, 2), R(1, 2, 2)],
+    auto: [0, 1, 2, 3].map((i) => R(2, i, 1)),
   };
 }
 
