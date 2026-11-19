@@ -375,8 +375,9 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
   marked PLAYING and choosing it gives the stop-the-deck message. Esc or a click elsewhere closes it. `WallHooks.busy` comes from main.ts.
 - **LIVE knob colours:** the lit ring of a knob is per TYPE, the same on both channels (GAIN red, HI yellow, MID orange, LOW brown, FILTER blue; the FILTER
   also sits in a thin blue outline with no fill). Faders, pads and the deck title keep the deck colours (A cyan, B amber).
-- **Title, FREE PLAY and LIVE (19 Nov, evening).** The title has PLAY, FREE PLAY (`showMode("free")`: the game's booth with its room, the CRATE sheet and MY MUSIC,
-  plain iPhone parity) and LIVE (`openLive()`: `Booth.mode = "live"`). THE ENDING is off the title. `?live` opens the page on ONE button, LIVE (`#start.live-link`;
+- **Title, FREE PLAY and LIVE (19 Nov, evening).** The title has PLAY, FREE PLAY (`showMode("free")`: the game's booth EXACTLY as the deployed site had it before LIVE: the effect bar under the gear
+  (the first three effects), a GAIN knob above each fader, the wall of records in front of the room with ROOM / RECORDS to swap it for the crowd, the CRATE sheet with MY MUSIC;
+  a lesson or a night is plain iPhone parity: no bar, no knobs, no wall) and LIVE (`openLive()`: `Booth.mode = "live"`). THE ENDING is off the title. `?live` opens the page on ONE button, LIVE (`#start.live-link`;
   until you leave it); the Worker redirects `/headliner/live` to `/headliner/?live` (needs `npm run deploy`). `?autostart` = free play; `?autostart&live` = LIVE with empty
   decks; add `&records` for the game's first two records on the decks (tests); `&playcount=<s>` shortens "a play" (30 s) for tests. LIVE's library has NO game records
   (`WallHooks.game` returns nothing); its decks start empty.

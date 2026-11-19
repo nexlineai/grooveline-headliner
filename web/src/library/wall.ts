@@ -22,6 +22,8 @@ export interface WallHooks {
   game(): TrackInfo[];
   /** True while a deck plays and cannot take a record (the popup says so). */
   busy?(deck: number): boolean;
+  /** The ROOM button (free play): the crowd instead of the wall. */
+  toRoom?(): void;
   /** The heart: a favourite or not (kept with the track). */
   toggleFav?(item: WallItem): void;
 }
@@ -187,6 +189,7 @@ export function buildWall(root: HTMLElement, lib: Library, sleeves: Sleeves, hoo
       group.append(b);
     }
     topLeft.append(group, pill("SHUFFLE", "mini w-shuffle", () => { shuffled = true; picks = pickRandom(items.length ? items : gameItems, MAX_PICKS); drawShelf(); }, "Another handful of records for the wall"));
+    if (hooks.toRoom) topLeft.append(pill("ROOM", "mini w-room", () => hooks.toRoom!(), "Show the crowd instead of the wall"));
     // What the library is doing: reading, or waiting for a click.
     const s = lib.scan;
     if (s) topLeft.append(make("span", "w-status", s.phase === "listing" ? `Looking through ${s.name}… ${n(s.found)}` : `Reading ${s.name}: ${n(s.done)} of ${n(s.total)}`));

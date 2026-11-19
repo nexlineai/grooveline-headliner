@@ -67,7 +67,7 @@ html, body {
 
 #top { position: fixed; top: 2vh; right: 2vw; z-index: 3; display: flex; gap: 0.5em; }
 /* The bar's buttons are small (about two thirds of the sheets' buttons): the booth is the thing to look at. */
-#top .pill { font-size: clamp(9px, 0.95vw, 11.5px); letter-spacing: 0.13em; padding: 0.55em 1.1em; }
+#top .pill, #wall-open { font-size: clamp(9px, 0.95vw, 11.5px); letter-spacing: 0.13em; padding: 0.55em 1.1em; }
 #note { position: fixed; top: 2.5vh; left: 2vw; z-index: 3; color: var(--orange); font-size: 14px; }
 
 .sheet {
@@ -638,3 +638,5 @@ body.live #top .pill.on { background: rgba(38, 198, 240, 0.2); color: #fff; bord
 .share-pop .sp-nets { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .share-pop .sp-nets a { padding: 7px 10px; border-radius: 7px; border: 1px solid rgba(255, 255, 255, 0.22); background: #0a0d11; color: var(--ink); text-decoration: none; font: 800 9.5px "Orbitron", sans-serif; letter-spacing: 0.12em; }
 .share-pop .sp-nets a:hover { border-color: rgba(255, 255, 255, 0.55); }
+/* ROOM / RECORDS: free play's wall can give way to the crowd; in LIVE the wall is the library, there is no room. */
+body.live #wall .w-room { display: none; }

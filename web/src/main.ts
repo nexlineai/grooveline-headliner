@@ -77,8 +77,9 @@ const trackFor = (id: string): TrackInfo | null => (id === "your-dubplate" ? cut
 /** A record is not changed under a playing needle: in LIVE a message comes up over that deck. True when the deck is busy. */
 function deckBusy(d: number): boolean {
   const deck = engine.decks[d];
-  if (booth.mode !== "live" || !deck.motorOn || Math.abs(deck.rate) <= 0.1) return false;
-  booth.alertDeck(d, `STOP THE ${d === 0 ? "LEFT" : "RIGHT"} DECK BEFORE LOADING A NEW RECORD`);
+  if (booth.lesson || booth.night || !deck.motorOn || Math.abs(deck.rate) <= 0.1) return false;
+  if (booth.mode === "live") booth.alertDeck(d, `STOP THE ${d === 0 ? "LEFT" : "RIGHT"} DECK BEFORE LOADING A NEW RECORD`);
+  else note.textContent = "Stop the deck before you change its record."; // free play: the small note, as before
   return true;
 }
 
@@ -114,6 +115,10 @@ function openMusicFolder(): void {
   input.addEventListener("change", () => { library.init().then(() => library.addFromFiles([...(input.files ?? [])])).catch(failed); });
   input.click();
 }
+// The record room (free play): the front of the booth is a wall with a shelf and crates, or the crowd if you choose; in LIVE the wall is under the gear row.
+const FRONT_KEY = "headliner.front";
+let front: "wall" | "room" = (() => { try { return localStorage.getItem(FRONT_KEY) === "room" ? "room" : "wall"; } catch { return "wall"; } })();
+const setFront = (f: "wall" | "room") => { front = f; try { localStorage.setItem(FRONT_KEY, f); } catch { /* private window */ } };
 const wall = buildWall($("wall"), library, bigSleeves, {
   load: (d, item) => {
     if (booth.refuseLoad(d)) return; // back to back: her deck is hers
@@ -122,8 +127,10 @@ const wall = buildWall($("wall"), library, bigSleeves, {
   },
   onDeck: (item) => [0, 1].filter((d) => engine.decks[d].info?.id === item.id),
   openFolder: openMusicFolder,
-  game: () => [], // LIVE's library is your own music: the game's records stay in the game
-  busy: (d) => booth.mode === "live" && engine.decks[d].motorOn && Math.abs(engine.decks[d].rate) > 0.1,
+  // Free play shows the game's records in its crates; LIVE's library is your own music only.
+  game: () => (booth.mode === "live" ? [] : gameRecords),
+  toRoom: () => setFront("room"),
+  busy: (d) => !booth.lesson && !booth.night && engine.decks[d].motorOn && Math.abs(engine.decks[d].rate) > 0.1,
   // The heart: kept with the track; the wall's shelf shows favourites (and what you play most) first.
   toggleFav: (item) => { const t = item.track; if (!t) return; t.fav = !t.fav; library.update(t).catch(() => {}); wall.refresh(); },
 });
@@ -1027,6 +1034,21 @@ midi.active = boothActive;
 const playedFor = [0, 0], counted = [false, false];
 const PLAY_COUNT_SECONDS = Number(params.get("playcount")) || 30; // ?playcount=2 for the tests
 let lastTick = performance.now();
+// The wall is up in free play when the booth is on screen; then nobody sees the crowd, so its clips rest.
+let wallMode = booth.mode;
+(function frontLoop() {
+  if (booth.mode !== wallMode) { wallMode = booth.mode; wall.refresh(); } // the game's records are in free play's crates, not in LIVE's
+  const free = booth.mode === "game" && !booth.lesson && !booth.night && boothActive();
+  wall.setVisible((free && front === "wall") || (booth.mode === "live" && boothActive()));
+  booth.setRoomHidden(free && front === "wall");
+  $("wall-open").hidden = !(free && front === "room");
+  requestAnimationFrame(frontLoop);
+})();
+$("wall-open").addEventListener("click", () => setFront("wall"));
+// The wall's own controls keep clear of the top bar, whatever its width is (its buttons come and go, the font follows the window).
+if (typeof ResizeObserver !== "undefined") {
+  new ResizeObserver(() => document.documentElement.style.setProperty("--top-w", `${$("top").getBoundingClientRect().width}px`)).observe($("top"));
+}
 (function liveLoop() {
   const now = performance.now(), dt = Math.min(1, (now - lastTick) / 1000);
   lastTick = now;
@@ -1037,7 +1059,6 @@ let lastTick = performance.now();
     if (playedFor[d] >= PLAY_COUNT_SECONDS) { counted[d] = true; t.plays = (t.plays ?? 0) + 1; library.update(t).catch(() => {}); wall.refresh(); }
   }
   const live = booth.mode === "live" && boothActive();
-  wall.setVisible(live);
   $("stream").hidden = !live;
   $("livebar").hidden = !live;
   requestAnimationFrame(liveLoop);
