@@ -5,6 +5,7 @@
 import { BeatGrid } from "../core/beatgrid.ts";
 import type { TrackInfo } from "../core/beatgrid.ts";
 import { eqDecibels } from "../core/mixjudge.ts";
+import { RoomAlignment, rampSeconds } from "./align.ts";
 import { PHONES_UNITY, phonesGainFor, trimGainFor } from "./fx.ts";
 import { isAiff, parseAiff } from "../library/aiff.ts";
 import { firstOnset, overview } from "../core/vinyl.ts";
@@ -355,6 +356,11 @@ export class DeckEngine {
   private phonesTarget = 1024;
   private roomDelay: DelayNode | null = null;
   private alignTimer: number | null = null;
+  /** How long the room waits for the headphones: smoothed, set once, then left alone (see align.ts). */
+  private readonly alignment = new RoomAlignment();
+  private alignedOnce = false;
+  private trimTimer: ReturnType<typeof setTimeout> | null = null;
+  private lastPostedTarget = 0;
   /** The headphones' timing set by ear (ms, + = the room waits more), per headphones device. */
   phonesTrimMs = 0;
   /** What the timing is now, for the PHONES panel. */
@@ -488,7 +494,11 @@ export class DeckEngine {
       this.phonesNode = null;
     }
     if (this.alignTimer !== null) { clearInterval(this.alignTimer); this.alignTimer = null; }
+    this.roomDelay?.delayTime.cancelScheduledValues(context.currentTime);
     this.roomDelay?.delayTime.setTargetAtTime(0, context.currentTime, 0.02);
+    this.alignment.reset();
+    this.alignedOnce = false;
+    this.lastPostedTarget = 0;
     this.timing = { roomMs: 0, phonesMs: 0, roomWaitsMs: 0, ring: false };
     const roomOut = this.roomDelay ?? roomPair;
     try { roomOut.disconnect(); } catch { /* not connected */ }
@@ -514,7 +524,8 @@ export class DeckEngine {
         else await this.openPhonesStream(context, splitter);
         this.shared.set(mixerAt(M.twoOutputs), 1);
         this.align();
-        this.alignTimer = window.setInterval(() => this.align(), 2000);
+        // A reading every second feeds the smoothing; the room's wait itself almost never changes.
+        this.alignTimer = window.setInterval(() => this.align(), 1000);
       }
       if (mode === "split") this.shared.set(mixerAt(M.split), 1);
     }
@@ -563,24 +574,33 @@ export class DeckEngine {
     this.phonesElement = element;
   }
 
-  /** The room waits as long as the headphones' way is longer (measured), plus the trim set by
-   * ear; when the headphones are the faster ones, their ring holds a little more instead. */
-  private align(): void {
+  /** The room waits as long as the headphones' way is longer, plus the trim set by ear; when the headphones are the faster
+   * ones, their ring holds a little more instead. The latencies the browser reports jump around, so this takes a reading,
+   * smooths it (align.ts) and only moves the room's delay when the real offset has changed, and then slowly: a delay node
+   * that is re-aimed bends the pitch of the main output. */
+  private align(urgent = false): void {
     const room = this.context, delay = this.roomDelay;
     if (!room || !delay) return;
     const roomS = room.baseLatency + (room.outputLatency || 0);
     const phones = this.phonesContext;
     const ring = phones !== null;
     const phonesS = phones ? phones.baseLatency + (phones.outputLatency || 0) + this.phonesTarget / room.sampleRate : roomS;
-    const diff = phonesS - roomS + this.phonesTrimMs / 1000;
-    const wait = Math.max(0, Math.min(0.9, diff));
-    delay.delayTime.setTargetAtTime(wait, room.currentTime, 0.05);
-    if (ring && diff < 0) {
-      // The headphones are ahead: keep more in their ring (at most half of it).
-      const extra = Math.min(4096, Math.round(-diff * room.sampleRate));
-      this.phonesNode?.port.postMessage({ target: Math.max(this.phonesTarget, 1024 + extra) });
+    const change = this.alignment.read(roomS, phonesS, this.phonesTrimMs / 1000, urgent);
+    if (change !== null) {
+      const now = room.currentTime, param = delay.delayTime, from = param.value;
+      param.cancelScheduledValues(now);
+      param.setValueAtTime(from, now);
+      if (this.alignedOnce) param.linearRampToValueAtTime(change, now + rampSeconds(from, change, urgent));
+      else param.setValueAtTime(change, now); // the first time, before anything is playing: at once
+      this.alignedOnce = true;
     }
-    this.timing = { roomMs: Math.round(roomS * 1000), phonesMs: Math.round(phonesS * 1000), roomWaitsMs: Math.round(wait * 1000), ring };
+    const A = this.alignment;
+    if (ring && A.diff < 0) {
+      // The headphones are ahead: keep more in their ring (at most half of it).
+      const target = Math.max(this.phonesTarget, 1024 + Math.min(4096, Math.round(-A.diff * room.sampleRate)));
+      if (target !== this.lastPostedTarget) { this.lastPostedTarget = target; this.phonesNode?.port.postMessage({ target }); }
+    }
+    this.timing = { roomMs: Math.round(A.roomS * 1000), phonesMs: Math.round(A.phonesS * 1000), roomWaitsMs: Math.round((A.applied ?? 0) * 1000), ring };
   }
 
   /** The trim set by ear for a headphones device (kept in this browser). */
@@ -592,7 +612,9 @@ export class DeckEngine {
   setPhonesTrim(ms: number): void {
     this.phonesTrimMs = Math.max(-150, Math.min(400, Math.round(ms)));
     try { localStorage.setItem(`headliner.phonesTrim.${this.phonesDevice}`, String(this.phonesTrimMs)); } catch { /* private window */ }
-    this.align();
+    // The slider sends many values a second: the room follows once the hand stops.
+    if (this.trimTimer) clearTimeout(this.trimTimer);
+    this.trimTimer = setTimeout(() => { this.trimTimer = null; this.align(true); }, 200);
   }
 
   /** Sends the room to a device ("" = the system's default). */

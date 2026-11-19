@@ -326,6 +326,13 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
   headphones' pair -> MediaStream -> `<audio>.setSinkId`; the room via `AudioContext.setSinkId`).
   Never recreate the AudioContext (the records live in the worklet). A vanished device -> OFF (the
   cue must never fall back to the room). Not testable headless: needs Zé's hardware.
+  **TWO DEVICES alignment (19 Nov, fix):** the room waits for the headphones' longer path through a `DelayNode`. A delay node that is
+  re-aimed bends the pitch of everything through it, and the browser's latency readings jump by tens of ms (measured with Zé's USB
+  card KM_B2: the old `align()` re-aimed it every 2 s and a 1 kHz tone moved by up to 38 cents each time: the "nudging" he heard).
+  `audio/align.ts` `RoomAlignment`: a reading a second, a median of 25, set once after 8 readings, changed again only when the wanted
+  wait moves by more than 25 ms (simulated: one change in ten minutes at +-14 ms jitter), then by a ramp of `|change| * 200` s (half a
+  percent at most); the trim slider (debounced 200 ms) follows in 0.35 s. Measured after: 0.0 cents for 40 s. The headphone ring's
+  own steering (phones-worklet.ts) is on the headphones side and untouched.
 - **LIVE booth (web only, 19 Nov; step L1 of `headliner-live-roadmap.md` in the vault).** Free play is now LIVE: `main.ts showMode("free")`
   sets `Booth.mode = "live"`, a lesson or a night sets `"game"` (the iPhone's desk, untouched, plain parity: no trim, no effects, no
   master, no wall). `booth/live-geometry.ts` = pure layout (tested at 7 window sizes: nothing overlaps, everything inside its module,
