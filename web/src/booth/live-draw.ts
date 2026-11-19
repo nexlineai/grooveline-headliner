@@ -3,7 +3,7 @@
 // and the mouse reach these controls the same way they reach the game's.
 
 import type { Deck } from "../audio/engine.ts";
-import { FX, FX_DIVISIONS, FX_TYPES } from "../audio/fx.ts";
+import { FX_KNOBS, FX_TYPES, stepIndex } from "../audio/fx.ts";
 import { levelFor, peakBetween } from "../audio/peaks.ts";
 import { centred, circle, label, picture, roundRect, rgba, tonearm, wavePicture } from "./gear.ts";
 import type { Point, RGB, Rect } from "./gear.ts";
@@ -21,6 +21,8 @@ export const LIVE = {
   /** The knobs' lit rings, the same on both channels: the GAIN red, the highs yellow, the mids orange, the bass brown, and blue for the FILTER only
    * (which also sits in a thin blue outline, so it is not taken for an EQ knob). */
   filter: [70, 128, 255] as RGB,
+  /** The effect unit's knobs and its fader: white, like the master (the mixer's colours belong to the mixer's knobs). */
+  fxRing: [236, 240, 245] as RGB,
   eqHigh: [255, 212, 60] as RGB, eqMid: [255, 142, 30] as RGB, eqLow: [168, 106, 58] as RGB,
   /** The eight pads: hot cues and saved loops. No pink. */
   pad: [[38, 198, 240], [74, 226, 142], [255, 172, 40], [255, 112, 60], [90, 140, 255], [172, 112, 255], [200, 232, 70], [236, 240, 245]] as RGB[],
@@ -136,7 +138,7 @@ function button(ctx: Ctx, r: Rect, title: string, lit: boolean, tint: RGB, u: nu
     roundRect(ctx, r, 3.2 * u, null, rgba(tint, 0.5));
     ctx.restore();
   }
-  label(ctx, title, r.x + r.w / 2, r.y + r.h / 2 + 0.4, { size: (o.size ?? Math.min(r.h * 0.5, 9.5 * u)), color: lit ? rgba(tint, 1) : enabled ? LIVE.ink : LIVE.dimmer, spacing: 0.6 * u });
+  label(ctx, title, r.x + r.w / 2, r.y + r.h / 2 + 0.4, { size: (o.size ?? Math.min(r.h * 0.5, 9.5 * u)) * BUTTON_TEXT, color: lit ? rgba(tint, 1) : enabled ? LIVE.ink : LIVE.dimmer, spacing: 0.6 * u });
 }
 
 /** A ladder of LEDs, bottom to top: green, amber, red at the very top. */
@@ -148,8 +150,11 @@ function meter(ctx: Ctx, x: number, y: number, w: number, h: number, level: numb
   }
 }
 
+/** The small captions are drawn this much bigger than their design size: on a laptop (a gear row about 1.5 px to the unit) 5.5 units were 8 px. */
+const SMALL_TEXT = 1.16;
+const BUTTON_TEXT = 1.1;
 const small = (ctx: Ctx, text: string, x: number, y: number, size: number, o: { color?: string; align?: CanvasTextAlign; mono?: boolean } = {}): void => {
-  label(ctx, text, x, y, { size, color: o.color ?? LIVE.dim, align: o.align, mono: o.mono, spacing: 0.7 });
+  label(ctx, text, x, y, { size: size * SMALL_TEXT, color: o.color ?? LIVE.dim, align: o.align, mono: o.mono, spacing: 0.7 });
 };
 
 /** The platter: aluminium rim with strobe dots, the record with its grooves, the label (or a cover), a marker line. */
@@ -227,7 +232,7 @@ export interface LiveView {
   pitchFader: number[]; channel: number[]; cross: number; eq: number[][]; filter: number[]; trim: number[]; phones: boolean[]; sync: boolean[];
   cueDown: boolean[]; previewing: boolean[]; meter: number[]; dropAt: (number | null)[];
   cueMix: number; phonesLevel: number; master: number;
-  fx: { type: number; div: number; amount: number; on: boolean };
+  fx: { type: number; div: number; amount: number; on: boolean; params: number[] };
   armAngle(d: number): number;
   pivot: Point[]; armLength: number;
   labelArt: ({ id: string; img: CanvasImageSource } | null)[];
@@ -537,11 +542,11 @@ export class LiveRenderer {
         // The gain's pointer is red; the FILTER knob sits in a thin blue outline (no fill), so neither is taken for an EQ knob.
         if (i === 4) roundRect(ctx, centred(s.x, y, 2 * (s.knobR + 6.5 * u), 2 * (s.knobR + 6.5 * u)), 4 * u, null, rgba(LIVE.filter, 0.4), 1);
         knob(ctx, s.x, y, s.knobR, values[i], rings[i], bipolar[i], true, i === 0 ? LIVE.red : null);
-        small(ctx, names[i], s.x + (d === 0 ? 1 : -1) * 15 * u, y, 5.4 * u, { align: d === 0 ? "left" : "right" });
+        small(ctx, names[i], s.x + (d === 0 ? 1 : -1) * 19 * u, y, 5.6 * u, { align: d === 0 ? "left" : "right" });
       });
       // The gain, in dB, once it is not at zero.
       const db = Math.round(v.trimDb(d));
-      if (db !== 0) small(ctx, `${db > 0 ? "+" : "−"}${Math.abs(db)} dB`, s.x + (d === 0 ? 1 : -1) * 15 * u, s.knobY[0] - 8 * u, 5 * u, { align: d === 0 ? "left" : "right", color: rgba(LIVE.red) });
+      if (db !== 0) small(ctx, `${db > 0 ? "+" : "−"}${Math.abs(db)} dB`, s.x + (d === 0 ? 1 : -1) * 19 * u, s.knobY[0] - 8 * u, 5.2 * u, { align: d === 0 ? "left" : "right", color: rgba(LIVE.red) });
       button(ctx, centred(s.cue.x, s.cue.y, s.cueW, s.cueH), "CUE", v.phones[d], LIVE.cue, u, { size: 7.4 * u });
       fader(ctx, s.fader.x, s.fader.y, s.fader.travel, v.channel[d], true, 24 * u, 13 * u, tint, u);
     });
@@ -568,31 +573,22 @@ export class LiveRenderer {
   private fxModule(ctx: Ctx, g: LiveGeometry, v: LiveView): void {
     const F = g.fx, u = g.u;
     panel(ctx, F.rect, u);
-    small(ctx, "EFFECT", F.title.x, F.title.y, 7 * u, { color: LIVE.dim });
-    // The effect's name between two arrows (a touch on the left half-third goes back, anywhere else forward).
-    button(ctx, F.name, FX_TYPES[v.fx.type], false, LIVE.deck[0], u, { size: 7.8 * u });
+    small(ctx, "EFFECT", F.title.x, F.title.y, 6.6 * u, { color: LIVE.dim });
+    // The effect's name between two arrows (a touch on the left third goes back, anywhere else forward).
+    button(ctx, F.name, FX_TYPES[v.fx.type], false, LIVE.deck[0], u, { size: 7.2 * u });
     small(ctx, "\u2039", F.name.x + 7 * u, F.name.y + F.name.h / 2, 10 * u, { color: LIVE.ink });
     small(ctx, "\u203a", F.name.x + F.name.w - 7 * u, F.name.y + F.name.h / 2, 10 * u, { color: LIVE.ink });
     button(ctx, F.on, "ON", v.fx.on, LIVE.play, u, { size: 8 * u });
-    // The first fader works now: how much of the effect there is.
-    const f = F.faders[0];
-    fader(ctx, f.x, f.y, f.travel, v.fx.amount, true, F.capW, 9 * u, LIVE.deck[0], u, { noScale: true });
-    small(ctx, "LEVEL", f.x, F.labelY, 5.2 * u);
-    // DIV: a vertical stepped selector, the note value from 1/4 at the top to 1/32 at the bottom (a reverb has none).
-    const D = F.div, usable = v.fx.type !== FX.reverb;
-    ctx.save();
-    ctx.globalAlpha = usable ? 1 : 0.3;
-    roundRect(ctx, { x: D.x - 1.6 * u, y: D.steps[3].y - 4 * u, w: 3.2 * u, h: D.steps[0].y - D.steps[3].y + 8 * u }, 1.6 * u, "#020304", "rgba(255,255,255,0.07)");
-    D.steps.forEach((p, i) => {
-      const on = i === v.fx.div;
-      circle(ctx, p.x, p.y, 1.6 * u, on ? "rgba(255,255,255,0.9)" : LIVE.dimmer);
-      label(ctx, FX_DIVISIONS[i].label, D.labelX, p.y, { size: 6.6 * u, color: on ? LIVE.ink : LIVE.dim, align: "left", mono: true });
+    // The four knobs of this effect, the size of the mixer's: each with its name, and a stepped one with the step it is on.
+    FX_KNOBS[v.fx.type].forEach((def, i) => {
+      const k = F.knobs[i], value = v.fx.params[i] ?? 0;
+      knob(ctx, k.c.x, k.c.y, k.r, value, LIVE.fxRing, false);
+      small(ctx, def.name, k.name.x, k.name.y, 5.6 * u);
+      if (def.steps) small(ctx, def.steps[stepIndex(value, def.steps.length)], k.value.x, k.value.y, 6.2 * u, { color: LIVE.ink, mono: true });
     });
-    const at = D.steps[v.fx.div];
-    roundRect(ctx, centred(at.x, at.y, 13 * u, 8 * u), 2 * u, "#232832", "rgba(255,255,255,0.3)");
-    ctx.fillStyle = rgba(LIVE.deck[0], 0.95);
-    ctx.fillRect(at.x - 5 * u, at.y - 0.7, 10 * u, 1.4);
-    ctx.restore();
-    small(ctx, "DIV", D.x + 3 * u, D.labelY, 5.2 * u);
+    // LEVEL: a long fader, how much of the effect there is.
+    const L = F.level;
+    fader(ctx, L.x, L.y, L.travel, v.fx.amount, true, L.capW, 13 * u, LIVE.fxRing, u);
+    small(ctx, "LEVEL", L.x, L.labelY, 5.6 * u);
   }
 }

@@ -16,6 +16,7 @@ class HeadlinerProcessor extends AudioWorkletProcessor {
   private readonly strips: ChannelStrip[] = [];
   private readonly mixer = new MixerShared();
   private readonly master = new MasterSection(sampleRate);
+  private readonly fxKnobs = [0.5, 0.5, 0.5, 0.5];
   private readonly seekSeen: number[] = [];
   private readonly scratch = { left: new Float32Array(128), right: new Float32Array(128) };
   private spareR = new Float32Array(128);
@@ -139,6 +140,8 @@ class HeadlinerProcessor extends AudioWorkletProcessor {
     m.fxType = Math.trunc(v[mixerAt(M.fxType)]);
     m.fxOn = v[mixerAt(M.fxOn)] !== 0;
     m.fxAmount = v[mixerAt(M.fxAmount)];
+    for (let k = 0; k < 4; k++) this.fxKnobs[k] = v[mixerAt(M.fxKnob + k)];
+    m.fxParams = this.fxKnobs;
     m.fxDelaySeconds = v[mixerAt(M.fxDelay)] || 0.5;
     this.master.process(left, right, two ? out[2] : null, two ? out[3] : null, mixer.split, mixer.cueMix, count);
     if (!two) for (let c = 2; c < out.length; c++) out[c].fill(0);

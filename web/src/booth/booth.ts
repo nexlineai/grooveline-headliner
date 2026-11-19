@@ -22,7 +22,7 @@ import type { NightRunner } from "../game/night.ts";
 import type { NightInfo } from "../game/content.ts";
 import type { LessonRunner } from "../game/lesson.ts";
 import { PHRASE } from "../game/lesson.ts";
-import { FX, FX_DIVISIONS, FX_TYPES, PHONES_UNITY, ROOM_UNITY, beatDelaySeconds, trimDecibels } from "../audio/fx.ts";
+import { FX_DEFAULTS, FX_DIVISIONS, FX_KNOBS, FX_TYPES, PHONES_UNITY, ROOM_UNITY, beatDelaySeconds, fxTempoKnob, stepIndex, stepValue, trimDecibels } from "../audio/fx.ts";
 
 export type Kind =
   | { t: "jog"; d: number }
@@ -35,7 +35,7 @@ export type Kind =
   // LIVE only: a pad under the deck (`band` = which one), a loop control (`band` = LOOP_ACTIONS), the zoom buttons (band +1 in, -1 out), and the zoomable waveform.
   | { t: "pad"; d: number; band: number } | { t: "loop"; d: number; band: number } | { t: "zoom"; d: number; band: number } | { t: "zwave"; d: number }
   // The effect unit (free play): `d` is the effect or the note value, -1 = the next one.
-  | { t: "fxOn" } | { t: "fxAmount" } | { t: "fxType"; d: number } | { t: "fxDiv"; d: number };
+  | { t: "fxOn" } | { t: "fxAmount" } | { t: "fxType"; d: number } | { t: "fxDiv"; d: number } | { t: "fxParam"; d: number };
 
 export const keyOf = (k: Kind): string => `${k.t}:${"d" in k ? k.d : ""}:${"band" in k ? k.band : ""}`;
 
@@ -153,7 +153,9 @@ export class Booth {
   private cueDown = [false, false];
   private previewing = [false, false];
   /** The effect unit: which effect, which note value, how much, on or off. Off at every start. */
-  fx = { type: 0, div: 1, amount: 0.5, on: false };
+  fx = { type: 0, div: 1, amount: 0.5, on: false, params: FX_DEFAULTS[0].slice() };
+  /** The four knobs of every effect, kept as you left them (null: the effect's defaults). */
+  private fxSaved: (number[] | null)[] = FX_TYPES.map(() => null);
   private fxSent = 0;
 
   /** Puts a record (by id) on a deck; the page knows where records live. */
@@ -213,14 +215,23 @@ export class Booth {
     this.engine = engine;
     for (const d of [0, 1]) this.decks[d].volume = faderGain(this.channel[d]) * (d === 0 ? crossfade(this.cross).a : crossfade(this.cross).b);
     try {
-      const saved = JSON.parse(localStorage.getItem("headliner.fx") ?? "{}") as { type?: number; div?: number; amount?: number };
+      const saved = JSON.parse(localStorage.getItem("headliner.fx") ?? "{}") as { type?: number; div?: number; amount?: number; knobs?: unknown };
       if (saved.type !== undefined && saved.type >= 0 && saved.type < FX_TYPES.length) this.fx.type = Math.trunc(saved.type);
-      if (saved.div !== undefined && saved.div >= 0 && saved.div < FX_DIVISIONS.length) this.fx.div = Math.trunc(saved.div);
       if (saved.amount !== undefined && saved.amount >= 0 && saved.amount <= 1) this.fx.amount = saved.amount;
+      if (Array.isArray(saved.knobs)) {
+        FX_TYPES.forEach((_, t) => {
+          const k = (saved.knobs as unknown[])[t];
+          if (Array.isArray(k) && k.length === 4 && k.every((x) => typeof x === "number" && x >= 0 && x <= 1)) this.fxSaved[t] = k as number[];
+        });
+      } else if (saved.div !== undefined && saved.div >= 0 && saved.div < FX_DIVISIONS.length) {
+        this.fxSaved[0] = [stepValue(Math.trunc(saved.div), FX_DIVISIONS.length), ...FX_DEFAULTS[0].slice(1)]; // an older save: only the note value
+      }
     } catch { /* nothing saved */ }
+    this.fx.params = (this.fxSaved[this.fx.type] ?? FX_DEFAULTS[this.fx.type]).slice();
     engine.fxType = this.fx.type;
     engine.fxAmount = this.fx.amount;
     engine.fxOn = false;
+    this.pushFxKnobs();
     canvas.addEventListener("pointerdown", (e) => this.down(e));
     canvas.addEventListener("pointermove", (e) => this.move(e));
     canvas.addEventListener("pointerup", (e) => this.up(e));
@@ -520,12 +531,12 @@ export class Booth {
     first({ t: "cueMix" }, T.mix);
     first({ t: "phonesLevel" }, T.level);
     // The effect controller: the name (the left third goes to the effect before, the rest to the next), ON, the LEVEL fader, DIV.
-    const F = g.fx, lvl = F.faders[0];
+    const F = g.fx, lvl = F.level;
     first({ t: "fxType", d: -1 }, F.name);
     first({ t: "fxType", d: -2 }, { x: F.name.x, y: F.name.y, w: F.name.w * 0.3, h: F.name.h });
     first({ t: "fxOn" }, F.on);
-    first({ t: "fxAmount" }, centred(lvl.x, lvl.y, 26 * u, lvl.travel + 16 * u));
-    F.div.touch.forEach((r, i) => first({ t: "fxDiv", d: i }, r));
+    first({ t: "fxAmount" }, centred(lvl.x, lvl.y, lvl.capW + 4 * u, lvl.travel + 16 * u));
+    F.knobs.forEach((k, i) => first({ t: "fxParam", d: i }, k.touch));
 
     this.hits = hits;
     const B0 = g.deck[0].buttons;
@@ -535,7 +546,7 @@ export class Booth {
       pitchX, pitchY, pitchTravel: g.deck[0].pitch.travel, bpmX: [0, 0], topY: 0, phaseY: 0, phaseWidth: 0,
       knobX: M.strip.map((s) => s.x), knobY: M.strip[0].knobY, knobTravel: 90 * u, channelX: M.strip.map((s) => s.fader.x), channelY: M.strip[0].fader.y,
       channelTravel: M.strip[0].fader.travel, phonesY: M.mid.mix.y, meterX: M.mid.meterX, meterY: M.mid.meter.y, meterH: M.mid.meter.h,
-      live: g, sliderTravel: M.mid.mix.w - 12 * u, fxTravel: g.fx.faders[0].travel, crossY: M.mid.cross.y, crossTravel: M.mid.cross.travel, filterY: 0,
+      live: g, sliderTravel: M.mid.mix.w - 12 * u, fxTravel: g.fx.level.travel, crossY: M.mid.cross.y, crossTravel: M.mid.cross.travel, filterY: 0,
     };
     this.labelShown = [null, null];
     // Where the page's own parts sit (the library and the stream panel are HTML over the canvas), published as CSS variables.
@@ -719,6 +730,7 @@ export class Booth {
       case "cueMix": return this.engine.cueMix;
       case "phonesLevel": return this.engine.phonesLevel;
       case "fxAmount": return this.fx.amount;
+      case "fxParam": return this.fx.params[k.d] ?? 0;
       default: return 0;
     }
   }
@@ -807,6 +819,10 @@ export class Booth {
         break;
       case "fxAmount":
         if (doubleTap) { this.setFxAmount(0.5); grab.startValue = 0.5; }
+        break;
+      case "fxParam":
+        // A double tap puts the knob back where the effect rests.
+        if (doubleTap) { const v = FX_DEFAULTS[this.fx.type][kind.d]; this.setFxParam(kind.d, v); grab.startValue = v; }
         break;
       case "eq":
         // A double tap puts a knob back at its default: EQ flat, in the middle.
@@ -903,6 +919,9 @@ export class Booth {
         break;
       case "fxAmount":
         this.setFxAmount(grab.startValue + (p.y - grab.start.y) / (L.live ? L.fxTravel : L.knobTravel));
+        break;
+      case "fxParam":
+        this.setFxParam(k.d, grab.startValue + (p.y - grab.start.y) / L.knobTravel);
         break;
       case "eq":
         this.setEQ(k.d, k.band, clamp01(grab.startValue + (p.y - grab.start.y) / L.knobTravel));
@@ -1006,6 +1025,12 @@ export class Booth {
       case "cueMix": this.engine.cueMix = clamp01(this.engine.cueMix + step); break;
       case "phonesLevel": this.engine.phonesLevel = clamp01(this.engine.phonesLevel + step); break;
       case "fxAmount": this.setFxAmount(this.fx.amount + step); break;
+      case "fxParam": {
+        // A stepped knob moves one step for a notch of the wheel; the others by the usual small step.
+        const knob = FX_KNOBS[this.fx.type][kind.d], n = knob.steps?.length ?? 0;
+        this.setFxParam(kind.d, n ? this.fx.params[kind.d] + Math.sign(step) / (n - 1) : this.fx.params[kind.d] + step);
+        break;
+      }
       default: break;
     }
   }
@@ -1048,6 +1073,7 @@ export class Booth {
       case "fxOn": if (this.mode === "live") this.setFxOn(!this.fx.on); break;
       case "fxType": if (this.mode === "live") this.setFxType(k.d === -2 ? (this.fx.type + FX_TYPES.length - 1) % FX_TYPES.length : k.d < 0 ? (this.fx.type + 1) % FX_TYPES.length : k.d); break;
       case "fxDiv": if (this.mode === "live") this.setFxDiv(k.d < 0 ? (this.fx.div + 1) % FX_DIVISIONS.length : k.d); break;
+      case "fxParam": break; // a knob has no press
       default:
         break;
     }
@@ -1056,11 +1082,40 @@ export class Booth {
   // MARK: - The effect unit
 
   private setFxOn(on: boolean): void { this.fx.on = on; this.engine.fxOn = on; }
-  private setFxType(i: number): void { this.fx.type = i; this.engine.fxType = i; this.saveFx(); }
-  private setFxDiv(i: number): void { this.fx.div = i; this.saveFx(); }
+  /** Another effect: its four knobs come back as you left them. */
+  private setFxType(i: number): void {
+    this.fxSaved[this.fx.type] = this.fx.params.slice();
+    this.fx.type = i;
+    this.fx.params = (this.fxSaved[i] ?? FX_DEFAULTS[i]).slice();
+    this.engine.fxType = i;
+    this.pushFxKnobs();
+    this.saveFx();
+  }
+  /** The note value (Y key, MIDI): the effect's tempo knob steps to it; a reverb has none. */
+  private setFxDiv(i: number): void {
+    const t = fxTempoKnob(this.fx.type);
+    if (t >= 0) this.setFxParam(t, stepValue(i, FX_DIVISIONS.length));
+  }
+  /** One knob of the effect, 0...1 (a stepped knob snaps to a step). */
+  private setFxParam(i: number, v: number): void {
+    const knob = FX_KNOBS[this.fx.type][i];
+    if (!knob) return;
+    const value = knob.steps ? stepValue(stepIndex(v, knob.steps.length), knob.steps.length) : clamp01(v);
+    this.fx.params[i] = value;
+    this.engine.setFxKnob(i, value);
+    if (knob.tempo) this.fx.div = stepIndex(value, FX_DIVISIONS.length);
+    this.saveFx();
+  }
+  /** The effect's four knobs (and its note value) to the sound. */
+  private pushFxKnobs(): void {
+    this.fx.params.forEach((v, i) => this.engine.setFxKnob(i, v));
+    const t = fxTempoKnob(this.fx.type);
+    if (t >= 0) this.fx.div = stepIndex(this.fx.params[t], FX_DIVISIONS.length);
+  }
   private setFxAmount(x: number): void { this.fx.amount = clamp01(x); this.engine.fxAmount = this.fx.amount; this.saveFx(); }
   private saveFx(): void {
-    try { localStorage.setItem("headliner.fx", JSON.stringify({ type: this.fx.type, div: this.fx.div, amount: this.fx.amount })); } catch { /* private window */ }
+    this.fxSaved[this.fx.type] = this.fx.params.slice();
+    try { localStorage.setItem("headliner.fx", JSON.stringify({ type: this.fx.type, amount: this.fx.amount, knobs: this.fxSaved })); } catch { /* private window */ }
   }
 
   /** The delay's time follows the tempo of the record the room hears: the louder of the playing
@@ -1096,6 +1151,7 @@ export class Booth {
       case "cueMix": this.engine.cueMix = x; break;
       case "phonesLevel": this.engine.phonesLevel = x; break;
       case "fxAmount": this.setFxAmount(x); break;
+      case "fxParam": this.setFxParam(k.d, x); break;
       default: break;
     }
   }
@@ -1322,7 +1378,7 @@ export class Booth {
     if (h === null) return false;
     switch (k.t) {
       case "cross": return this.channel[h] > 0.04;
-      case "phones": case "cueMix": case "phonesLevel": case "master": case "fxOn": case "fxAmount": case "fxType": case "fxDiv": return false;
+      case "phones": case "cueMix": case "phonesLevel": case "master": case "fxOn": case "fxAmount": case "fxType": case "fxDiv": case "fxParam": return false;
       default: return "d" in k && k.d === h;
     }
   }

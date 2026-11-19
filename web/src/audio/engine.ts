@@ -825,6 +825,9 @@ export class DeckEngine {
   set fxOn(v: boolean) { this.shared.set(mixerAt(M.fxOn), v ? 1 : 0); }
   get fxAmount(): number { return this.shared.get(mixerAt(M.fxAmount)); }
   set fxAmount(v: number) { this.shared.set(mixerAt(M.fxAmount), Math.max(0, Math.min(1, v))); }
+  /** The four knobs of the effect, 0...1 (what each one is: FX_KNOBS in fx.ts). */
+  fxKnob(i: number): number { return this.shared.get(mixerAt(M.fxKnob + i)); }
+  setFxKnob(i: number, v: number): void { this.shared.set(mixerAt(M.fxKnob + i), Math.max(0, Math.min(1, v))); }
   /** The delay time in seconds (a note value at the playing tempo; the flanger sweeps once per eight of them). */
   set fxDelaySeconds(v: number) { this.shared.set(mixerAt(M.fxDelay), v); }
 

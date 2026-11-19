@@ -858,7 +858,7 @@ function kindFromKey(key: string): Kind | null {
     case "phonesLevel": return { t: "phonesLevel" };
     case "fxOn": return { t: "fxOn" };
     case "fxAmount": return { t: "fxAmount" };
-    case "fxType": case "fxDiv": return { t, d } as Kind;
+    case "fxType": case "fxDiv": case "fxParam": return { t, d } as Kind;
     default: return null;
   }
 }
@@ -868,7 +868,7 @@ function targetKind(key: string): TargetKind | null {
   if (["play", "sync", "phones", "fxOn", "fxType", "fxDiv", "pad", "loop", "zoom"].includes(t)) return "button";
   if (t === "jog") return "relative";
   if (t === "nudge" || t === "cue") return "hold"; // held down: a nudge pushes, CUE plays from its mark
-  if (["pitch", "channel", "cross", "eq", "filter", "trim", "master", "cueMix", "phonesLevel", "fxAmount"].includes(t)) return "absolute";
+  if (["pitch", "channel", "cross", "eq", "filter", "trim", "master", "cueMix", "phonesLevel", "fxAmount", "fxParam"].includes(t)) return "absolute";
   return null;
 }
 
@@ -876,7 +876,8 @@ function targetKind(key: string): TargetKind | null {
 function labelOf(key: string): string {
   const [t, ds, bs] = key.split(":");
   if (t === "fxOn") return "EFFECT ON";
-  if (t === "fxAmount") return "EFFECT AMOUNT";
+  if (t === "fxAmount") return "EFFECT LEVEL";
+  if (t === "fxParam") return `EFFECT KNOB ${Number(ds) + 1}`;
   if (t === "fxType") return `EFFECT ${FX_TYPES[Number(ds)] ?? "(NEXT)"}`;
   if (t === "fxDiv") return `NOTE ${FX_DIVISIONS[Number(ds)]?.label ?? "(NEXT)"}`;
   const side = ds === "0" ? "LEFT " : ds === "1" ? "RIGHT " : "";
