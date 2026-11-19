@@ -292,6 +292,23 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
   handled (`Cover.unsync`); WAV files with art in an ID3 chunk (about 1 %) still show no cover. Real files: 122 of 122 embedded
   covers decode, median 15 ms, worst 69 ms. NOT done: online tagging (MusicBrainz + Cover Art Archive via the Worker; about 31 % of
   his library has no picture at all), and the "closet" look (crates with records) beyond the grid.
+- **The record room (web only, 19 Nov; item 4b): in free play the front of the booth is a wall and crates.** `library/wall.ts` (look
+  and feel), `library/crates.ts` (data, no DOM, tested), covers from a second, bigger `Sleeves` (320 px, `bigSleeves` in main.ts).
+  `#wall` is a fixed overlay as high as the room (`calc(100dvh - var(--gear-h))`, z 2): a shelf of picks (random, covers first, SHUFFLE),
+  a row of crates, and a crate opens to DIG: the front record stands up, the ones behind show their tops (CSS 3D, only about 10 records
+  in the DOM), flip with the wheel, a drag, the arrows (captured only while a crate is open: they are the crossfader otherwise), Home/End,
+  PageUp/Down, the scrub bar; Esc or a click on the empty stage closes (in fullscreen Esc leaves fullscreen first: the click and the CLOSE button are the way). LEFT / RIGHT put the record on a deck through the same paths as MY MUSIC
+  (`loadUserTrack`, `loadRecord`, `booth.refuseLoad`). Crates are chosen by CRATES BY: A-Z (default; balanced, cut between letters),
+  GENRE (your own tags, top ones, rest, none), TEMPO (bands 110/120/126/134, from the analysis or the tag); THE GAME is always the first
+  crate; no library: an "OPEN A FOLDER" crate. ROOM button = the crowd instead (then a RECORDS pill); choice in `headliner.front`,
+  grouping in `headliner.wallBy`. Shown only in free play with the booth on screen (`frontLoop` in main.ts), never in a lesson or night.
+  While it is up the room's clips are not played (`Booth.setRoomHidden`). Rebuilt from `Library.subscribe` at most every 0.8 s (a
+  scan reports often); 10,000 tracks group in about 40 ms. Compact (front shorter than 240 px: a phone held sideways): crates only.
+  Measured on 500 real files: tag tempo 67 %, genre 56 %, artist 90 %, and 27 % of the files share one copy date (so no "newest" crate).
+  Not done: drag a record onto a deck, a crate front board drawn over the dig, remembering the last records played.
+  **Bug fixed with it (from 0f7f5db):** `build()` set `--gear-h` to the ROOM's height but the CSS uses the GEAR's height (fallback 58vh,
+  `#studio bottom`): lesson/night/studio overlays were taller than the room and covered the top of the gear (a lesson caption over the
+  mixer's BPM numbers). Now `--gear-h` = `gearTop`.
 - **Outputs (PHONES):** the worklet always renders 4 channels (room 1-2, headphones 3-4); modes only
   rewire a splitter/merger: OFF, SPLIT, SOUND CARD (destination 4 ch, discrete), TWO DEVICES (the
   headphones' pair -> MediaStream -> `<audio>.setSinkId`; the room via `AudioContext.setSinkId`).

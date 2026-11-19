@@ -113,12 +113,14 @@ export class Sleeves {
   private readonly lib: Pick<Library, "fileQuiet">;
   private readonly limit: number;
   private readonly parallel: number;
+  /** The side of the master canvases, in pixels. */
+  private readonly size: number;
   /** Master canvases, least recently used first. A track without a usable picture is kept as "none". */
   private readonly cache = new Map<string, HTMLCanvasElement | "none">();
   private readonly queue: Job[] = [];
   private active = 0;
 
-  constructor(lib: Pick<Library, "fileQuiet">, limit = 400, parallel = 4) { this.lib = lib; this.limit = limit; this.parallel = parallel; }
+  constructor(lib: Pick<Library, "fileQuiet">, limit = 400, parallel = 4, size = SLEEVE_PX) { this.lib = lib; this.limit = limit; this.parallel = parallel; this.size = size; }
 
   /** Can this track have a picture at all (its file has one, or its folder does)? */
   static hasPicture(t: LibraryTrack): boolean { return !!t.cover || !!t.art; }
@@ -181,7 +183,7 @@ export class Sleeves {
       const f = await this.lib.fileQuiet(t);
       if (f === "locked") return "later";
       if (f && t.cover.length <= MAX_PICTURE_BYTES) {
-        const made = await makeThumbnail(await readCover(fileSource(f), t.cover), t.cover.mime);
+        const made = await makeThumbnail(await readCover(fileSource(f), t.cover), t.cover.mime, this.size);
         if (made) return made;
       } else if (!f && !t.art) return "later"; // the file is not there now (a drive unplugged?): try again later
     }
@@ -190,7 +192,7 @@ export class Sleeves {
       if (f === "locked") return "later";
       if (!f) return "later";
       if (f.size > MAX_PICTURE_BYTES) return "none";
-      const made = await makeThumbnail(new Uint8Array(await f.arrayBuffer()), /\.png$/i.test(f.name) ? "image/png" : "image/jpeg");
+      const made = await makeThumbnail(new Uint8Array(await f.arrayBuffer()), /\.png$/i.test(f.name) ? "image/png" : "image/jpeg", this.size);
       if (made) return made;
     }
     return "none";

@@ -181,6 +181,8 @@ export class Booth {
   private roomVideos: (HTMLVideoElement | null)[] = [null, null, null, null];
   private roomMissing = new Set<number>();
   private roomMood = -1;
+  /** The record room is up over the room (free play): its clips are not played (nobody sees them). */
+  private roomHidden = false;
   private lastTime = 0;
   /** What the room heard this frame. */
   lastReading: MixReading | null = null;
@@ -363,8 +365,8 @@ export class Booth {
     const gh = 210 * u;
     const gy0 = bottom + (fxBar ? (BAR + BAR_GAP) * u : 0);
     const gearTop = gy0 + gh + 6;
-    // The overlays (lesson, night, studio grid) take the room's real height from here.
-    document.documentElement.style.setProperty("--gear-h", `${H - gearTop}px`);
+    // The overlays (lesson, night, studio grid, record room) are as high as the room above the gear: 100vh minus this.
+    document.documentElement.style.setProperty("--gear-h", `${gearTop}px`);
     const gap = 8 * u;
     const mixerW = Math.min(gw * 0.31, 224 * u);
     const deckW = (gw - mixerW - gap * 2) / 2;
@@ -516,7 +518,10 @@ export class Booth {
   }
 
   /** Shows the room in `mood` (fading over from the mood before), or with -1 holds it still. */
+  setRoomHidden(hidden: boolean): void { this.roomHidden = hidden; }
+
   private showRoom(mood: number, dt: number): void {
+    if (this.roomHidden) { for (const v of this.roomVideos) if (v && !v.paused) v.pause(); return; }
     let wanted = mood;
     if (wanted >= 0 && !this.roomVideo(wanted)) wanted = this.roomVideo(2) ? 2 : -1;
     if (wanted >= 0) {

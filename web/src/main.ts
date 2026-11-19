@@ -27,6 +27,7 @@ import { FX_DIVISIONS, FX_TYPES } from "./audio/fx.ts";
 import { Library } from "./library/library.ts";
 import { buildPanel } from "./library/panel.ts";
 import { Sleeves } from "./library/sleeves.ts";
+import { buildWall } from "./library/wall.ts";
 import type { GridFix } from "./library/panel.ts";
 import { analyse } from "./library/analyse.ts";
 import { monoForAnalysis } from "./library/beats.ts";
@@ -92,6 +93,32 @@ async function loadRecord(d: number, track: TrackInfo): Promise<void> {
 
 const library = new Library();
 const sleeves = new Sleeves(library);
+
+// The record room: in free play the front of the booth is a wall with a shelf and crates (or the crowd, if you choose).
+const bigSleeves = new Sleeves(library, 150, 4, 320);
+let gameRecords: TrackInfo[] = [];
+const FRONT_KEY = "headliner.front";
+let front: "wall" | "room" = (() => { try { return localStorage.getItem(FRONT_KEY) === "room" ? "room" : "wall"; } catch { return "wall"; } })();
+const setFront = (f: "wall" | "room") => { front = f; try { localStorage.setItem(FRONT_KEY, f); } catch { /* private window */ } };
+function openMusicFolder(): void {
+  if (Library.canPickFolder) { library.init().then(() => library.pickFolder()).catch(failed); return; }
+  const input = document.createElement("input");
+  input.type = "file"; input.multiple = true; input.setAttribute("webkitdirectory", "");
+  input.addEventListener("change", () => { library.init().then(() => library.addFromFiles([...(input.files ?? [])])).catch(failed); });
+  input.click();
+}
+const wall = buildWall($("wall"), library, bigSleeves, {
+  load: (d, item) => {
+    if (booth.refuseLoad(d)) return; // back to back: her deck is hers
+    if (item.track) loadUserTrack(d, item.track).catch(failed);
+    else if (item.game) loadRecord(d, item.game).catch(failed);
+  },
+  onDeck: (item) => [0, 1].filter((d) => engine.decks[d].info?.id === item.id),
+  openFolder: openMusicFolder,
+  game: () => gameRecords,
+  toRoom: () => setFront("room"),
+});
+$("wall-open").addEventListener("click", () => setFront("wall"));
 /** The library track on each deck (null: a record of the game, or nothing). */
 const userOnDeck: (LibraryTrack | null)[] = [null, null];
 /** A track longer than this is too big to hold decoded (48 kHz stereo float: about 23 MB a minute, and a copy while loading). */
@@ -394,6 +421,8 @@ function freePlay(): void {
 
 /** The crate: onto the left or the right deck. */
 function fillCrate(list: TrackInfo[]): void {
+  gameRecords = list;
+  wall.refresh();
   crateList.replaceChildren();
   for (const t of list) {
     const row = document.createElement("div");
@@ -958,6 +987,15 @@ Object.assign((window as unknown as { headliner: object }).headliner, { midi, le
 // credits or a result card).
 const boothActive = () => title.hidden && chapterScreen.hidden && $("story").hidden && $("bag").hidden && $("credits").hidden && result.hidden;
 midi.active = boothActive;
+
+// The wall is up in free play when the booth is on screen; then nobody sees the crowd, so its clips rest.
+(function frontLoop() {
+  const free = !booth.lesson && !booth.night && boothActive();
+  wall.setVisible(free && front === "wall");
+  booth.setRoomHidden(free && front === "wall");
+  $("wall-open").hidden = !(free && front === "room");
+  requestAnimationFrame(frontLoop);
+})();
 attachKeys(booth, boothActive, () => { fillControls(); toggle($("controls")); });
 
 if (params.has("autostart")) autostart().catch(failed); // screenshots (the browser allows sound without a click)

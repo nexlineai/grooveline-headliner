@@ -19,8 +19,10 @@ export class Library {
   remembers = true;
   /** Folders that need a click before their files can be read again (the browser forgets the permission). */
   needsAccess = new Set<number>();
-  /** Something changed: the panel redraws. */
+  /** Something changed: the MY MUSIC panel redraws. */
   onChange: () => void = () => {};
+  /** Others who want to know (the record room). */
+  private readonly listeners = new Set<() => void>();
 
   private store: LibraryStore = new MemoryStore();
   private readonly byKey = new Map<string, LibraryTrack>();
@@ -45,7 +47,15 @@ export class Library {
     for (const t of await this.store.tracks()) this.byKey.set(t.key, t);
     this.reindex();
     await this.checkAccess();
+    this.notify();
+  }
+
+  /** Calls `fn` whenever the library changes (a scan step, a folder added or removed). Returns a way to stop. */
+  subscribe(fn: () => void): () => void { this.listeners.add(fn); return () => { this.listeners.delete(fn); }; }
+
+  private notify(): void {
     this.onChange();
+    for (const fn of this.listeners) fn();
   }
 
   private async checkAccess(): Promise<void> {
@@ -65,7 +75,7 @@ export class Library {
   /** While a scan runs the list is rebuilt now and then, not for every batch. */
   private reindexSoon(): void {
     if (this.indexTimer) return;
-    this.indexTimer = setTimeout(() => { this.indexTimer = null; this.reindex(); this.onChange(); }, 500);
+    this.indexTimer = setTimeout(() => { this.indexTimer = null; this.reindex(); this.notify(); }, 500);
   }
 
   countOf(folder: number): number {
@@ -89,7 +99,7 @@ export class Library {
     }
     const folder = await this.store.addFolder(handle.name, handle);
     this.folders.push(folder);
-    this.onChange();
+    this.notify();
     await this.rescan(folder);
   }
 
@@ -110,11 +120,11 @@ export class Library {
   /** Looks through a folder again: new files are read, changed ones again, gone ones dropped. */
   async rescan(folder: LibraryFolder): Promise<void> {
     if (this.scan || !folder.handle) return;
-    try { await this.ensureAccess(folder); } catch { this.onChange(); return; }
+    try { await this.ensureAccess(folder); } catch { this.notify(); return; }
     this.abort = new AbortController();
     this.scan = { folder: folder.id, name: folder.name, phase: "listing", found: 0, done: 0, total: 0 };
-    this.onChange();
-    const entries = await listFolder(folder.handle, this.abort.signal, (n) => { if (this.scan) { this.scan.found = n; this.onChange(); } });
+    this.notify();
+    const entries = await listFolder(folder.handle, this.abort.signal, (n) => { if (this.scan) { this.scan.found = n; this.notify(); } });
     this.scan = null;
     await this.readEntries(folder, entries);
   }
@@ -122,7 +132,7 @@ export class Library {
   private async readEntries(folder: LibraryFolder, entries: Entry[]): Promise<void> {
     this.abort ??= new AbortController();
     this.scan = { folder: folder.id, name: folder.name, phase: "reading", found: entries.length, done: 0, total: entries.length };
-    this.onChange();
+    this.notify();
     const existing = new Map<string, LibraryTrack>();
     for (const t of this.byKey.values()) if (t.folder === folder.id) existing.set(t.key, t);
     const persist = folder.id >= 0;
@@ -137,7 +147,7 @@ export class Library {
       progress: (done, total) => {
         if (!this.scan) return;
         this.scan.done = done; this.scan.total = total;
-        if (done - last >= 25 || done === total) { last = done; this.onChange(); }
+        if (done - last >= 25 || done === total) { last = done; this.notify(); }
       },
     });
     if (result.complete) {
@@ -147,7 +157,7 @@ export class Library {
     this.scan = null;
     this.abort = null;
     this.reindex();
-    this.onChange();
+    this.notify();
   }
 
   /** Stops a scan that is running (what was read so far stays). */
@@ -160,7 +170,7 @@ export class Library {
     for (const [k, t] of this.byKey) if (t.folder === id) { this.byKey.delete(k); this.files.delete(k); }
     this.needsAccess.delete(id);
     this.reindex();
-    this.onChange();
+    this.notify();
   }
 
   /** The browser asks before a folder is read in a new visit: this is called from a click. */
@@ -177,7 +187,7 @@ export class Library {
   /** The "RECONNECT" button of a folder. */
   async reconnect(folder: LibraryFolder): Promise<void> {
     try { await this.ensureAccess(folder); } catch { /* still not given */ }
-    this.onChange();
+    this.notify();
   }
 
   /** The file of a track (asking for the folder's permission if the browser forgot it). Throws with a sentence for the player. */
