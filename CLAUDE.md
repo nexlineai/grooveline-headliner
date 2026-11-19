@@ -375,6 +375,25 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
   marked PLAYING and choosing it gives the stop-the-deck message. Esc or a click elsewhere closes it. `WallHooks.busy` comes from main.ts.
 - **LIVE knob colours:** the lit ring of a knob is per TYPE, the same on both channels (GAIN red, HI yellow, MID orange, LOW brown, FILTER blue; the FILTER
   also sits in a thin blue outline with no fill). Faders, pads and the deck title keep the deck colours (A cyan, B amber).
+- **Title, FREE PLAY and LIVE (19 Nov, evening).** The title has PLAY, FREE PLAY (`showMode("free")`: the game's booth with its room, the CRATE sheet and MY MUSIC,
+  plain iPhone parity) and LIVE (`openLive()`: `Booth.mode = "live"`). THE ENDING is off the title. `?live` opens the page on ONE button, LIVE (`#start.live-link`;
+  until you leave it); the Worker redirects `/headliner/live` to `/headliner/?live` (needs `npm run deploy`). `?autostart` = free play; `?autostart&live` = LIVE with empty
+  decks; add `&records` for the game's first two records on the decks (tests); `&playcount=<s>` shortens "a play" (30 s) for tests. LIVE's library has NO game records
+  (`WallHooks.game` returns nothing); its decks start empty.
+- **LIVE deck header (19 Nov):** title (`label` with `ellipsis`, stops at `titleMax` = `HEADER_RIGHT` units from the right), time, four bar lamps, key (8.4 units, smaller than the
+  tempo), tempo (10 units, the deck's colour) at the corner. The mixer has no tempo or key. FILTER is the fifth `knobY` of a strip and sits UNDER the fader, with its name between
+  (`filterLabelY`); no outline. Hovering the title shows the whole title (`#deck-tip`, `Booth.hoverTitle`).
+- **Crates are DJ flight cases and record bags** (`.w-crate.case` / `.bag`, alternating; CSS only: ribbed shell, latches, handle, corners / flap, buckle, straps; they rise in one
+  after the other, the records bob, hover lifts them). **Favourites and plays** (`LibraryTrack.fav/plays`, `WallItem.fav/plays`): the heart is in the popup and the list rows; a
+  play = 30 s running on a deck (`liveLoop` in main.ts); `rankShelf` puts favourites first (most played first), then the most played; random picks fill the rest (SHUFFLE = random
+  until the page is opened again). **SHARE** (`share.ts`, `#share-button`, LIVE only): link, COPY LINK, the system share sheet when there is one, six networks; the link is
+  `SHARE_URL` (the radio) until a DJ has a page of their own. The list lights the record on a deck in that deck's colour (`.l-row.on.ona/.onb`). The page's message (`#note`)
+  sits between the stream bar and the buttons in LIVE.
+- **The effects unit (19 Nov):** `audio/fx.ts`: seven effects (`FX_TYPES`), four knobs each (`FX_KNOBS`: name, steps; `FX_DEFAULTS`; the `tempo` knob picks the note value, the
+  page turns it into `fxDelaySeconds`), `M.fxKnob..+3` in the shared mixer slots; knobs glide (30 ms), NaN/runaway output is dropped and the effect restarts, off = bit-identical
+  (tests: every knob changes the sound, extremes stay finite and inside full scale). Delay/reverb/DLY+FLT have a tail and take the sound at their input; the others at their output.
+  The filter and FLG+FLT are INSERTS (LEVEL fades between dry and processed). Booth: `fxParam` Kind (MIDI "EFFECT KNOB n"), knobs saved per effect in `headliner.fx`. NOT built yet:
+  an ON per channel (A / B / MASTER): see the roadmap in the vault.
 - **Layout unit (18 Nov, the game's booth):** `u = min(height share / 210, width / 816)` (816u = the iPhone's gear width), the gear sits at the
   bottom and the room takes the rest; `build()` publishes `--gear-h` (the gear's height in px) and the overlays (lesson, night,
   studio grid) size themselves from it, so fullscreen 16:9 no longer overlaps. FULLSCREEN button in the top bar (hidden where

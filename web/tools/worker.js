@@ -23,6 +23,12 @@ export default {
       url.pathname = "/headliner/";
       return Response.redirect(url.toString(), 308);
     }
+    if (url.pathname === "/headliner/live" || url.pathname === "/headliner/live/") {
+      // The link for the website: grooveline.org/headliner/live opens the page on its LIVE button.
+      url.pathname = "/headliner/";
+      url.search = "?live";
+      return Response.redirect(url.toString(), 302);
+    }
     if (!url.pathname.startsWith("/headliner/")) return fetch(request); // a neighbouring path stays with the site
     if (request.method !== "GET" && request.method !== "HEAD") {
       return new Response("Method not allowed", { status: 405, headers: { Allow: "GET, HEAD" } });
