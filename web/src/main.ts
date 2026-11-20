@@ -42,6 +42,7 @@ import { BAR_ROOM_NEEDED_PX } from "./booth/live-geometry.ts";
 import { SIGN_IN_URL, WHIP_BASE, readSession } from "./stream/account.ts";
 import { SoundCheck } from "./stream/soundcheck.ts";
 import type { CheckView } from "./stream/soundcheck.ts";
+import { Meter } from "./audio/meter.ts";
 import { GoLive } from "./stream/golive.ts";
 import type { LiveView } from "./stream/golive.ts";
 import { WhipPublisher } from "./stream/whip.ts";
@@ -1266,7 +1267,29 @@ function streamVisibility(live: boolean, nowMs: number): void {
   if (soundCheck.view.stops) void soundCheck.stop();
   if (goLive.busy || goLive.state === "confirming") void goLive.stop();
 }
-Object.assign((window as unknown as { headliner: object }).headliner, { soundCheck, goLive, streamTest });
+// The master meter in the stream panel (audio/meter.ts): what the radio gets, read every frame while LIVE is on screen.
+const meter = new Meter();
+const meterEl = $("meter"), meterCovers = [...meterEl.querySelectorAll<HTMLElement>(".m-cover")], meterHolds = [...meterEl.querySelectorAll<HTMLElement>(".m-hold")], meterDb = meterEl.querySelector<HTMLElement>(".m-db")!;
+let meterAt = 0, meterText = "";
+function renderMeter(live: boolean, nowMs: number): void {
+  const peaks = live ? engine.streamPeaks() : null;
+  if (!peaks) { if (meterAt) { meter.reset(); meterAt = 0; paintMeter(); } return; }
+  meter.update(peaks[0], peaks[1], meterAt ? nowMs - meterAt : 16);
+  meterAt = nowMs;
+  paintMeter();
+}
+function paintMeter(): void {
+  const v = meter.view;
+  for (let i = 0; i < 2; i++) {
+    meterCovers[i].style.transform = `scaleY(${(1 - v.fill[i]).toFixed(3)})`;
+    meterHolds[i].style.bottom = `calc(${(v.hold[i] * 100).toFixed(1)}% - 1px)`;
+    meterHolds[i].style.opacity = v.hold[i] > 0.01 ? "1" : "0";
+  }
+  const text = v.holdDb === null ? "\u2014" : (v.holdDb <= -59.9 ? "-\u221e" : v.holdDb.toFixed(1));
+  if (text !== meterText) { meterText = text; meterDb.textContent = text; }
+  meterEl.classList.toggle("clipping", v.clipping);
+}
+Object.assign((window as unknown as { headliner: object }).headliner, { soundCheck, goLive, streamTest, meter });
 
 // Keys and controllers work only while the booth is on screen (not a menu, a scene, the bag, the
 // credits or a result card).
@@ -1305,6 +1328,7 @@ if (typeof ResizeObserver !== "undefined") {
   const live = booth.mode === "live" && boothActive();
   $("stream").hidden = !live;
   streamVisibility(live, now);
+  renderMeter(live, now);
   $("livebar").hidden = !live;
   requestAnimationFrame(liveLoop);
 })();

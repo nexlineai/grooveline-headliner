@@ -58,7 +58,7 @@ G.p0 = async () => {
   // the window opens: 10 minutes before the start
   setSlot(10 * MIN, 60 * MIN); await goLive.refresh(); await sleep(1500);
   p = panel();
-  ok("10 min before the start: GO LIVE is on, and the note says that going live now puts you on the radio at once", !p.go.disabled && p.go.textContent === "GO LIVE" && /on the radio at once/.test(p.note) && /starts in/.test(p.slot), show(p));
+  ok("10 min before the start: GO LIVE is on, and the note says that going live now puts you on the radio at once", !p.go.disabled && p.go.textContent === "GO LIVE" && /on the radio at once/.test(p.note) && / in 10 min/.test(p.slot), show(p));
   const r = $("go-live").getBoundingClientRect();
   T("INFO", "go-live at", Math.round(r.x + r.width / 2), Math.round(r.y + r.height / 2));
 };

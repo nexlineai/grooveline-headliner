@@ -70,6 +70,5 @@ export function slotLine(slot: Slot | null, serverMs: number, locale?: string): 
   const when = `${sameDay ? "" : day + " "}${hm(start)}–${hm(end)}`;
   const phase = phaseAt(slot, serverMs);
   if (phase === "on") return `${when} · now`;
-  if (phase === "early") return `${when} · starts in ${inWords(start - serverMs)}`;
   return `${when} · in ${inWords(start - serverMs)}`;
 }

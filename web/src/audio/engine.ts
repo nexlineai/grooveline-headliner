@@ -497,6 +497,8 @@ export class DeckEngine {
   private roomDelay: DelayNode | null = null;
   /** What a listener hears (the stream for the radio): see `broadcastStream`. */
   private tap: { merger: ChannelMergerNode; dest: MediaStreamAudioDestinationNode } | null = null;
+  /** Two analysers on the tap, for the level meter (`streamPeaks`). */
+  private meterNodes: { l: AnalyserNode; r: AnalyserNode; bufL: Float32Array<ArrayBuffer>; bufR: Float32Array<ArrayBuffer> } | null = null;
   private alignTimer: number | null = null;
   /** How long the room waits for the headphones: smoothed, set once, then left alone (see align.ts). */
   private readonly alignment = new RoomAlignment();
@@ -633,6 +635,27 @@ export class DeckEngine {
       this.wireTap();
     }
     return this.tap.dest.stream;
+  }
+
+  /** The peak of each side of what the radio gets (the same two channels as `broadcastStream`), over the last 21 ms; linear, 0...1 and a little above when it clips.
+   * For the meter in the stream panel. Null before the engine runs. Makes the tap (once) if nobody has yet. */
+  streamPeaks(): [number, number] | null {
+    const context = this.context;
+    if (!context || !this.splitter) return null;
+    if (!this.tap) this.broadcastStream();
+    const tap = this.tap;
+    if (!tap) return null;
+    if (!this.meterNodes) {
+      const split = context.createChannelSplitter(2), l = context.createAnalyser(), r = context.createAnalyser();
+      l.fftSize = r.fftSize = 1024; l.smoothingTimeConstant = r.smoothingTimeConstant = 0;
+      tap.merger.connect(split); split.connect(l, 0); split.connect(r, 1);
+      this.meterNodes = { l, r, bufL: new Float32Array(1024), bufR: new Float32Array(1024) };
+    }
+    const m = this.meterNodes;
+    m.l.getFloatTimeDomainData(m.bufL); m.r.getFloatTimeDomainData(m.bufR);
+    let pl = 0, pr = 0;
+    for (let i = 0; i < 1024; i++) { const a = Math.abs(m.bufL[i]), b = Math.abs(m.bufR[i]); if (a > pl) pl = a; if (b > pr) pr = b; }
+    return [pl, pr];
   }
 
   /** Connects the tap for the current headphone mode (called when it is made and after every mode change). */

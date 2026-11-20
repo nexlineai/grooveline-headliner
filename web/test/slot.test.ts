@@ -68,12 +68,12 @@ describe("words", () => {
     assert.equal(inWords(72 * 60 * MIN), "3 days");
     assert.equal(inWords(-5), "0 s");
   });
-  test("slotLine: none booked; later; starts in; now; the day shows when it is not today", () => {
+  test("slotLine: none booked; later; in 10 min inside the window; now; the day shows when it is not today", () => {
     assert.equal(slotLine(null, NOW, "en-GB"), "none booked");
     const here = (h: number, m: number) => new Date(2026, 10, 20, h, m).getTime();
     const mk = (a: number, b: number) => ({ ...slot(0, 0), start: iso(a), end: iso(b) });
     assert.match(slotLine(mk(here(20, 0), here(22, 0)), here(12, 0), "en-GB"), /^20:00–22:00 · in 8 h$/);
-    assert.match(slotLine(mk(here(20, 0), here(22, 0)), here(19, 50), "en-GB"), /starts in 10 min$/);
+    assert.match(slotLine(mk(here(20, 0), here(22, 0)), here(19, 50), "en-GB"), / · in 10 min$/);
     assert.match(slotLine(mk(here(20, 0), here(22, 0)), here(20, 30), "en-GB"), /· now$/);
     const tomorrow = mk(here(20, 0) + 24 * 60 * MIN, here(22, 0) + 24 * 60 * MIN);
     assert.match(slotLine(tomorrow, here(12, 0), "en-GB"), /^\w{3} 20:00–22:00 · in 1 day|^\w{3} 20:00–22:00 · in 32 h/);
