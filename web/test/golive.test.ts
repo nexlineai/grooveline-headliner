@@ -201,7 +201,8 @@ describe("the end of the slot", () => {
     r.clock.t = r.endAbs; r.g.tick();
     await new Promise((x) => setTimeout(x, 20));
     assert.ok(r.pubs[0].stopped, "the audio stopped at the end");
-    assert.ok(["ended", "none"].includes(r.g.state), r.g.state);
+    assert.equal(r.g.state, "ended", "a show cut off by the slot's end keeps saying so, the refresh with no next slot does not turn it into none");
+    assert.match(r.g.view.note, /has ended/);
     assert.equal(r.g.view.onAirSince, null);
   });
 

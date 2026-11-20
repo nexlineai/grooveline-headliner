@@ -52,6 +52,8 @@ export class GoLive {
   private run = 0;
   private onAirSince: number | null = null;
   private confirmTimer: ReturnType<typeof setTimeout> | null = null;
+  /** A show was cut off by the slot's end: the panel keeps saying so (instead of "no slot booked") until another slot shows up. */
+  private keepEnded = false;
   private last = "";
   private readonly d: LiveDeps;
 
@@ -113,7 +115,8 @@ export class GoLive {
 
   /** The state of an idle panel from the slot and the server's clock. */
   private settle(): void {
-    if (!this.slot) { this.set("none"); return; }
+    if (!this.slot) { this.set(this.keepEnded && this.state === "ended" ? "ended" : "none"); return; }
+    this.keepEnded = false;
     const phase = phaseAt(this.slot, this.serverNow);
     if (phase === "over") { this.slot = null; this.ingest = null; this.set("ended"); return; }
     this.set(phase);
@@ -150,7 +153,7 @@ export class GoLive {
 
   private async go(): Promise<void> {
     const run = ++this.run;
-    this.failure = "";
+    this.failure = ""; this.keepEnded = false;
     const ingest = this.ingest;
     if (!ingest || !this.slot) { await this.refresh(); return; }
     this.set("connecting");
@@ -189,6 +192,7 @@ export class GoLive {
     this.pub = null; this.onAirSince = null;
     if (pub) await pub.stop().catch(() => {});
     this.slot = null; this.ingest = null;
+    this.keepEnded = true;
     this.set("ended");
     void this.refresh(); // the next booking, if any
   }

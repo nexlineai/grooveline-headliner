@@ -104,7 +104,7 @@ G.p5 = () => {
 G.p6 = () => {
   const p = panel();
   ok("at the slot's end the audio stops by itself: the connection is closed, OFF AIR, GO LIVE is off", open() === 0 && p.chip === "OFF AIR" && p.go.disabled && p.timer === "00:00:00", `${show(p)} | connections ${open()}`);
-  ok("and the panel says why (the slot has ended, or there is no slot)", /(has ended|No slot booked)/.test(p.note), p.note);
+  ok("and the panel says why: the slot has ended", /has ended/.test(p.note), p.note);
   G.liveOn = false;
   // next booking: running, 1 hour long, for the sound check -> go live sequence
   setSlot(-30e3, 60 * MIN); goLive.refresh();
