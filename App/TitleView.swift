@@ -4,11 +4,6 @@ struct TitleView: View {
     @EnvironmentObject var game: Game
     @State private var toast: String?
 
-    /// MERIDIAN played (it has a star) or its ending seen.
-    private var finished: Bool {
-        (game.progress.stars[Nights.meridian.id] ?? 0) > 0 || game.progress.seen.contains("meridian-end")
-    }
-
     private func small(_ title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
@@ -57,10 +52,6 @@ struct TitleView: View {
             .padding(.top, 16)
             HStack(spacing: 12) {
                 small("FREE PLAY") { game.run([.booth]) }
-                // Once the career is over: Lia, the credits and zdB's record again.
-                if finished || game.unlockAll {
-                    small("THE ENDING") { game.run([.story("meridian-end"), .credits]) }
-                }
             }
             .padding(.top, 10)
             .padding(.bottom, game.unlockAll ? 4 : 24)
