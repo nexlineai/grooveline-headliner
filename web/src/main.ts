@@ -39,6 +39,10 @@ import { probeDuration } from "./library/duration.ts";
 import type { LibraryTrack } from "./library/store.ts";
 import { LOOP_ACTIONS, PITCH_RANGES, keyOf } from "./booth/booth.ts";
 import { BAR_ROOM_NEEDED_PX } from "./booth/live-geometry.ts";
+import { SIGN_IN_URL, readSession } from "./stream/account.ts";
+import { SoundCheck } from "./stream/soundcheck.ts";
+import type { CheckView } from "./stream/soundcheck.ts";
+import { WhipPublisher } from "./stream/whip.ts";
 import type { Kind } from "./booth/booth.ts";
 import { KEYS, attachKeys } from "./input/keys.ts";
 import { MidiInput, parseMidiConfig } from "./input/midi.ts";
@@ -1151,6 +1155,38 @@ function fillControls(body: HTMLElement = $("controls-body")): void {
 
 Object.assign((window as unknown as { headliner: object }).headliner, { midi, learn: setLearn, menu: () => menuMusic });
 
+// MARK: - SOUND CHECK (the stream panel): the booth's master to a private test stream on the server. Nobody hears it; see stream/soundcheck.ts.
+
+/** Seams for the page tests (a stand-in server, another proxy address); never set by the page itself. */
+const streamTest: { fetchFn?: (url: string, init?: RequestInit) => Promise<Response>; whipBase?: string } = {};
+const checkButton = $("sound-check"), streamNote = $("stream-note"), streamChip = document.querySelector<HTMLElement>("#stream .s-state")!;
+function renderCheck(v: CheckView): void {
+  checkButton.textContent = v.button;
+  checkButton.classList.toggle("stops", v.stops);
+  streamChip.textContent = v.chip;
+  streamChip.classList.toggle("checking", v.state === "sending" || v.state === "connecting" || v.state === "asking");
+  streamNote.textContent = v.note;
+  streamNote.hidden = !v.note;
+  streamNote.classList.toggle("good", v.state === "sending");
+  streamNote.title = v.note;
+}
+const soundCheck = new SoundCheck({
+  session: () => { try { return readSession(localStorage); } catch { return null; } },
+  fetchFn: (url, init) => (streamTest.fetchFn ?? fetch)(url, init),
+  stream: () => engine.broadcastStream(),
+  makePublisher: (endpoint, stream, onState) => new WhipPublisher({ endpoint, stream, onState }),
+  whipBase: () => streamTest.whipBase,
+  openSignIn: () => { window.open(SIGN_IN_URL, "_blank", "noopener"); },
+  onChange: renderCheck,
+});
+renderCheck(soundCheck.view);
+checkButton.addEventListener("click", () => { soundCheck.toggle().catch((e) => { note.textContent = e instanceof Error ? e.message : String(e); }); });
+// Signed in on another tab (the site's /broadcast), or coming back to this one: look again. Closing the page ends the test session at the server.
+window.addEventListener("storage", (e) => { if (e.key === "gl_token") soundCheck.refresh(); });
+document.addEventListener("visibilitychange", () => { if (!document.hidden) soundCheck.refresh(); });
+window.addEventListener("pagehide", () => { void soundCheck.stop(); });
+Object.assign((window as unknown as { headliner: object }).headliner, { soundCheck, streamTest });
+
 // Keys and controllers work only while the booth is on screen (not a menu, a scene, the bag, the
 // credits or a result card).
 const boothActive = () => title.hidden && chapterScreen.hidden && $("story").hidden && $("bag").hidden && $("credits").hidden && result.hidden;
@@ -1187,6 +1223,7 @@ if (typeof ResizeObserver !== "undefined") {
   }
   const live = booth.mode === "live" && boothActive();
   $("stream").hidden = !live;
+  if (!live && soundCheck.view.stops) void soundCheck.stop(); // leaving LIVE ends a test in progress
   $("livebar").hidden = !live;
   requestAnimationFrame(liveLoop);
 })();

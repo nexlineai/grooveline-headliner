@@ -495,6 +495,8 @@ export class DeckEngine {
   private phonesNode: AudioWorkletNode | null = null;
   private phonesTarget = 1024;
   private roomDelay: DelayNode | null = null;
+  /** What a listener hears (the stream for the radio): see `broadcastStream`. */
+  private tap: { merger: ChannelMergerNode; dest: MediaStreamAudioDestinationNode } | null = null;
   private alignTimer: number | null = null;
   /** How long the room waits for the headphones: smoothed, set once, then left alone (see align.ts). */
   private readonly alignment = new RoomAlignment();
@@ -615,6 +617,33 @@ export class DeckEngine {
   /** This browser can send the headphones to a second device. */
   static get canChoosePhones(): boolean { return typeof HTMLMediaElement !== "undefined" && "setSinkId" in HTMLMediaElement.prototype; }
 
+  /** The ROOM as a media stream, for the radio (WebRTC): what the speakers get, before the wait for slower headphones, and NEVER the headphones' cue.
+   * With the headphones on one cable (SPLIT) the worklet puts the room in mono on the LEFT channel and the cue on the RIGHT, so then the left channel
+   * feeds both sides of the stream; in every other mode channels 1-2 are the room's stereo pair and the cue is on 3-4 or not there at all.
+   * (The room's master knob is in the room's level, so it sets the stream's level too: at 0 the stream is silent.) Null before the engine runs. */
+  broadcastStream(): MediaStream | null {
+    const context = this.context;
+    if (!context || !this.splitter) return null;
+    if (!this.tap) {
+      const merger = context.createChannelMerger(2);
+      const dest = context.createMediaStreamDestination();
+      dest.channelCount = 2; dest.channelCountMode = "explicit";
+      merger.connect(dest);
+      this.tap = { merger, dest };
+      this.wireTap();
+    }
+    return this.tap.dest.stream;
+  }
+
+  /** Connects the tap for the current headphone mode (called when it is made and after every mode change). */
+  private wireTap(): void {
+    const splitter = this.splitter, tap = this.tap;
+    if (!splitter || !tap) return;
+    try { splitter.disconnect(tap.merger); } catch { /* not connected yet */ }
+    splitter.connect(tap.merger, 0, 0);
+    splitter.connect(tap.merger, this._phones === "split" ? 0 : 1, 1);
+  }
+
   /** Switches the headphone feed. Only rewires: the records and the decks are not touched. */
   async setPhones(mode: PhonesMode): Promise<void> {
     const context = this.context, splitter = this.splitter, roomPair = this.roomPair;
@@ -674,6 +703,7 @@ export class DeckEngine {
       if (mode === "split") this.shared.set(mixerAt(M.split), 1);
     }
     this._phones = mode;
+    this.wireTap();
   }
 
   /** The low-delay way: the headphones' own AudioContext on their device, fed by a ring. */

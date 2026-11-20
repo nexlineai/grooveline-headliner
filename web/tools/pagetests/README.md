@@ -28,3 +28,8 @@ Set it up in a scratch folder (never in the repo): download `mediamtx_v1.4.0_lin
 `externalAuthenticationURL: http://127.0.0.1:4010/mediamtx-auth`; run `node whip-auth-stub.mjs` (allows publish to `live/goodkey` only), then `./mediamtx ./mediamtx.yml`, then `./whip-local.sh <scratch dir>` with the dev server on :5174.
 Behind a reverse proxy MediaMTX must be told to trust it (`webrtcTrustedProxies: [127.0.0.1]`) or the auth hook sees every client as 127.0.0.1 (tested 20 Nov): see the vault note headliner-live-dj-slots-design.
 
+## SOUND CHECK against a real MediaMTX (20 Nov)
+`stream-local.sh` drives the stream panel's SOUND CHECK button (`bodies/stream-panel.js`: fake sign-in token, stand-in `/check/mount`, the real booth master) against the same local MediaMTX as `whip-local.sh`, with the auth stub allowing
+`vcheck-0123456789abcdef0123` (`ALLOWED=<keys>`), and reads the stream back over RTSP: `stream-analyze.mjs` says whether it is MUSIC (level and spread over 13 bands; a pure tone scores 5, the game's first record 12 to 13).
+`stream-tap` (in `run.sh`) needs no server: it checks the stream for the radio carries the room and never the headphone cue (SPLIT mode puts the room in mono on the left and the cue on the right of the cable).
+

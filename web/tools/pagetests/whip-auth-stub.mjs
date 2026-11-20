@@ -1,7 +1,7 @@
 // Test stand-in for the sync agent's /mediamtx-auth (rules copied from production, 20 Nov): read allowed; publish only live/<key> for a key in ALLOWED.
 // (The production rule also lets 127.0.0.1 publish anything: NOT copied, the test would then allow everything; see the vault note.)
 import http from "node:http";
-const ALLOWED = new Set(["goodkey"]);
+const ALLOWED = new Set((process.env.ALLOWED || "goodkey").split(","));
 http.createServer((req, res) => {
   let b = ""; req.on("data", (c) => (b += c));
   req.on("end", () => {

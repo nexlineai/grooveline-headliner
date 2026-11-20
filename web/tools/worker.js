@@ -10,9 +10,10 @@ const HEADERS = {
   "Cross-Origin-Resource-Policy": "same-origin",
   "X-Content-Type-Options": "nosniff",
   "X-Robots-Tag": "noindex",
-  // Only the game's own files; the one way out is the link to grooveline.org (a new tab).
+  // Only the game's own files; the ways out are the link to grooveline.org (a new tab) and, for the SOUND CHECK / going live, the account API (the DJ's sign-in and key)
+  // and the WHIP proxy on the stream host (the booth's audio): nothing else.
   "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; " +
-    "media-src 'self' blob:; font-src 'self'; connect-src 'self'; worker-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'",
+    "media-src 'self' blob:; font-src 'self'; connect-src 'self' https://api.grooveline.org https://stream.grooveline.org; worker-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'",
   "Referrer-Policy": "strict-origin-when-cross-origin",
 };
 

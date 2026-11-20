@@ -229,7 +229,7 @@ export class WhipPublisher {
     if (pc) { pc.onconnectionstatechange = null; pc.onicegatheringstatechange = null; try { pc.close(); } catch { /* closed already */ } }
     if (resource) {
       const doFetch = this.o.fetchFn ?? ((u: string, i?: RequestInit) => fetch(u, i));
-      await doFetch(resource, { method: "DELETE", headers: this.o.headers }).catch(() => {}); // best effort: the server drops a silent session by itself
+      await doFetch(resource, { method: "DELETE", headers: this.o.headers, keepalive: true }).catch(() => {}); // best effort (keepalive: it also leaves while the page is closing); the server drops a silent session by itself
     }
   }
 }
