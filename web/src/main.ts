@@ -47,6 +47,8 @@ import { GoLive } from "./stream/golive.ts";
 import { NowPlaying } from "./stream/nowplaying.ts";
 import type { LiveView } from "./stream/golive.ts";
 import { WhipPublisher } from "./stream/whip.ts";
+import { CameraPreview } from "./stream/camera.ts";
+import type { CameraView } from "./stream/camera.ts";
 import type { Kind } from "./booth/booth.ts";
 import { KEYS, attachKeys } from "./input/keys.ts";
 import { MidiInput, parseMidiConfig } from "./input/midi.ts";
@@ -1181,7 +1183,7 @@ const streamSlot = $("stream-slot"), streamOnAir = $("stream-onair"), barOnAir =
 const readStreamSession = () => { try { return readSession(localStorage); } catch { return null; } };
 const streamFetch = (url: string, init?: RequestInit): Promise<Response> => (streamTest.fetchFn ?? fetch)(url, init);
 // What each part last said; the panel is drawn from both (the views are kept here, so a part that reports while the other is still being made cannot reach an unmade one).
-let checkView: CheckView | null = null, liveView: LiveView | null = null;
+let checkView: CheckView | null = null, liveView: LiveView | null = null, camView: CameraView | null = null;
 const CALM = new Set(["signed-out", "loading", "none", "later", "on", "sending", "onair", "ended"]);
 const clockText = (ms: number): string => { const s = Math.max(0, Math.floor(ms / 1000)); return [Math.floor(s / 3600), Math.floor(s / 60) % 60, s % 60].map((n) => String(n).padStart(2, "0")).join(":"); };
 
@@ -1191,14 +1193,17 @@ function renderStream(): void {
   // The show wins the chip and the note while it runs or waits for its second click; otherwise the sound check's words win while it has any (it is running, failed, or needs a sign-in), else the slot's.
   const liveWins = lv.stops || lv.state === "confirming";
   const checkSays = !liveWins && cv.note !== "";
-  const text = liveWins ? lv.note : checkSays ? cv.note : lv.note;
+  // A camera message ("blocked: allow it in the address bar") is the answer to what he just clicked, so it comes first; the camera clears it.
+  const camNote = camView?.note ?? "";
+  const camSays = camNote !== "";
+  const text = camSays ? camNote : liveWins ? lv.note : checkSays ? cv.note : lv.note;
   const chip = lv.stops ? lv.chip : cv.chip;
   streamChip.textContent = chip;
   streamChip.classList.toggle("checking", lv.stops ? lv.state !== "onair" : cv.state === "sending" || cv.state === "connecting" || cv.state === "asking");
   streamChip.classList.toggle("onair", lv.state === "onair");
   streamNote.textContent = text;
   streamNote.hidden = !text;
-  streamNote.classList.toggle("good", checkSays ? cv.state === "sending" || cv.state === "signed-out" : CALM.has(lv.state));
+  streamNote.classList.toggle("good", camSays ? false : checkSays ? cv.state === "sending" || cv.state === "signed-out" : CALM.has(lv.state));
   streamNote.title = text;
   checkButton.textContent = cv.button;
   checkButton.classList.toggle("stops", cv.stops);
@@ -1241,6 +1246,39 @@ const soundCheck = new SoundCheck({
   onChange: (v) => { checkView = v; renderStream(); },
 });
 liveView = goLive.view; checkView = soundCheck.view; renderStream();
+
+// The camera preview in the PREVIEW row: a picture of this browser, shown here and NOWHERE else (stream/camera.ts). Nothing is
+// published (the stream keeps sending the mixer's audio only), and the microphone is never opened. The tracks stop when he
+// switches it off, picks another camera, leaves LIVE (the panel's 1 s rule) or closes the page.
+const cameraBox = $("camera"), cameraVideo = $("camera-video") as HTMLVideoElement, streamPanel = $("stream");
+const cameraButton = $("camera-toggle") as HTMLButtonElement, cameraPick = $("camera-pick") as HTMLSelectElement;
+const cameraStore = (() => { try { return window.localStorage; } catch { return null; } })();
+const mediaDevices = typeof navigator !== "undefined" ? navigator.mediaDevices ?? null : null;
+let cameraList = "";
+const camera = new CameraPreview({
+  media: mediaDevices, video: cameraVideo, store: cameraStore,
+  onChange: (v) => { camView = v; renderCamera(); renderStream(); },
+});
+function renderCamera(): void {
+  const v = camView;
+  if (!v) return;
+  cameraBox.hidden = !v.on;
+  streamPanel.classList.toggle("camera-on", v.on);
+  cameraButton.textContent = v.button;
+  // The cameras are in a select only where there is a choice; before the first allow their names are empty, so there is one.
+  const list = v.devices.map((d) => `${d.deviceId}\u0000${d.name}`).join("\u0001");
+  if (list !== cameraList) {
+    cameraList = list;
+    cameraPick.replaceChildren(...v.devices.map((d) => { const o = document.createElement("option"); o.value = d.deviceId; o.textContent = d.name; return o; }));
+  }
+  cameraPick.hidden = v.devices.length < 2;
+  if (v.deviceId) cameraPick.value = v.deviceId;
+}
+cameraButton.addEventListener("click", () => { void camera.toggle().catch(() => {}); });
+cameraPick.addEventListener("change", () => { void camera.choose(cameraPick.value || null).catch(() => {}); });
+// Another camera plugged in (or taken out) is offered at once.
+mediaDevices?.addEventListener?.("devicechange", () => { void camera.refreshDevices().catch(() => {}); });
+void camera.refreshDevices().catch(() => {});
 const streamFailed = (e: unknown): void => { note.textContent = e instanceof Error ? e.message : String(e); };
 checkButton.addEventListener("click", () => { soundCheck.toggle().catch(streamFailed); });
 goButton.addEventListener("click", () => { goLive.toggle().catch(streamFailed); });
@@ -1248,7 +1286,7 @@ goButton.addEventListener("click", () => { goLive.toggle().catch(streamFailed); 
 const streamRefresh = (): void => { soundCheck.refresh(); void goLive.refresh(); };
 window.addEventListener("storage", (e) => { if (e.key === "gl_token") streamRefresh(); });
 document.addEventListener("visibilitychange", () => { if (!document.hidden) streamRefresh(); });
-window.addEventListener("pagehide", () => { void soundCheck.stop(); void goLive.stop(); });
+window.addEventListener("pagehide", () => { void soundCheck.stop(); void goLive.stop(); void camera.stop(); });
 // While the panel is on screen: the slot's countdown and the timer every second, the slot read again every half minute, and the radio asked every 5 s whether it lists this booking.
 let streamShown = false, streamAwaySince = 0;
 // What the booth is playing goes to the Worker while the show is sending, so the site's player can show it (stream/nowplaying.ts).
@@ -1272,6 +1310,8 @@ function streamVisibility(live: boolean, nowMs: number): void {
   streamShown = false; streamAwaySince = 0;
   if (soundCheck.view.stops) void soundCheck.stop();
   if (goLive.busy || goLive.state === "confirming") void goLive.stop();
+  // The camera goes out with them: a picture left running keeps the device (and its light) away from every other program.
+  if (camView?.on || camView?.asking) void camera.stop();
 }
 // The master meter in the stream panel (audio/meter.ts): what the radio gets, read every frame while LIVE is on screen.
 const meter = new Meter();
@@ -1295,7 +1335,7 @@ function paintMeter(): void {
   if (text !== meterText) { meterText = text; meterDb.textContent = text; }
   meterEl.classList.toggle("clipping", v.clipping);
 }
-Object.assign((window as unknown as { headliner: object }).headliner, { soundCheck, goLive, streamTest, meter });
+Object.assign((window as unknown as { headliner: object }).headliner, { soundCheck, goLive, streamTest, meter, camera });
 
 // Keys and controllers work only while the booth is on screen (not a menu, a scene, the bag, the
 // credits or a result card).

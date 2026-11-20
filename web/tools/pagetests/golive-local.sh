@@ -3,8 +3,9 @@
 # MediaMTX v1.4.0 with webrtc on 127.0.0.1:8889 and rtsp on 127.0.0.1:8554 is already running). The server's answers (/me/next-slot, /live, /check/mount) are stand-ins with the real
 # shapes (bodies/golive-panel.js); the auth stub allows the booking's key and the sound-check key. An ffmpeg reads the stream back twice: while ON AIR, and while ON AIR after a
 # SOUND CHECK (so a show started after a check carries music too). Takes about 3 minutes. The dev server must be on :5174.
-#   web/tools/pagetests/golive-local.sh [scratch dir]
-HERE="$(cd "$(dirname "$0")" && pwd)"; WEB="$HERE/../.."; OUT="${1:-${TMPDIR:-/tmp}}"; KEY=zdb-b1; SIZE=1152x720; URL='http://localhost:5174/?autostart&live&records'
+#   web/tools/pagetests/golive-local.sh [scratch dir]      (PORT=5175 for a dev server on another port)
+PORT="${PORT:-5174}"
+HERE="$(cd "$(dirname "$0")" && pwd)"; WEB="$HERE/../.."; OUT="${1:-${TMPDIR:-/tmp}}"; KEY=zdb-b1; SIZE=1152x720; URL="http://localhost:$PORT/?autostart&live&records"
 cd "$WEB" || exit 1; "$HERE/build.sh" >/dev/null
 ALLOWED="$KEY,vcheck-0123456789abcdef0123" node "$HERE/whip-auth-stub.mjs" > "$OUT/golive-auth.log" 2>&1 & AP=$!
 trap 'kill $AP 2>/dev/null' EXIT

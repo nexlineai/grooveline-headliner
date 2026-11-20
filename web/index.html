@@ -61,18 +61,19 @@
   <aside id="stream" hidden>
     <div class="s-head"><span>STREAM</span><span class="s-state">OFF AIR</span></div>
     <div class="s-body">
+      <div id="camera" hidden><video id="camera-video" muted playsinline></video></div>
       <dl>
         <dt>SLOT</dt><dd id="stream-slot">&mdash;</dd>
         <dt>ON AIR</dt><dd id="stream-onair">00:00:00</dd>
         <dt>LISTENERS</dt><dd>&mdash;</dd>
         <dt>BITRATE</dt><dd>&mdash;</dd>
-        <dt>PREVIEW</dt><dd>&mdash;</dd>
       </dl>
       <div id="meter" title="MASTER: the level the radio gets (the room, not the headphones). Aim for the top of the green; red is clipping." aria-label="Master level">
         <div class="m-bars"><div class="m-bar"><i class="m-cover"></i><b class="m-hold"></b></div><div class="m-bar"><i class="m-cover"></i><b class="m-hold"></b></div></div>
         <span class="m-db">&mdash;</span><span class="m-clip">CLIP</span>
       </div>
     </div>
+    <div id="camera-bar"><span class="cam-label">PREVIEW</span><span class="cam-tight">no room for the picture in this window</span><select id="camera-pick" hidden aria-label="Camera"></select><button id="camera-toggle" type="button" title="The camera stays in this page: nothing is sent anywhere">ON</button></div>
     <p id="stream-note" class="s-note" hidden></p>
     <div class="s-buttons">
       <button id="sound-check" class="check" type="button" title="Send your master to a private test stream: nobody hears it">SOUND CHECK</button>
