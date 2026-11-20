@@ -301,7 +301,7 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
   PageUp/Down, the scrub bar; Esc or a click on the empty stage closes (in fullscreen Esc leaves fullscreen first: the click and the CLOSE button are the way). LEFT / RIGHT put the record on a deck through the same paths as MY MUSIC
   (`loadUserTrack`, `loadRecord`, `booth.refuseLoad`). Crates are chosen by CRATES BY: A-Z (default; balanced, cut between letters),
   GENRE (your own tags, top ones, rest, none), TEMPO (bands 110/120/126/134, from the analysis or the tag); THE GAME is always the first
-  crate; no library: an "OPEN A FOLDER" crate. ROOM button = the crowd instead (then a RECORDS pill); choice in `headliner.front`,
+  crate; no library: a dashed "YOUR MUSIC / OPEN A FOLDER" crate, and it does NOT go away with the first folder: it stays as the last crate, saying "ADD A FOLDER", while a crate slot is free (21 Nov, Zé: "after i import a folder, i dont have any more an option to import music" -> there was no way back to the picker from the wall; MY MUSIC has ADD A FOLDER too). ROOM button = the crowd instead (then a RECORDS pill); choice in `headliner.front`,
   grouping in `headliner.wallBy`. Shown only in LIVE with the booth on screen (`liveLoop` in main.ts), never in a lesson or night. (The ROOM button and the
   crowd clips pause are gone: LIVE has no room.)
   While it is up the room's clips are not played (`Booth.setRoomHidden`). Rebuilt from `Library.subscribe` at most every 0.8 s (a

@@ -35,8 +35,12 @@ const key = (k) => window.dispatchEvent(new KeyboardEvent("keydown", { key: k, c
   await H.library.init();
   await H.library.addHandle(dir);
   await sleep(3500);
-  ok("3 the library shows in the crates (A-Z)", crates().length >= 2 && !document.querySelector("#wall .w-ask"), crates().map((c) => c.querySelector("b").textContent + " " + c.querySelector("i").textContent).join(" | "));
-  const mine = crates().filter((c) => !c.textContent.includes("THE GAME"));
+  const real = crates().filter((c) => !c.classList.contains("w-ask"));
+  const askAfter = document.querySelector("#wall .w-ask");
+  ok("3 the library shows in the crates (A-Z)", real.length >= 2, real.map((c) => c.querySelector("b").textContent + " " + c.querySelector("i").textContent).join(" | "));
+  // The dashed crate does not go away with the first folder any more: it becomes the way to ADD another one (Zé, 21 Nov).
+  ok("3 the dashed crate stays, now offering to ADD another folder", !!askAfter && /ADD A FOLDER/.test(askAfter.textContent), askAfter ? askAfter.textContent.trim() : "none");
+  const mine = real.filter((c) => !c.textContent.includes("THE GAME"));
   ok("3 all 4 of your records are in the crates", mine.reduce((n, c) => n + Number(c.querySelector("i").textContent.replace(/,/g, "")), 0) === 4);
 
   // 4. dig into a crate

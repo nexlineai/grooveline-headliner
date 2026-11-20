@@ -270,12 +270,23 @@ export function buildWall(root: HTMLElement, lib: Library, sleeves: Sleeves, hoo
     floor.replaceChildren();
     crates.forEach((crate, i) => floor.append(crateButton(crate, i)));
     if (items.length === 0 && lib.folders.length === 0) {
-      const ask = make("button", "w-crate w-ask");
-      ask.type = "button";
-      ask.append(make("span", "w-box"), make("b", "", "YOUR MUSIC"), make("i", "", "OPEN A FOLDER"));
-      ask.addEventListener("click", hooks.openFolder);
-      floor.append(ask);
+      floor.append(askCrate("OPEN A FOLDER"));
+      return;
     }
+    // Once there is music the crate above is gone, and with it the only way back to the picker (Zé, 21 Nov: "after i import a folder, i
+    // dont have any more an option to import music"). It stays as the last crate while a slot is free: six library crates plus THE GAME
+    // (free play) is seven, which is what the wall's width fits.
+    if (lib.folders.length > 0 && crates.length + (gameItems.length ? 1 : 0) < 7) floor.append(askCrate("ADD A FOLDER"));
+  }
+
+  /** The dashed crate that opens the folder picker (a click, so the browser may ask which folder). */
+  function askCrate(what: string): HTMLElement {
+    const ask = make("button", "w-crate w-ask");
+    ask.type = "button";
+    ask.title = "Your own music: the files stay on this computer, they are read here and never sent anywhere";
+    ask.append(make("span", "w-box"), make("b", "", "YOUR MUSIC"), make("i", "", what));
+    ask.addEventListener("click", hooks.openFolder);
+    return ask;
   }
 
   /** A crate is a DJ's flight case or a record bag (they alternate along the floor). */
