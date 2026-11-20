@@ -492,8 +492,8 @@ body.live #top .pill .icon { width: 1.1em; height: 1.1em; margin-right: 0.5em; }
 body.live #livebar { align-items: flex-start; padding-top: 6px; box-sizing: border-box; }
 body.live #note { top: 22px; left: 48px; font-size: 10px; line-height: 11px; max-width: max(180px, calc(100vw - 48px - 540px)); max-height: 22px; overflow: hidden;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; z-index: 4; }
-/* The effects controls are in the bar (a wide window): the message is one line under them, from the left edge to the buttons. */
-body.live.fxbar #note { top: 28px; line-height: 12px; max-height: 12px; max-width: calc(100vw - 48px - 410px); -webkit-line-clamp: 1; }
+/* The effects controls are in the bar (a wide window): the message is one line under the title and stops before the effects (--fx-left is their left edge, set by the booth). */
+body.live.fxbar #note { top: 28px; line-height: 12px; max-height: 12px; max-width: calc(var(--fx-left, 400px) - 56px); -webkit-line-clamp: 1; }
 #deck-tip { position: fixed; z-index: 50; max-width: 70vw; padding: 6px 10px; border-radius: 7px; background: rgba(8, 11, 16, 0.96); border: 1px solid rgba(255, 255, 255, 0.25);
   font: 600 13px system-ui, sans-serif; color: var(--ink); pointer-events: none; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6); }
 #deck-tip[hidden] { display: none; }

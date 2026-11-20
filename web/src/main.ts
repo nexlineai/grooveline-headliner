@@ -67,7 +67,13 @@ Object.assign(window, { headliner: { engine, booth, progress, credits: () => ope
 
 // The canvas only uses a web font once it has loaded; ask for it now.
 document.fonts.load(`600 16px "Barlow Condensed"`).catch(() => {});
-document.fonts.ready.then(() => booth.relayout()).catch(() => {}); // a late font changes the width of the bar's text, and with it the room for the effects
+// The effects in the top bar are placed by where the stream bar's text ends and where the page's buttons begin: lay the booth out again whenever either changes size
+// (a late font, EXIT FULLSCREEN, the bar showing, a button added).
+if (typeof ResizeObserver !== "undefined") {
+  const barWatch = new ResizeObserver(() => booth.relayout());
+  barWatch.observe($("livebar"));
+  barWatch.observe($("top"));
+}
 
 // MARK: - Records
 
@@ -785,7 +791,7 @@ if (document.fullscreenEnabled) {
   fullscreenButton.addEventListener("click", () => {
     (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {});
   });
-  document.addEventListener("fullscreenchange", () => { fullscreenButton.textContent = document.fullscreenElement ? "EXIT FULLSCREEN" : "FULLSCREEN"; booth.relayout(); }); // the buttons' width changes the room for the effects
+  document.addEventListener("fullscreenchange", () => { fullscreenButton.textContent = document.fullscreenElement ? "EXIT FULLSCREEN" : "FULLSCREEN"; });
 }
 $("controls-close").addEventListener("click", () => { $("controls").hidden = true; });
 $("phones-button").addEventListener("click", () => { fillPhones().then(() => toggle(phonesPanel)).catch(failed); });
@@ -1070,8 +1076,7 @@ if (typeof ResizeObserver !== "undefined") {
   }
   const live = booth.mode === "live" && boothActive();
   $("stream").hidden = !live;
-  const liveBar = $("livebar");
-  if (liveBar.hidden === live) { liveBar.hidden = !live; if (live) booth.relayout(); } // the effects in the top bar are placed by where its text ends: measure once it shows
+  $("livebar").hidden = !live;
   requestAnimationFrame(liveLoop);
 })();
 attachKeys(booth, boothActive, () => { fillControls(); toggle($("controls")); });

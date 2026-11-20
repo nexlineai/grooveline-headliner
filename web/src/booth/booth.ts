@@ -521,7 +521,7 @@ export class Booth {
     return left > 0 && right > left ? { left, right } : undefined;
   }
 
-  /** Lay the booth out again at the next frame (the bar's text or buttons changed size). */
+  /** Lay the booth out again at the next frame (the top bar's text or buttons changed size; main.ts watches them). */
   relayout(): void { this.L = null; }
 
   /** The LIVE booth: free play's own layout. Everything is registered with the same pointer code as the game's gear. */
@@ -575,7 +575,8 @@ export class Booth {
     // The effects strip: the name (the left third goes to the effect before, the rest to the next), the four knobs, the LEVEL fader. The effect is
     // switched on for a channel by the FX button beside its FILTER.
     const F = g.fx, lvl = F.level;
-    document.body.classList.toggle("fxbar", g.fxInBar); // the page's orange message makes room for them
+    document.body.classList.toggle("fxbar", g.fxInBar); // the page's orange message makes room for them:
+    document.body.style.setProperty("--fx-left", `${g.fxInBar ? Math.round(g.fx.rect.x) : 0}px`); // ... it stops before the effects
     first({ t: "fxType", d: -1 }, F.name);
     first({ t: "fxType", d: -2 }, { x: F.name.x, y: F.name.y, w: F.name.w * 0.3, h: F.name.h });
     first({ t: "fxAmount" }, lvl.touch);
