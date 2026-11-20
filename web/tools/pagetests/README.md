@@ -36,6 +36,6 @@ Behind a reverse proxy MediaMTX must be told to trust it (`webrtcTrustedProxies:
 
 ## GO LIVE with the real mouse (20 Nov)
 `golive-local.sh` (not in `run.sh`: it needs the local MediaMTX from `whip-local.sh`, running) drives the stream panel's GO LIVE and SOUND CHECK buttons with CDP mouse clicks (`bodies/golive-panel.js` defines the stand-in server answers `/me/next-slot`, `/live`, `/check/mount`
-in the real shapes, and the checks `GL.p0` to `GL.p11`, which the script calls between the clicks). It walks: signed out, slot 2 h away (GO LIVE off), 10 min before the start (GO LIVE on, the note warns), click 1 (ON AIR NOW?), click 2 (SENDING, the radio does not list the booking yet),
+in the real shapes, and the checks `GL.p0` to `GL.p11`, which the script calls between the clicks). It walks: signed out, slot 2 h away (GO LIVE off), 10 min before the start (GO LIVE OFF: it opens when the slot starts; a real click sends nothing), the slot starts, one click (SENDING, the radio does not list the booking yet),
 `/live` names the booking (ON AIR, the timer and the bar), END SHOW, a running slot (one click), the slot's end (the audio stops by itself), SOUND CHECK then STOP then GO LIVE (one connection, real tracks), and leaving LIVE. The stream is read back twice (`stream-analyze.mjs`). About 3 minutes.
 The button positions are measured first (1152 x 720, the width of Zé's browser at 100 %). The server's stand-in `whip_url` is the real `https://stream.grooveline.org/whip/...`; the page's test seam `headliner.streamTest.whipBase` points it at the local MediaMTX.

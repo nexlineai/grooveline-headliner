@@ -79,7 +79,8 @@ export class GoLive {
       case "unavailable": return v("GO LIVE", false, false, "OFF AIR", this.detail);
       case "none": return v("GO LIVE", false, false, "OFF AIR", "No slot booked. Book one on grooveline.org/broadcast.");
       case "later": return v("GO LIVE", false, false, "OFF AIR", "GO LIVE opens 15 minutes before your slot. Until then, the SOUND CHECK.");
-      case "early": return v("GO LIVE", true, false, "OFF AIR", `Your slot starts in ${until}. Going live now puts you on the radio at once.`);
+      // 20 Nov: going live before the slot starts is NOT possible (it put a DJ on the radio at once, 7 min early). The 15 minutes before the start are for the SOUND CHECK.
+      case "early": return v("GO LIVE", false, false, "OFF AIR", `GO LIVE opens when your slot starts, in ${until}. Until then, the SOUND CHECK.`);
       case "confirming": return v("ON AIR NOW?", true, false, "OFF AIR", `Click again to go on the radio now. Your slot starts in ${until}.`);
       case "on": return v("GO LIVE", true, false, "OFF AIR", "Your slot is running.");
       case "connecting": return v("CANCEL", true, true, "CONNECTING", "");
@@ -138,7 +139,7 @@ export class GoLive {
   /** The button: sign in is the SOUND CHECK's; this one starts, confirms or ends. */
   async toggle(): Promise<void> {
     switch (this.state) {
-      case "early": this.askConfirm(); return;
+      case "early": return;
       case "confirming": this.clearConfirm(); await this.go(); return;
       case "on": await this.go(); return;
       case "failed": this.failure = ""; await this.refresh(); return;

@@ -55,10 +55,10 @@ G.p0 = async () => {
   p = panel();
   ok("signed in, slot in 2 h: SLOT says when, GO LIVE is off, the note says it opens 15 minutes before, SOUND CHECK is on offer", /in 2 h/.test(p.slot) && p.go.disabled && /opens 15 minutes before/.test(p.note) && p.check.textContent === "SOUND CHECK" && !p.check.disabled, show(p));
   ok("the top bar says OFF AIR and 00:00:00", p.bar === "OFF AIR" && p.barTime === "00:00:00" && p.timer === "00:00:00", `${p.bar} ${p.barTime}`);
-  // the window opens: 10 minutes before the start
+  // 10 minutes before the start: the sound check's time, not GO LIVE's (20 Nov: going live before the start is not possible)
   setSlot(10 * MIN, 60 * MIN); await goLive.refresh(); await sleep(1500);
   p = panel();
-  ok("10 min before the start: GO LIVE is on, and the note says that going live now puts you on the radio at once", !p.go.disabled && p.go.textContent === "GO LIVE" && /on the radio at once/.test(p.note) && / in 10 min/.test(p.slot), show(p));
+  ok("10 min before the start: GO LIVE is OFF (it opens when the slot starts) and the note says so; SOUND CHECK stays available", p.go.disabled && /opens when your slot starts/.test(p.note) && / in 10 min/.test(p.slot) && !p.check.disabled, show(p));
   const r = $("go-live").getBoundingClientRect();
   T("INFO", "go-live at", Math.round(r.x + r.width / 2), Math.round(r.y + r.height / 2));
 };
@@ -66,13 +66,14 @@ G.p0 = async () => {
 // after the first real click: it asks, it does not send
 G.p1 = () => {
   const p = panel();
-  ok("first click in the early window: the button asks ON AIR NOW? and nothing is sent yet", p.go.textContent === "ON AIR NOW?" && /Click again/.test(p.note) && p.chip === "OFF AIR" && open() === 0, `${show(p)} | connections ${open()}`);
+  ok("a real click on GO LIVE before the start does nothing: nothing is sent, still OFF AIR", open() === 0 && p.chip === "OFF AIR" && p.go.disabled, `${show(p)} | connections ${open()}`);
+  setSlot(-30e3, 60 * MIN); goLive.refresh(); // the slot starts
 };
 
 // after the second click, connected, but the radio does not list the booking yet
 G.p2 = () => {
   const p = panel();
-  ok("second click: SENDING (connected), not ON AIR; the radio is not listing the booking yet", p.chip === "SENDING" && p.go.textContent === "END SHOW" && /Waiting for the radio/.test(p.note) && p.timer === "00:00:00" && p.bar === "SENDING", show(p));
+  ok("one click when the slot runs: SENDING (connected), not ON AIR; the radio is not listing the booking yet", p.chip === "SENDING" && p.go.textContent === "END SHOW" && /Waiting for the radio/.test(p.note) && p.timer === "00:00:00" && p.bar === "SENDING", show(p));
   ok("one connection is open, and the sound check is blocked while the show runs", open() === 1 && p.check.disabled, `connections ${open()} check disabled ${p.check.disabled}`);
   G.liveOn = true; // the radio now lists the DJ's mount
 };

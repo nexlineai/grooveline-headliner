@@ -83,8 +83,8 @@ describe("GO LIVE phases", () => {
     assert.equal(r.g.state, "later");
     r.clock.t += 6 * MIN; r.g.tick();
     assert.equal(r.g.state, "early");
-    assert.equal(r.g.view.enabled, true);
-    assert.match(r.g.view.note, /on the radio at once/);
+    assert.equal(r.g.view.enabled, false);
+    assert.match(r.g.view.note, /opens when your slot starts/);
     r.clock.t += 15 * MIN; r.g.tick();
     assert.equal(r.g.state, "on");
     assert.match(r.g.view.note, /running/);
@@ -100,16 +100,19 @@ describe("GO LIVE phases", () => {
 });
 
 describe("going live", () => {
-  test("in the early window it takes TWO clicks (it puts the DJ on the radio at once); the second must come soon", async () => {
+  test("BEFORE the slot starts (also in the last 15 minutes) GO LIVE is off and a click sends nothing; when the start comes it turns on by itself and takes ONE click", async () => {
     const r = rig({ startIn: 10 * MIN });
     await r.g.refresh();
-    await r.g.toggle();
-    assert.equal(r.g.state, "confirming");
-    assert.equal(r.g.view.button, "ON AIR NOW?");
-    assert.equal(r.pubs.length, 0, "nothing is sent after one click");
-    await new Promise((x) => setTimeout(x, 90));
-    assert.equal(r.g.state, "early", "the second click did not come: back to early");
+    assert.equal(r.g.state, "early");
+    assert.equal(r.g.view.enabled, false, "not before the start");
+    assert.match(r.g.view.note, /opens when your slot starts/);
     await r.g.toggle(); await r.g.toggle();
+    assert.equal(r.pubs.length, 0, "clicks before the start send nothing");
+    assert.equal(r.g.state, "early");
+    r.clock.t += 10 * MIN; r.g.tick();
+    assert.equal(r.g.state, "on");
+    assert.equal(r.g.view.enabled, true);
+    await r.g.toggle();
     assert.equal(r.pubs.length, 1);
     assert.equal(r.pubs[0].endpoint, WHIP);
     assert.equal(r.g.state, "sending");
@@ -237,6 +240,6 @@ describe("the server answering badly", () => {
     const e = rig({ startIn: 5 * MIN });
     await e.g.refresh(); await e.g.toggle();
     await e.g.refresh();
-    assert.equal(e.g.state, "confirming");
+    assert.equal(e.g.state, "early", "a click before the start does nothing, and a refresh keeps it so");
   });
 });

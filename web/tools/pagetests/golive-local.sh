@@ -14,7 +14,7 @@ read -r GX GY SX SY <<< "$(echo "$POS" | tr -d '[]' | tr ',' ' ')"
 [ -n "$GX" ] && [ -n "$SY" ] || { echo "could not find the buttons: '$POS'"; exit 1; }
 echo "GO LIVE at $GX,$GY; SOUND CHECK at $SX,$SY"
 G="click $GX $GY"; S="click $SX $SY"
-STEPS="run $HERE/built/golive-panel.js; wait 10; $G; wait 1.5; eval GL.p1(); $G; wait 7; eval GL.p2(); wait 9; eval GL.p3(); wait 14; $G; wait 3; eval GL.p4(); wait 2; $G; wait 6; eval GL.p5(); wait 13; eval GL.p6(); wait 3; $S; wait 7; eval GL.p7(); $S; wait 2.5; $G; wait 6; eval GL.p8(); wait 9; eval GL.p9(); wait 14; eval GL.p10(); wait 5; eval GL.p11(); wait 1"
+STEPS="run $HERE/built/golive-panel.js; wait 10; $G; wait 1; eval GL.p1(); wait 3; $G; wait 7; eval GL.p2(); wait 9; eval GL.p3(); wait 14; $G; wait 3; eval GL.p4(); wait 2; $G; wait 6; eval GL.p5(); wait 13; eval GL.p6(); wait 3; $S; wait 7; eval GL.p7(); $S; wait 2.5; $G; wait 6; eval GL.p8(); wait 9; eval GL.p9(); wait 14; eval GL.p10(); wait 5; eval GL.p11(); wait 1"
 node tools/shot.ts "$OUT/golive-panel.png" "$URL" --size $SIZE --wait 14 --do "$STEPS" 2>&1 | grep --line-buffered -E "console.log: T |run .*:" | sed -u 's/console.log: T //' > "$OUT/golive-page.log" &
 PG=$!
 for H in HOLD1 HOLD2; do
