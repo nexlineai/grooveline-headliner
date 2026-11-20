@@ -39,9 +39,11 @@ import { probeDuration } from "./library/duration.ts";
 import type { LibraryTrack } from "./library/store.ts";
 import { LOOP_ACTIONS, PITCH_RANGES, keyOf } from "./booth/booth.ts";
 import { BAR_ROOM_NEEDED_PX } from "./booth/live-geometry.ts";
-import { SIGN_IN_URL, readSession } from "./stream/account.ts";
+import { SIGN_IN_URL, WHIP_BASE, readSession } from "./stream/account.ts";
 import { SoundCheck } from "./stream/soundcheck.ts";
 import type { CheckView } from "./stream/soundcheck.ts";
+import { GoLive } from "./stream/golive.ts";
+import type { LiveView } from "./stream/golive.ts";
 import { WhipPublisher } from "./stream/whip.ts";
 import type { Kind } from "./booth/booth.ts";
 import { KEYS, attachKeys } from "./input/keys.ts";
@@ -1155,37 +1157,103 @@ function fillControls(body: HTMLElement = $("controls-body")): void {
 
 Object.assign((window as unknown as { headliner: object }).headliner, { midi, learn: setLearn, menu: () => menuMusic });
 
-// MARK: - SOUND CHECK (the stream panel): the booth's master to a private test stream on the server. Nobody hears it; see stream/soundcheck.ts.
+// MARK: - The STREAM panel: SOUND CHECK (a private test stream, nobody hears it: stream/soundcheck.ts) and GO LIVE (the booked slot, on the radio: stream/golive.ts)
 
 /** Seams for the page tests (a stand-in server, another proxy address); never set by the page itself. */
 const streamTest: { fetchFn?: (url: string, init?: RequestInit) => Promise<Response>; whipBase?: string } = {};
-const checkButton = $("sound-check"), streamNote = $("stream-note"), streamChip = document.querySelector<HTMLElement>("#stream .s-state")!;
-function renderCheck(v: CheckView): void {
-  checkButton.textContent = v.button;
-  checkButton.classList.toggle("stops", v.stops);
-  streamChip.textContent = v.chip;
-  streamChip.classList.toggle("checking", v.state === "sending" || v.state === "connecting" || v.state === "asking");
-  streamNote.textContent = v.note;
-  streamNote.hidden = !v.note;
-  streamNote.classList.toggle("good", v.state === "sending");
-  streamNote.title = v.note;
+const checkButton = $("sound-check"), goButton = $("go-live"), streamNote = $("stream-note"), streamChip = document.querySelector<HTMLElement>("#stream .s-state")!;
+const streamSlot = $("stream-slot"), streamOnAir = $("stream-onair"), barOnAir = $("bar-onair"), barTime = $("bar-time");
+const readStreamSession = () => { try { return readSession(localStorage); } catch { return null; } };
+const streamFetch = (url: string, init?: RequestInit): Promise<Response> => (streamTest.fetchFn ?? fetch)(url, init);
+// What each part last said; the panel is drawn from both (the views are kept here, so a part that reports while the other is still being made cannot reach an unmade one).
+let checkView: CheckView | null = null, liveView: LiveView | null = null;
+const CALM = new Set(["signed-out", "loading", "none", "later", "on", "sending", "onair", "ended"]);
+const clockText = (ms: number): string => { const s = Math.max(0, Math.floor(ms / 1000)); return [Math.floor(s / 3600), Math.floor(s / 60) % 60, s % 60].map((n) => String(n).padStart(2, "0")).join(":"); };
+
+function renderStream(): void {
+  const lv = liveView, cv = checkView;
+  if (!lv || !cv) return;
+  // The show wins the chip and the note while it runs or waits for its second click; otherwise the sound check's words win while it has any (it is running, failed, or needs a sign-in), else the slot's.
+  const liveWins = lv.stops || lv.state === "confirming";
+  const checkSays = !liveWins && cv.note !== "";
+  const text = liveWins ? lv.note : checkSays ? cv.note : lv.note;
+  const chip = lv.stops ? lv.chip : cv.chip;
+  streamChip.textContent = chip;
+  streamChip.classList.toggle("checking", lv.stops ? lv.state !== "onair" : cv.state === "sending" || cv.state === "connecting" || cv.state === "asking");
+  streamChip.classList.toggle("onair", lv.state === "onair");
+  streamNote.textContent = text;
+  streamNote.hidden = !text;
+  streamNote.classList.toggle("good", checkSays ? cv.state === "sending" || cv.state === "signed-out" : CALM.has(lv.state));
+  streamNote.title = text;
+  checkButton.textContent = cv.button;
+  checkButton.classList.toggle("stops", cv.stops);
+  (checkButton as HTMLButtonElement).disabled = lv.stops; // the master is going out as a show: a test would only get in the way
+  goButton.textContent = lv.button;
+  goButton.classList.toggle("stops", lv.stops);
+  goButton.classList.toggle("confirm", lv.state === "confirming");
+  (goButton as HTMLButtonElement).disabled = !lv.enabled;
+  streamSlot.textContent = lv.slot;
+  streamSlot.title = lv.slot;
+  // The top bar says the same as the panel (it used to be a fixed OFF AIR and 00:00:00).
+  barOnAir.classList.toggle("live", lv.state === "onair");
+  barOnAir.classList.toggle("warm", lv.stops && lv.state !== "onair");
+  barOnAir.querySelector("span")!.textContent = lv.stops ? lv.chip : "OFF AIR";
+  renderOnAirTimer();
 }
+function renderOnAirTimer(): void {
+  const t = liveView?.onAirSince != null ? clockText(Date.now() - liveView.onAirSince) : "00:00:00";
+  if (streamOnAir.textContent !== t) streamOnAir.textContent = t;
+  if (barTime.textContent !== t) barTime.textContent = t;
+}
+
+/** The address the server gives is the real one (https, stream.grooveline.org); a page test points it at its own MediaMTX. */
+const goEndpoint = (url: string): string => (streamTest.whipBase !== undefined && url.startsWith(WHIP_BASE) ? streamTest.whipBase + url.slice(WHIP_BASE.length) : url);
+const goLive = new GoLive({
+  session: readStreamSession,
+  fetchFn: streamFetch,
+  stream: () => engine.broadcastStream(),
+  makePublisher: (endpoint, stream, onState) => new WhipPublisher({ endpoint: goEndpoint(endpoint), stream, onState }),
+  beforeGo: async () => { if (soundCheck.view.stops) await soundCheck.stop(); },
+  onChange: (v) => { liveView = v; renderStream(); },
+});
 const soundCheck = new SoundCheck({
-  session: () => { try { return readSession(localStorage); } catch { return null; } },
-  fetchFn: (url, init) => (streamTest.fetchFn ?? fetch)(url, init),
+  session: readStreamSession,
+  fetchFn: streamFetch,
   stream: () => engine.broadcastStream(),
   makePublisher: (endpoint, stream, onState) => new WhipPublisher({ endpoint, stream, onState }),
   whipBase: () => streamTest.whipBase,
   openSignIn: () => { window.open(SIGN_IN_URL, "_blank", "noopener"); },
-  onChange: renderCheck,
+  onChange: (v) => { checkView = v; renderStream(); },
 });
-renderCheck(soundCheck.view);
-checkButton.addEventListener("click", () => { soundCheck.toggle().catch((e) => { note.textContent = e instanceof Error ? e.message : String(e); }); });
-// Signed in on another tab (the site's /broadcast), or coming back to this one: look again. Closing the page ends the test session at the server.
-window.addEventListener("storage", (e) => { if (e.key === "gl_token") soundCheck.refresh(); });
-document.addEventListener("visibilitychange", () => { if (!document.hidden) soundCheck.refresh(); });
-window.addEventListener("pagehide", () => { void soundCheck.stop(); });
-Object.assign((window as unknown as { headliner: object }).headliner, { soundCheck, streamTest });
+liveView = goLive.view; checkView = soundCheck.view; renderStream();
+const streamFailed = (e: unknown): void => { note.textContent = e instanceof Error ? e.message : String(e); };
+checkButton.addEventListener("click", () => { soundCheck.toggle().catch(streamFailed); });
+goButton.addEventListener("click", () => { goLive.toggle().catch(streamFailed); });
+// Signed in on another tab (the site's /broadcast), or coming back to this one: look again. Closing the page ends a test or a show at the server.
+const streamRefresh = (): void => { soundCheck.refresh(); void goLive.refresh(); };
+window.addEventListener("storage", (e) => { if (e.key === "gl_token") streamRefresh(); });
+document.addEventListener("visibilitychange", () => { if (!document.hidden) streamRefresh(); });
+window.addEventListener("pagehide", () => { void soundCheck.stop(); void goLive.stop(); });
+// While the panel is on screen: the slot's countdown and the timer every second, the slot read again every half minute, and the radio asked every 5 s whether it lists this booking.
+let streamShown = false, streamAwaySince = 0;
+setInterval(() => { if (streamShown) { goLive.tick(); renderOnAirTimer(); } }, 1000);
+setInterval(() => { if (streamShown) void goLive.refresh(); }, 30_000);
+setInterval(() => { if (streamShown) void goLive.pollLive(); }, 5_000);
+/** Called every frame with "the booth is in LIVE and on screen". Leaving it (another mode, a title, a card over the booth) ends a test or a show, but not for a blink: it must be gone for a second. */
+function streamVisibility(live: boolean, nowMs: number): void {
+  if (live) {
+    streamAwaySince = 0;
+    if (!streamShown) { streamShown = true; streamRefresh(); }
+    return;
+  }
+  if (!streamShown) return;
+  if (!streamAwaySince) streamAwaySince = nowMs;
+  if (nowMs - streamAwaySince < 1000) return;
+  streamShown = false; streamAwaySince = 0;
+  if (soundCheck.view.stops) void soundCheck.stop();
+  if (goLive.busy || goLive.state === "confirming") void goLive.stop();
+}
+Object.assign((window as unknown as { headliner: object }).headliner, { soundCheck, goLive, streamTest });
 
 // Keys and controllers work only while the booth is on screen (not a menu, a scene, the bag, the
 // credits or a result card).
@@ -1223,7 +1291,7 @@ if (typeof ResizeObserver !== "undefined") {
   }
   const live = booth.mode === "live" && boothActive();
   $("stream").hidden = !live;
-  if (!live && soundCheck.view.stops) void soundCheck.stop(); // leaving LIVE ends a test in progress
+  streamVisibility(live, now);
   $("livebar").hidden = !live;
   requestAnimationFrame(liveLoop);
 })();

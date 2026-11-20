@@ -55,14 +55,14 @@
   <div id="livebar" hidden>
     <span class="brand">GROOVELINE<b>LIVE</b></span>
     <span class="clock" title="The time of day">--:--</span>
-    <span class="onair"><i></i><span>OFF AIR</span></span>
-    <span class="time">00:00:00</span>
+    <span class="onair" id="bar-onair"><i></i><span>OFF AIR</span></span>
+    <span class="time" id="bar-time" title="How long you have been on air">00:00:00</span>
   </div>
   <aside id="stream" hidden>
     <div class="s-head"><span>STREAM</span><span class="s-state">OFF AIR</span></div>
     <dl>
-      <dt>DESTINATION</dt><dd>Grooveline Radio</dd>
-      <dt>ON AIR</dt><dd>00:00:00</dd>
+      <dt>SLOT</dt><dd id="stream-slot">&mdash;</dd>
+      <dt>ON AIR</dt><dd id="stream-onair">00:00:00</dd>
       <dt>LISTENERS</dt><dd>&mdash;</dd>
       <dt>BITRATE</dt><dd>&mdash;</dd>
       <dt>PREVIEW</dt><dd>&mdash;</dd>
@@ -70,7 +70,7 @@
     <p id="stream-note" class="s-note" hidden></p>
     <div class="s-buttons">
       <button id="sound-check" class="check" type="button" title="Send your master to a private test stream: nobody hears it">SOUND CHECK</button>
-      <button class="go" type="button" disabled title="Going live from the page comes with your slot (next step)">GO LIVE</button>
+      <button id="go-live" class="go" type="button" disabled title="Go on Grooveline Radio in your booked slot">GO LIVE</button>
     </div>
   </aside>
   <div id="note"></div>

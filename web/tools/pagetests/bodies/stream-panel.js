@@ -12,7 +12,7 @@ const jwt = (p) => `${b64({ alg: "HS256", typ: "JWT" })}.${b64(p)}.sig`;
   for (let i = 0; i < 100 && !(A.isLoaded && engine.decks[1].isLoaded); i++) await sleep(100);
   await sleep(2000);
   const panel = $("stream"), btn = $("sound-check"), chip = document.querySelector("#stream .s-state"), noteEl = $("stream-note");
-  ok("the stream panel shows in LIVE with a SOUND CHECK button next to GO LIVE (still disabled)", !panel.hidden && !!btn && document.querySelector("#stream .go").disabled);
+  ok("the stream panel shows in LIVE with a SOUND CHECK button next to GO LIVE (off while signed out)", !panel.hidden && !!btn && document.querySelector("#stream .go").disabled);
 
   // signed out
   localStorage.removeItem("gl_token"); headliner.soundCheck.refresh();
@@ -23,11 +23,15 @@ const jwt = (p) => `${b64({ alg: "HS256", typ: "JWT" })}.${b64(p)}.sig`;
 
   // signed in (the site's token, in the same storage): the offer comes back by itself when the other tab stores it
   const asked = [];
-  headliner.streamTest.fetchFn = async (url, init) => { asked.push({ url, auth: init && init.headers && init.headers.Authorization }); return new Response(JSON.stringify({ video_key: KEY }), { status: 200 }); };
+  // GO LIVE asks /me/next-slot through the same seam: no booking here (its own checks are in golive-panel)
+  headliner.streamTest.fetchFn = async (url, init) => {
+    if (url.endsWith("/me/next-slot")) return new Response(JSON.stringify({ now: new Date().toISOString(), slot: null, ingest: null }), { status: 200 });
+    asked.push({ url, auth: init && init.headers && init.headers.Authorization }); return new Response(JSON.stringify({ video_key: KEY }), { status: 200 });
+  };
   headliner.streamTest.whipBase = "http://127.0.0.1:8889";
   localStorage.setItem("gl_token", jwt({ sub: "u1", dj_name: "Zé", exp: Date.now() + 3600e3 }));
   window.dispatchEvent(new StorageEvent("storage", { key: "gl_token" })); await sleep(200);
-  ok("signed in: the button offers SOUND CHECK, no note", btn.textContent === "SOUND CHECK" && noteEl.hidden, `${btn.textContent}`);
+  ok("signed in: the button offers SOUND CHECK, and the only note is the slot's (none booked)", btn.textContent === "SOUND CHECK" && /No slot booked/.test(noteEl.textContent), `${btn.textContent} | ${noteEl.textContent}`);
 
   // the booth's master: deck A on air, so there is music to send
   booth.channel[0] = 0.9; booth.channel[1] = 0; booth.cross = 0; booth.applyMix(); engine.roomVolume = 0.75;
