@@ -37,6 +37,21 @@ Design, story, decisions and the build log are in the vault:
   `git tag full-shots-N && git push origin full-shots-N` (about 25 min). Store pictures: tag `store-shots-N`.
 - `project.yml` -> `xcodegen generate` -> `GroovelineHeadliner.xcodeproj` (gitignored).
 - iOS 26.0, iPhone only, landscape only, Swift 5 language mode.
+- **Releasing to the App Store (learned the hard way, 20-21 Nov 2026).** The build number is not a file and
+  not a setting: `testflight.yml` passes `BUILD_NUMBER: ${{ github.run_number }}` and `ci-testflight.sh`
+  archives with `CURRENT_PROJECT_VERSION="$BUILD_NUMBER"`, so an upload's build number is that workflow's run
+  number (`CURRENT_PROJECT_VERSION: "1"` in `project.yml` is only the local/simulator fallback). A build is
+  attached to a release on the version page's **Build** row (the `+` beside "Build"), and ONLY while that
+  version is unreleased; a released version cannot be re-pointed at another build, so shipping a different
+  build means a NEW version. `MARKETING_VERSION` must equal the App Store version string on that page, and the
+  tag must match it (`v1.0.1`, or `vX.Y.Z-N` for another build of the same version). 1.0 went live on
+  20 Nov 2026 carrying build 0.1.0 (5) while build 0.1.0 (6) = `b7e3ee8` sat unused; `release-1.0.1` sets
+  `MARKETING_VERSION: "1.0.1"` so binary and store version finally agree.
+  **EU storefronts (21 Nov):** every EU storefront returns nothing (`itunes.apple.com/lookup?id=...&country=pt`
+  => `resultCount 0`) while US/GB/CA/BR serve the app. That is ASC > Business > Compliance > **Digital
+  Services Act** still "In Review" (declared 18 Nov 2026), which by Apple's rule keeps the app out of the EU
+  "until trader status is provided and verified", plus the **DAC7** row beside it showing "Missing Info".
+  Neither is a code problem, no build fixes them, and the store page itself is fine.
 - Launch arguments for screenshots: `-screen booth`, `-demo 1`, `-screen lesson`, `-screen story -scene <id>`. Add one per new screen and a
   `shot` line in `scripts/ci-shots.sh`.
 
