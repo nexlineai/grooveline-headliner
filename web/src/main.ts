@@ -1180,6 +1180,8 @@ Object.assign((window as unknown as { headliner: object }).headliner, { midi, le
 const streamTest: { fetchFn?: (url: string, init?: RequestInit) => Promise<Response>; whipBase?: string } = {};
 const checkButton = $("sound-check"), goButton = $("go-live"), streamNote = $("stream-note"), streamChip = document.querySelector<HTMLElement>("#stream .s-state")!;
 const streamSlot = $("stream-slot"), streamOnAir = $("stream-onair"), barOnAir = $("bar-onair"), barTime = $("bar-time");
+// The PREVIEW row's label: it says "IN SHOW" while the picture is part of what is being sent (see renderStream).
+const cameraLabel = document.querySelector<HTMLElement>("#camera-bar .cam-label")!;
 const readStreamSession = () => { try { return readSession(localStorage); } catch { return null; } };
 const streamFetch = (url: string, init?: RequestInit): Promise<Response> => (streamTest.fetchFn ?? fetch)(url, init);
 // What each part last said; the panel is drawn from both (the views are kept here, so a part that reports while the other is still being made cannot reach an unmade one).
@@ -1201,6 +1203,9 @@ function renderStream(): void {
   streamChip.textContent = chip;
   streamChip.classList.toggle("checking", lv.stops ? lv.state !== "onair" : cv.state === "sending" || cv.state === "connecting" || cv.state === "asking");
   streamChip.classList.toggle("onair", lv.state === "onair");
+  // Is the picture part of what is going out right now? (?publishCamera only; the row says so, the toggle keeps working.)
+  const sending = cv.stops || lv.stops; // a check or a show has a connection (up, being made, or reconnecting)
+  cameraLabel.textContent = publishCamera ? (sending && camView?.on ? "PREVIEW \u00b7 IN SHOW" : "PREVIEW") : "PREVIEW";
   streamNote.textContent = text;
   streamNote.hidden = !text;
   streamNote.classList.toggle("good", camSays ? false : checkSays ? cv.state === "sending" || cv.state === "signed-out" : CALM.has(lv.state));
@@ -1280,14 +1285,20 @@ function renderCamera(): void {
   if (v.deviceId) cameraPick.value = v.deviceId;
 }
 cameraForShow = () => (publishCamera ? camera.track : null);
+// With ?publishCamera the camera must be ON before the connection is made: a track is added once, at connect time, and a show that
+// started without it would go out as audio only (measured 21 Nov: "1 track (Opus)" in MediaMTX while Zé streamed a video slot).
+const ensureCameraForShow = async (): Promise<void> => {
+  if (!publishCamera || camera.view.on) return;
+  await camera.start();
+};
 cameraButton.addEventListener("click", () => { void camera.toggle().catch(() => {}); });
 cameraPick.addEventListener("change", () => { void camera.choose(cameraPick.value || null).catch(() => {}); });
 // Another camera plugged in (or taken out) is offered at once.
 mediaDevices?.addEventListener?.("devicechange", () => { void camera.refreshDevices().catch(() => {}); });
 void camera.refreshDevices().catch(() => {});
 const streamFailed = (e: unknown): void => { note.textContent = e instanceof Error ? e.message : String(e); };
-checkButton.addEventListener("click", () => { soundCheck.toggle().catch(streamFailed); });
-goButton.addEventListener("click", () => { goLive.toggle().catch(streamFailed); });
+checkButton.addEventListener("click", () => { void ensureCameraForShow().then(() => soundCheck.toggle()).catch(streamFailed); });
+goButton.addEventListener("click", () => { void ensureCameraForShow().then(() => goLive.toggle()).catch(streamFailed); });
 // Signed in on another tab (the site's /broadcast), or coming back to this one: look again. Closing the page ends a test or a show at the server.
 const streamRefresh = (): void => { soundCheck.refresh(); void goLive.refresh(); };
 window.addEventListener("storage", (e) => { if (e.key === "gl_token") streamRefresh(); });
