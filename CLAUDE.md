@@ -409,6 +409,10 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
   (not the folder id) + title/artist/length. Add from the which-deck popup (ADD TO PLAYLIST, own music only); NEW, RENAME, reorder, take out, DELETE (asks twice). EXPORT writes an
   extended M3U (.m3u8, UTF-8, paths from the folder that holds your music folders; the browser's save dialog or a plain download), IMPORT reads .m3u8/.m3u from any program: records are
   found by path suffix, then artist + title; what is not found is KEPT (grey, "NOT IN YOUR LIBRARY"). Tests: `playlist.test.ts`, `playlists.test.ts`, `length.test.ts`, page test `playlist-e2e`.
+- **Page tests, and where to start (20 Nov).** The browser tests that were in a temp folder are now in `web/tools/pagetests/` (README there): `./run.sh` runs the 15 headless suites one at a time (about 25 min, dev server on :5174),
+  `mouse-fx.ts` drives controls with the REAL mouse (on 20 Nov the FX buttons and the LEVEL fader were broken while every test was green, because tests called the control directly: drive each new control once with the mouse).
+  The effects controls sit in the TOP BAR after the stream bar's 00:00:00 when the window is 1270 px or wider (`fxFitsTheBar`), else in a strip above the gear row; the LEVEL fader is short and follows the pointer 1:1.
+  **A new session starts at the vault note `04_projects/grooveline/notes/2026-11-20-headliner-live-handoff-next-session.md`** (open items in order, pitfalls, how to test and push).
 - **The effects unit (19 Nov):** `audio/fx.ts`: seven effects (`FX_TYPES`), four knobs each (`FX_KNOBS`: name, steps; `FX_DEFAULTS`; the `tempo` knob picks the note value, the
   page turns it into `fxDelaySeconds`), `M.fxKnob..+3` in the shared mixer slots; knobs glide (30 ms), NaN/runaway output is dropped and the effect restarts, off = bit-identical
   (tests: every knob changes the sound, extremes stay finite and inside full scale). Delay/reverb/DLY+FLT have a tail and take the sound at their input; the others at their output.
