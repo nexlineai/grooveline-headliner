@@ -13,7 +13,8 @@ const ok = (name, cond, extra = "") => T(cond ? "PASS" : "FAIL", name, extra);
   const dest = ctx.createMediaStreamDestination();
   osc.connect(gain).connect(dest); osc.start();
   const states = [];
-  const whip = new WhipPublisher({ endpoint: `http://127.0.0.1:8889/live/${good ? "goodkey" : "badkey"}/whip`, stream: dest.stream, retryMs: [500, 1000], onState: (s, d) => { states.push(s); T("state", s, d); } });
+  const base = new URLSearchParams(location.search).get("base") || "http://127.0.0.1:8889";
+  const whip = new WhipPublisher({ endpoint: `${base}/live/${new URLSearchParams(location.search).get("key") || (good ? "goodkey" : "badkey")}/whip`, stream: dest.stream, retryMs: [500, 1000], onState: (s, d) => { states.push(s); T("state", s, d); } });
   window.__whip = whip;
   await whip.start();
   if (good) {

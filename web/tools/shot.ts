@@ -1,6 +1,6 @@
 // Screenshots of the web version from headless Chromium, with its console and errors:
 //   node tools/shot.ts OUT.png [URL] [--size 1600x740] [--wait 6] [--chromium /usr/bin/chromium] [--gpu]
-//                      [--do "click 181 697; wait 2; drag 515 518 515 440; eval engine.decks[0].pitch"]
+//                      [--do "click 181 697; wait 2; drag 515 518 515 440; eval engine.decks[0].pitch"] [--bypass-csp]
 // Verbs: click X Y | down X Y | up X Y (a held button: down, wait, eval, up) | drag X1 Y1 X2 Y2 | wait S | run FILE | eval EXPR
 //        | files SELECTOR PATH... (puts local files into a file input, as a person choosing them would)
 // `run FILE` evaluates a script file in the page (a bot that plays a lesson, for instance).
@@ -88,6 +88,8 @@ try {
   // (visibilityState "hidden") and stops its animation frames.
   await send("Page.bringToFront");
   await send("Emulation.setFocusEmulationEnabled", { enabled: true });
+  // --bypass-csp: the page's Content-Security-Policy is not enforced (CORS still is). For trying a page's own origin against a server before the page's CSP lists it.
+  if (args.includes("--bypass-csp")) await send("Page.setBypassCSP", { enabled: true });
   await send("Page.navigate", { url });
   await sleep(wait);
   const mouse = (type: string, x: number, y: number, buttons = 1) =>
