@@ -202,11 +202,10 @@ button.quiet[hidden] { display: none; }
 
 
 .pill[hidden] { display: none; }
-/* A link straight to LIVE (?live): the title shows one button. */
-#start .live-note { margin: 4px 0 0; font: 600 12px system-ui, sans-serif; letter-spacing: 0.08em; color: rgba(236, 240, 245, 0.55); }
-#start.live-link #title-play, #start.live-link #title-free { display: none; }
-#start.live-link #title-live { font-size: 1.15em; padding: 0.9em 2.4em; background: #26c6f0; color: #04121a; border-color: #26c6f0; }
-#start.live-link .live-note { display: block; }
+/* The link straight to LIVE (?live): browsers start sound after a click, so a prompt sits on the booth until then (only if the sound is not allowed yet). */
+#sound-gate { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: rgba(5, 7, 10, 0.55); cursor: pointer; }
+#sound-gate[hidden] { display: none; }
+#sound-gate span { padding: 16px 26px; border-radius: 10px; border: 1.5px solid rgba(38, 198, 240, 0.6); background: rgba(8, 11, 16, 0.94); color: var(--ink); font: 800 13px system-ui, sans-serif; letter-spacing: 0.18em; }
 .pill.pointed { border: 2.5px solid var(--orange); animation: pulse 1.2s ease-in-out infinite alternate; }
 @keyframes pulse { from { box-shadow: 0 0 2px rgba(255, 153, 61, 0.2); } to { box-shadow: 0 0 14px rgba(255, 153, 61, 0.9); } }
 

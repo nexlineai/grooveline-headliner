@@ -20,12 +20,14 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     ok("3 LIVE is the DJ's booth: the gear row, the wall, the stream panel, SHARE; the CRATE button is gone", H.booth.mode === "live" && !!H.booth.L.live && !$("#wall").hidden && !$("#stream").hidden && getComputedStyle($("#share-button")).display !== "none" && $("#crate-button").hidden);
     ok("3 the room picture is not there", getComputedStyle($("#room")).display === "none");
   } else {
-    ok("1 a link to LIVE: the title offers one button, LIVE", $("#start").classList.contains("live-link") && vis($("#title-live")) && !vis($("#title-play")) && !vis($("#title-free")) && !$(".live-note").hidden);
-    $("#title-live").click(); await sleep(5000);
+    // the website's link (?live, /headliner/live): straight into the DJ's booth, no game title
+    await sleep(2500);
     const H = window.headliner;
-    ok("2 it opens LIVE with empty decks (no game record on them)", H.booth.mode === "live" && !H.engine.decks[0].isLoaded && !H.engine.decks[1].isLoaded);
+    ok("1 a link to LIVE: no game title, the page is the DJ's booth at once (stream panel, wall, gear row, no CRATE button)", !vis($("#start")) && H.booth.mode === "live" && !!H.booth.L.live && !$("#stream").hidden && !$("#wall").hidden && $("#crate-button").hidden, `start visible ${vis($("#start"))} mode ${H.booth.mode}`);
+    ok("2 the sound is running (this browser allows it), so no prompt is on the booth", !vis($("#sound-gate")) && H.engine.running, `gate ${vis($("#sound-gate"))} running ${H.engine.running}`);
+    ok("3 the decks are empty (no game record on them)", !H.engine.decks[0].isLoaded && !H.engine.decks[1].isLoaded);
     $("#back").click(); await sleep(1500);
-    ok("3 back, the title is the whole title again", vis($("#title-play")) && vis($("#title-free")) && vis($("#title-live")));
+    ok("4 back, the title is the whole title again", vis($("#title-play")) && vis($("#title-free")) && vis($("#title-live")));
   }
   T("DONE");
 })().catch((e) => T("ERROR", e && e.stack || e));

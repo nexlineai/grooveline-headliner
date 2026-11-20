@@ -377,8 +377,9 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
   also sits in a thin blue outline with no fill). Faders, pads and the deck title keep the deck colours (A cyan, B amber).
 - **Title, FREE PLAY and LIVE (19 Nov, evening).** The title has PLAY, FREE PLAY (`showMode("free")`: the game's booth EXACTLY as the deployed site had it before LIVE: the effect bar under the gear
   (the first three effects), a GAIN knob above each fader, the wall of records in front of the room with ROOM / RECORDS to swap it for the crowd, the CRATE sheet with MY MUSIC;
-  a lesson or a night is plain iPhone parity: no bar, no knobs, no wall) and LIVE (`openLive()`: `Booth.mode = "live"`). THE ENDING is off the title. `?live` opens the page on ONE button, LIVE (`#start.live-link`;
-  until you leave it); the Worker redirects `/headliner/live` to `/headliner/?live` (needs `npm run deploy`). `?autostart` = free play; `?autostart&live` = LIVE with empty
+  a lesson or a night is plain iPhone parity: no bar, no knobs, no wall) and LIVE (`openLive()`: `Booth.mode = "live"`). THE ENDING is off the title. `?live` opens STRAIGHT in the DJ's booth, no game title (`openLiveLink()` in main.ts: `showMode("live")`, then
+  `ensureStarted()` and `openLive()`); browsers start sound only after a click or key, so when the sound is blocked a one-line prompt `#sound-gate` ("CLICK ANYWHERE TO START THE SOUND") sits on the booth after 700 ms until the first click (test the blocked case with
+  `shot.ts --chromium <wrapper that swaps --autoplay-policy=no-user-gesture-required for document-user-activation-required>`; the normal page tests allow sound); the back arrow leads to the whole title; the Worker redirects `/headliner/live` to `/headliner/?live` (needs `npm run deploy`). `?autostart` = free play; `?autostart&live` = LIVE with empty
   decks; add `&records` for the game's first two records on the decks (tests); `&playcount=<s>` shortens "a play" (30 s) for tests. LIVE's library has NO game records
   (`WallHooks.game` returns nothing); its decks start empty.
 - **LIVE deck header (19 Nov):** title (`label` with `ellipsis`, stops at `titleMax` = `HEADER_RIGHT` units from the right), time, four bar lamps, key (8.4 units, smaller than the

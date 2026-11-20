@@ -25,7 +25,7 @@ export default {
       return Response.redirect(url.toString(), 308);
     }
     if (url.pathname === "/headliner/live" || url.pathname === "/headliner/live/") {
-      // The link for the website: grooveline.org/headliner/live opens the page on its LIVE button.
+      // The link for the website: grooveline.org/headliner/live opens the page straight in the DJ's LIVE booth (no game title).
       url.pathname = "/headliner/";
       url.search = "?live";
       return Response.redirect(url.toString(), 302);

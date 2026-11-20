@@ -3,7 +3,7 @@
 //   ?lesson=<id>[&step=<n>]   start straight in a lesson
 //   ?night=<id>[&length=<s>]  start straight in a night (a short length for tests)
 //   ?demo                     free play with both records turning (screenshots)
-//   ?live                     the page opens on one button: LIVE (the link for the website)
+//   ?live                     the page opens straight in the DJ's booth (LIVE), no title (the link for the website: /headliner/live)
 //   &playcount=<s>            how many seconds make a play (30), for the tests
 //   ?autostart&live[&records] straight into LIVE (screenshots, tests); &records puts the game's first two records on the decks
 //   ?autostart                no click needed (screenshots; the browser must allow sound)
@@ -403,12 +403,25 @@ function showTitle(): void {
   showMode("menu");
   chapterScreen.hidden = true;
   title.hidden = false;
-  title.classList.toggle("live-link", liveLink);
-  title.querySelector<HTMLElement>(".live-note")!.hidden = !liveLink;
 }
 
-/** The page was opened by a link to LIVE (?live): the title offers just that, until you leave it. */
-let liveLink = params.has("live") && !params.has("autostart");
+/** The link for the website (?live, /headliner/live): straight into the DJ's booth, no game title. Browsers start sound only after a click or a key, so when the
+ * sound is not allowed yet a one-line prompt sits on the booth (after a moment, so a browser that allows it never shows it) until the first click. */
+function openLiveLink(): void {
+  title.hidden = true;
+  showMode("live");
+  const gate = $("sound-gate");
+  const wait = window.setTimeout(() => { gate.hidden = false; }, 700);
+  const unlock = (): void => { engine.context?.resume().catch(() => {}); ensureStarted().catch(failed); };
+  window.addEventListener("pointerdown", unlock);
+  window.addEventListener("keydown", unlock);
+  ensureStarted().then(() => openLive()).catch(failed).finally(() => {
+    clearTimeout(wait);
+    gate.hidden = true;
+    window.removeEventListener("pointerdown", unlock);
+    window.removeEventListener("keydown", unlock);
+  });
+}
 
 function openChapter(n: number): void {
   if (!content) return;
@@ -430,8 +443,8 @@ $("title-play").addEventListener("click", () => {
   // The chapter you are up to.
   ensureStarted().then(() => openChapter(Progress.current(progress, content!.career.chapters))).catch(failed);
 });
-$("title-free").addEventListener("click", () => { liveLink = false; ensureStarted().then(() => openFreePlay()).catch(failed); });
-$("title-live").addEventListener("click", () => { liveLink = false; ensureStarted().then(() => openLive()).catch(failed); });
+$("title-free").addEventListener("click", () => { ensureStarted().then(() => openFreePlay()).catch(failed); });
+$("title-live").addEventListener("click", () => { ensureStarted().then(() => openLive()).catch(failed); });
 
 // Zé's hidden unlock, as on the iPhone: hold the Grooveline logo three seconds.
 {
@@ -1301,4 +1314,5 @@ attachKeys(booth, boothActive, () => {
 });
 
 if (params.has("autostart")) autostart().catch(failed); // screenshots (the browser allows sound without a click)
+else if (params.has("live")) openLiveLink();
 else showTitle();
