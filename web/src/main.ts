@@ -1228,11 +1228,16 @@ function renderOnAirTimer(): void {
 
 /** The address the server gives is the real one (https, stream.grooveline.org); a page test points it at its own MediaMTX. */
 const goEndpoint = (url: string): string => (streamTest.whipBase !== undefined && url.startsWith(WHIP_BASE) ? streamTest.whipBase + url.slice(WHIP_BASE.length) : url);
+// SPIKE, page only (?publishCamera): send the camera's picture in the SAME WHIP connection as the mixer, H264 preferred. Off unless the flag is
+// given, so a normal show is exactly what it was; the preview still owns its track, so turning the preview off ends the video of a show.
+const publishCamera = params.has("publishCamera");
+let cameraForShow: () => MediaStreamTrack | null = () => null;
+const videoCodecs = (): RTCRtpCodec[] => RTCRtpSender.getCapabilities?.("video")?.codecs ?? [];
 const goLive = new GoLive({
   session: readStreamSession,
   fetchFn: streamFetch,
   stream: () => engine.broadcastStream(),
-  makePublisher: (endpoint, stream, onState) => new WhipPublisher({ endpoint: goEndpoint(endpoint), stream, onState }),
+  makePublisher: (endpoint, stream, onState) => new WhipPublisher({ endpoint: goEndpoint(endpoint), stream, onState, video: cameraForShow(), videoCodecs }),
   beforeGo: async () => { if (soundCheck.view.stops) await soundCheck.stop(); },
   onChange: (v) => { liveView = v; renderStream(); },
 });
@@ -1240,7 +1245,7 @@ const soundCheck = new SoundCheck({
   session: readStreamSession,
   fetchFn: streamFetch,
   stream: () => engine.broadcastStream(),
-  makePublisher: (endpoint, stream, onState) => new WhipPublisher({ endpoint, stream, onState }),
+  makePublisher: (endpoint, stream, onState) => new WhipPublisher({ endpoint, stream, onState, video: cameraForShow(), videoCodecs }),
   whipBase: () => streamTest.whipBase,
   openSignIn: () => { window.open(SIGN_IN_URL, "_blank", "noopener"); },
   onChange: (v) => { checkView = v; renderStream(); },
@@ -1274,6 +1279,7 @@ function renderCamera(): void {
   cameraPick.hidden = v.devices.length < 2;
   if (v.deviceId) cameraPick.value = v.deviceId;
 }
+cameraForShow = () => (publishCamera ? camera.track : null);
 cameraButton.addEventListener("click", () => { void camera.toggle().catch(() => {}); });
 cameraPick.addEventListener("change", () => { void camera.choose(cameraPick.value || null).catch(() => {}); });
 // Another camera plugged in (or taken out) is offered at once.

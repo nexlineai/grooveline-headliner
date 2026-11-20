@@ -150,6 +150,11 @@ export class CameraPreview {
     deps.onChange(this.view); // the panel shows the off state at once
   }
 
+  /** The picture's track while the preview is on (what a show would send), else null. The track belongs to the preview: stop() ends it. */
+  get track(): MediaStreamTrack | null {
+    return this.stream?.getVideoTracks()[0] ?? null;
+  }
+
   get view(): CameraView {
     const on = this.stream !== null;
     return {

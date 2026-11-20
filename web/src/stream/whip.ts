@@ -12,6 +12,12 @@
 
 export type WhipState = "idle" | "connecting" | "live" | "reconnecting" | "failed" | "stopped";
 
+/** What the publisher uses of one transceiver: its sender (for the bitrate) and, when the browser has it, its codec list. */
+export interface WhipTransceiver {
+  sender: { getParameters(): unknown; setParameters(p: never): Promise<void> };
+  setCodecPreferences?(codecs: RTCRtpCodec[]): void;
+}
+
 /** What the publisher uses of an RTCPeerConnection (so a test can stand one in). */
 export interface WhipPeer {
   connectionState: string;
@@ -19,7 +25,7 @@ export interface WhipPeer {
   localDescription: { sdp?: string } | null;
   onconnectionstatechange: ((e?: unknown) => void) | null;
   onicegatheringstatechange: ((e?: unknown) => void) | null;
-  addTransceiver(track: MediaStreamTrack, init: { direction: "sendonly"; streams?: MediaStream[] }): { sender: { getParameters(): unknown; setParameters(p: never): Promise<void> } };
+  addTransceiver(track: MediaStreamTrack, init: { direction: "sendonly"; streams?: MediaStream[] }): WhipTransceiver;
   createOffer(): Promise<{ type: "offer"; sdp?: string }>;
   setLocalDescription(d: { type: "offer"; sdp?: string }): Promise<void>;
   setRemoteDescription(d: { type: "answer"; sdp: string }): Promise<void>;
@@ -31,6 +37,13 @@ export interface WhipOptions {
   endpoint: string;
   /** What to send. */
   stream: MediaStream;
+  /** The camera's track, when there is one: it goes in the SAME connection (one WHIP session, one stream: H264 + Opus). */
+  video?: MediaStreamTrack | null;
+  /** Bits per second for the camera (1.5 Mbit/s is enough for 720p30 H264). */
+  videoBitrate?: number;
+  /** What the browser says it can send (`RTCRtpSender.getCapabilities("video").codecs`): H264 is put first, so the server can copy the
+   * picture into HLS instead of re-encoding it (VP8/VP9 would need an encoder on the server). */
+  videoCodecs?: () => RTCRtpCodec[];
   /** Opus bits per second for the audio (stereo music: 128 000 to 256 000). */
   audioBitrate?: number;
   /** Waits (ms) between attempts to connect again; the last one is repeated until stop(). */
@@ -84,6 +97,12 @@ export function tuneOpusSdp(sdp: string, bitrate: number): string {
   return lines.join(eol);
 }
 
+/** H264 first, the rest after it, so the offer prefers it (a camera is H264: MediaMTX can repackage that, it cannot repackage VP8). */
+export function h264First(codecs: RTCRtpCodec[]): RTCRtpCodec[] {
+  const isH264 = (c: RTCRtpCodec) => /^video\/H264/i.test(c.mimeType);
+  return [...codecs.filter(isH264), ...codecs.filter((c) => !isH264(c))];
+}
+
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 export class WhipPublisher {
@@ -98,7 +117,7 @@ export class WhipPublisher {
   private run = 0;
 
   constructor(options: WhipOptions) {
-    this.o = { audioBitrate: 192_000, retryMs: [1000, 2000, 4000, 8000, 15000], gatherMs: 2500, connectMs: 12_000, graceMs: 4000, ...options };
+    this.o = { audioBitrate: 192_000, videoBitrate: 1_500_000, retryMs: [1000, 2000, 4000, 8000, 15000], gatherMs: 2500, connectMs: 12_000, graceMs: 4000, ...options };
   }
 
   private set(state: WhipState, detail = ""): void {
@@ -149,14 +168,23 @@ export class WhipPublisher {
     const make = this.o.makePeer ?? ((c: RTCConfiguration) => new RTCPeerConnection(c) as unknown as WhipPeer);
     const pc = make({ iceServers: this.o.iceServers ?? [], bundlePolicy: "max-bundle" });
     this.pc = pc;
+    const bitrate = async (t: WhipTransceiver, bits: number): Promise<void> => {
+      const params = t.sender.getParameters() as { encodings?: { maxBitrate?: number }[] };
+      if (!params.encodings?.length) params.encodings = [{}];
+      params.encodings[0].maxBitrate = bits;
+      await t.sender.setParameters(params as never).catch(() => {});
+    };
     for (const track of stream.getTracks()) {
       const t = pc.addTransceiver(track, { direction: "sendonly", streams: [stream] });
-      if (track.kind === "audio") {
-        const params = t.sender.getParameters() as { encodings?: { maxBitrate?: number }[] };
-        if (!params.encodings?.length) params.encodings = [{}];
-        params.encodings[0].maxBitrate = audioBitrate;
-        await t.sender.setParameters(params as never).catch(() => {});
-      }
+      if (track.kind === "audio") await bitrate(t, audioBitrate);
+    }
+    // The camera rides along in the same session: one stream to the server, H264 first.
+    const video = this.o.video;
+    if (video && video.readyState === "live") {
+      const t = pc.addTransceiver(video, { direction: "sendonly", streams: [stream] });
+      const caps = this.o.videoCodecs?.() ?? [];
+      if (caps.length && t.setCodecPreferences) t.setCodecPreferences(h264First(caps));
+      await bitrate(t, this.o.videoBitrate ?? 1_500_000);
     }
     const offer = await pc.createOffer();
     await pc.setLocalDescription({ type: "offer", sdp: tuneOpusSdp(offer.sdp ?? "", audioBitrate) });

@@ -1,7 +1,7 @@
 // The WHIP publisher (stream/whip.ts) with a stand-in peer connection and a stand-in server: no browser, no network.
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { WhipPublisher, tuneOpusSdp, whipRefusal } from "../src/stream/whip.ts";
+import { WhipPublisher, h264First, tuneOpusSdp, whipRefusal } from "../src/stream/whip.ts";
 import type { WhipPeer, WhipState } from "../src/stream/whip.ts";
 
 const OFFER = ["v=0", "o=- 1 2 IN IP4 127.0.0.1", "s=-", "t=0 0", "m=audio 9 UDP/TLS/RTP/SAVPF 111", "a=rtpmap:111 opus/48000/2", "a=fmtp:111 minptime=10;useinbandfec=0;usedtx=1", "a=sendonly", ""].join("\r\n");
@@ -16,13 +16,22 @@ class FakePeer implements WhipPeer {
   closed = false;
   remote: string | null = null;
   tracks: string[] = [];
+  bits: number[] = [];
   bitrate: number | null = null;
+  /** The codec list the publisher asked the browser to prefer for the last transceiver, if it asked. */
+  codecs: string[] = [];
   /** What the test wants the connection to do after the answer. */
   after: "connected" | "failed" | "never" = "connected";
   addTransceiver(track: MediaStreamTrack) {
     this.tracks.push(track.kind);
     const self = this;
-    return { sender: { getParameters: () => ({}), setParameters: async (p: never) => { self.bitrate = (p as { encodings: { maxBitrate: number }[] }).encodings[0].maxBitrate; } } };
+    return {
+      sender: {
+        getParameters: () => ({}),
+        setParameters: async (p: never) => { const b = (p as { encodings: { maxBitrate: number }[] }).encodings[0].maxBitrate; self.bitrate = b; self.bits.push(b); },
+      },
+      setCodecPreferences: (codecs: RTCRtpCodec[]) => { self.codecs = codecs.map((c) => c.mimeType); },
+    };
   }
   async createOffer() { return { type: "offer" as const, sdp: OFFER }; }
   async setLocalDescription(d: { type: "offer"; sdp?: string }) {
@@ -38,7 +47,7 @@ class FakePeer implements WhipPeer {
 }
 
 interface Call { method: string; url: string; body: string; headers: Record<string, string> }
-function rig(opts: { statuses?: number[]; peerAfter?: ("connected" | "failed" | "never")[] } = {}) {
+function rig(opts: { statuses?: number[]; peerAfter?: ("connected" | "failed" | "never")[]; video?: MediaStreamTrack | null; videoCodecs?: () => RTCRtpCodec[] } = {}) {
   const calls: Call[] = [];
   const peers: FakePeer[] = [];
   const states: [WhipState, string][] = [];
@@ -57,6 +66,7 @@ function rig(opts: { statuses?: number[]; peerAfter?: ("connected" | "failed" | 
   const whip = new WhipPublisher({
     endpoint: "https://example.test/whip/live/key/whip", stream, fetchFn, makePeer: make,
     retryMs: [5, 5], gatherMs: 50, connectMs: 60, graceMs: 25, headers: { Authorization: "Bearer t" },
+    video: opts.video ?? null, videoCodecs: opts.videoCodecs,
     onState: (s, d) => states.push([s, d]),
   });
   return { whip, calls, peers, states };
@@ -94,6 +104,37 @@ describe("WHIP publisher", () => {
     assert.deepEqual(peers[0].tracks, ["audio"]);
     assert.equal(peers[0].bitrate, 192000);
     await whip.stop();
+  });
+
+  test("H264 first, everything else after it, nothing lost: that is what the offer should prefer for a camera", () => {
+    const list = ["video/VP8", "video/H264", "video/VP9", "video/AV1"].map((mimeType) => ({ mimeType }) as RTCRtpCodec);
+    assert.deepEqual(h264First(list).map((c) => c.mimeType), ["video/H264", "video/VP8", "video/VP9", "video/AV1"]);
+    assert.deepEqual(h264First([]), []);
+    assert.equal(h264First(list).length, list.length);
+  });
+
+  test("a camera track rides in the SAME connection: two transceivers, H264 preferred on the video one, its own bitrate", async () => {
+    const video = { kind: "video", readyState: "live" } as unknown as MediaStreamTrack;
+    const caps = ["video/VP8", "video/H264"].map((mimeType) => ({ mimeType }) as RTCRtpCodec);
+    const { whip, peers } = rig({ video, videoCodecs: () => caps });
+    await whip.start();
+    assert.equal(whip.state, "live");
+    assert.deepEqual(peers[0].tracks, ["audio", "video"]);
+    assert.deepEqual(peers[0].codecs, ["video/H264", "video/VP8"]);
+    assert.deepEqual(peers[0].bits, [192000, 1_500_000]);
+    await whip.stop();
+  });
+
+  test("a camera that has ended is not sent; without a camera there is one transceiver only", async () => {
+    const ended = { kind: "video", readyState: "ended" } as unknown as MediaStreamTrack;
+    const one = rig({ video: ended });
+    await one.whip.start();
+    assert.deepEqual(one.peers[0].tracks, ["audio"]);
+    await one.whip.stop();
+    const none = rig();
+    await none.whip.start();
+    assert.deepEqual(none.peers[0].tracks, ["audio"]);
+    await none.whip.stop();
   });
 
   test("stop(): DELETE on the session the server named (a relative Location is resolved), the connection closed, state stopped; the tracks are not touched", async () => {
