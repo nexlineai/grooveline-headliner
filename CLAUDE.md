@@ -461,7 +461,9 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
   makes the clip end on the picture it started from (use this, not the forwards-backwards
   `--loop`, for anything that looks wrong in reverse). `tools/art/story-lines.sh` holds the
   prompts of every spoken line. Check the words of each clip with `voxtype transcribe`.
-  Work files go in `/data/headliner-work/` (root disk is nearly full), only finished clips in git.
+  Work files go in `work/` in this repo (gitignored, never committed; moved here from
+  `/data/headliner-work` on 21 Nov 2026 at Zé's request so all Headliner work sits under the
+  project), only finished clips in git.
 - **On-camera clips: OpenRouter Omni for every character (Zé, 17 Nov).** Voice-over lines
   without a picture are xAI TTS (`say.sh`: Tó `helios`, Lia `ara`, Nuno `zagan`, Helena `luna`);
   on camera the voice comes from Omni (same voice description every clip). An earlier "Grok

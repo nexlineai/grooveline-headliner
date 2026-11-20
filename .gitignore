@@ -21,3 +21,8 @@ xcuserdata/
 # The web version: type-check tools are installed by CI only; builds are made by CI.
 web/node_modules/
 web/dist/
+
+# Headliner work files: generated media (clips, previews, takes, sheets, logs). Lives in the repo
+# folder since 21 Nov 2026 (moved from /data/headliner-work), but is NEVER committed — only the
+# finished clips go into App/. 1.1 GB, 376 files.
+work/
