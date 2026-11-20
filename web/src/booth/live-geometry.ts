@@ -27,6 +27,8 @@ const FX_STRIP_H = 30, FX_STRIP_GAP = 4;
 export interface BarRoom { left: number; right: number }
 const BAR_LEFT_PX = 376, BAR_RIGHT_PX = 416, BAR_FX_PX = 312, BAR_GAP_PX = 10;
 const barRoom = (W: number, room?: BarRoom): BarRoom => room ? { left: room.left + BAR_GAP_PX, right: room.right - BAR_GAP_PX } : { left: BAR_LEFT_PX, right: W - BAR_RIGHT_PX };
+/** What the controls need between the bar's text and its buttons, gaps included (the page sheds what the bar can spare until this is free). */
+export const BAR_ROOM_NEEDED_PX = BAR_FX_PX + 2 * BAR_GAP_PX;
 export const fxFitsTheBar = (W: number, room?: BarRoom): boolean => { const r = barRoom(W, room); return r.right - r.left >= BAR_FX_PX; };
 /** The knobs of the mixer strips and of the effect unit are all this size (units). */
 export const KNOB_R = 11;

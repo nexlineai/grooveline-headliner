@@ -2,8 +2,9 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  MidiInput, SoftTakeover, absoluteValue, buttonActs, buttonMode, decode, relativeMode, relativeTicks, sourceOf,
+  MIDI_CONFIG_APP, MidiInput, SoftTakeover, absoluteValue, buttonActs, buttonMode, decode, midiConfigText, parseMidiConfig, relativeMode, relativeTicks, sourceOf,
 } from "../src/input/midi.ts";
+import type { Binding, TargetKind } from "../src/input/midi.ts";
 
 describe("MIDI decoding", () => {
   test("notes, with note-on at velocity 0 as a release", () => {
@@ -165,5 +166,119 @@ describe("learning and playing a controller", () => {
     midi.handle("Korg", [0x90, 41, 127]);
     midi.handle("Korg", [0xb0, 16, 127]);
     assert.deepEqual(calls, ["press play:0:", "jog jog:0: -1"]);
+  });
+});
+
+describe("MIDI config file", () => {
+  const kindOf = (t: string): TargetKind | null => (t.startsWith("play") || t.startsWith("sync") ? "button" : t.startsWith("pitch") ? "absolute" : t.startsWith("jog") ? "relative" : t.startsWith("cue") ? "hold" : null);
+  const korg: Binding[] = [
+    { source: "note:0:41", target: "play:0:", kind: "button", mode: "push" },
+    { source: "cc:0:0", target: "pitch:0:", kind: "absolute", mode: "abs" },
+    { source: "cc:0:60", target: "jog:1:", kind: "relative", mode: "offset" },
+    { source: "cc:0:43", target: "cue:0:", kind: "hold", mode: "toggle" },
+  ];
+
+  test("what was saved is read back as it was (several controllers)", () => {
+    const text = midiConfigText({ "nanoKONTROL2": korg, "Other pad": [{ source: "note:9:36", target: "sync:1:", kind: "button", mode: "push" }], Empty: [] }, "2026-11-20T00:00:00Z");
+    const r = parseMidiConfig(text, kindOf);
+    assert.ok(r.ok);
+    if (!r.ok) return;
+    assert.deepEqual(r.bindings["nanoKONTROL2"], korg);
+    assert.equal(r.devices, 2, "an empty controller is not saved");
+    assert.equal(r.bound, 5);
+    assert.equal(r.skipped, 0);
+    assert.ok(text.includes(MIDI_CONFIG_APP) && text.endsWith("\n"));
+  });
+
+  test("a MidiInput saves its bindings and another one takes them (the learning is not needed again)", () => {
+    const t = { kindOf, press: () => {}, hold: () => {}, setValue: () => {}, valueOf: () => 0, jog: () => {} };
+    const a = new MidiInput(t);
+    a.importBindings({ Korg: korg });
+    const b = new MidiInput(t);
+    b.clear();
+    const r = parseMidiConfig(a.configText(), kindOf);
+    assert.ok(r.ok);
+    if (r.ok) b.importBindings(r.bindings);
+    assert.deepEqual(b.bindingsOf("Korg"), korg);
+  });
+
+  test("importing replaces the controllers in the file and leaves the others alone", () => {
+    const t = { kindOf, press: () => {}, hold: () => {}, setValue: () => {}, valueOf: () => 0, jog: () => {} };
+    const m = new MidiInput(t);
+    m.clear();
+    m.importBindings({ Mine: [{ source: "note:0:1", target: "play:1:", kind: "button", mode: "push" }], Korg: [{ source: "note:0:2", target: "sync:0:", kind: "button", mode: "push" }] });
+    m.importBindings({ Korg: korg });
+    assert.equal(m.bindingsOf("Mine").length, 1);
+    assert.deepEqual(m.bindingsOf("Korg"), korg);
+  });
+
+  test("a controller's bindings can be used for the same device under another name (ALSA, macOS and Windows name a USB controller differently)", () => {
+    const t = { kindOf, press: () => {}, hold: () => {}, setValue: () => {}, valueOf: () => 0, jog: () => {} };
+    const m = new MidiInput(t);
+    m.clear();
+    m.importBindings({ "nanoKONTROL2 SLIDER/KNOB": korg });
+    m.copyBindings("nanoKONTROL2 SLIDER/KNOB", "nanoKONTROL2 MIDI 1");
+    assert.deepEqual(m.bindingsOf("nanoKONTROL2 MIDI 1"), korg);
+    assert.notEqual(m.bindingsOf("nanoKONTROL2 MIDI 1")[0], m.bindingsOf("nanoKONTROL2 SLIDER/KNOB")[0], "a copy, not the same objects");
+    m.copyBindings("nothing", "x");
+    assert.equal(m.bindingsOf("x").length, 0);
+  });
+
+  test("files that are not ours or are damaged say so and change nothing", () => {
+    for (const text of ["", "not json", "[]", "null", "{}", JSON.stringify({ app: "something-else", version: 1, bindings: {} }),
+      JSON.stringify({ app: MIDI_CONFIG_APP, version: 2, bindings: {} }), JSON.stringify({ app: MIDI_CONFIG_APP, version: 1 }),
+      JSON.stringify({ app: MIDI_CONFIG_APP, version: 1, bindings: [] }), JSON.stringify({ app: MIDI_CONFIG_APP, version: 1, bindings: {} })]) {
+      const r = parseMidiConfig(text, kindOf);
+      assert.equal(r.ok, false, text);
+      if (!r.ok) assert.ok(r.error.length > 10);
+    }
+    assert.equal(parseMidiConfig("x".repeat(500_000), kindOf).ok, false, "too big");
+  });
+
+  test("each binding is checked: bad sources, targets this page does not know and wrong modes are skipped or mended, never trusted", () => {
+    const file = { app: MIDI_CONFIG_APP, version: 1, bindings: {
+      Korg: [
+        { source: "note:0:41", target: "play:0:", kind: "absolute", mode: "abs" }, // the kind in the file is ignored: this page says PLAY is a button; the mode does not fit it, so push
+        { source: "cc:16:1", target: "play:1:" }, // channel 16 does not exist
+        { source: "cc:0:128", target: "play:1:" }, // control 128 does not exist
+        { source: "wheel:0:1", target: "play:1:" },
+        { source: "cc:0:2", target: "nothing:0:" }, // a control from a newer version
+        { source: "cc:0:3", target: 5 },
+        "junk", null,
+        { source: "cc:0:4", target: "jog:0:", mode: "twos" },
+      ],
+      "": [{ source: "cc:0:5", target: "play:0:" }],
+      Bad: "not a list",
+    } };
+    const r = parseMidiConfig(JSON.stringify(file), kindOf);
+    assert.ok(r.ok);
+    if (!r.ok) return;
+    assert.deepEqual(r.bindings, { Korg: [
+      { source: "note:0:41", target: "play:0:", kind: "button", mode: "push" },
+      { source: "cc:0:4", target: "jog:0:", kind: "relative", mode: "twos" },
+    ] });
+    assert.equal(r.bound, 2);
+    assert.equal(r.skipped, 9 - 2 + 1 + 1, "the bad lines, the unnamed controller's line and the non-list");
+  });
+
+  test("one control, one target: a later line for the same control or target wins", () => {
+    const file = { app: MIDI_CONFIG_APP, version: 1, bindings: { K: [
+      { source: "cc:0:1", target: "play:0:", mode: "push" }, { source: "cc:0:1", target: "sync:0:", mode: "push" }, { source: "cc:0:2", target: "sync:0:", mode: "toggle" },
+    ] } };
+    const r = parseMidiConfig(JSON.stringify(file), kindOf);
+    assert.ok(r.ok);
+    if (r.ok) assert.deepEqual(r.bindings.K, [{ source: "cc:0:2", target: "sync:0:", kind: "button", mode: "toggle" }]);
+  });
+
+  test("a hostile file cannot make prototype keys or huge lists", () => {
+    const text = '{"app":"' + MIDI_CONFIG_APP + '","version":1,"bindings":{"__proto__":[{"source":"cc:0:1","target":"play:0:"}],"K":[' +
+      Array.from({ length: 2000 }, (_, i) => `{"source":"cc:0:${i % 100}","target":"play:${i}:"}`).join(",") + "]}}";
+    const r = parseMidiConfig(text, kindOf);
+    assert.ok(r.ok);
+    if (r.ok) {
+      assert.ok(r.bindings.K.length <= 600);
+      assert.equal(Object.getPrototypeOf(r.bindings), Object.prototype, "the result's prototype was not replaced");
+      assert.deepEqual(Object.keys(r.bindings), ["K"], "no controller called __proto__");
+    }
   });
 });

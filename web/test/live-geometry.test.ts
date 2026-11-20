@@ -1,7 +1,7 @@
 // The LIVE layout (booth/live-geometry.ts): at every window size nothing overlaps, nothing leaves its module, controls stay usable.
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { TOP_BAR, fxFitsTheBar, liveGeometry, liveTouch } from "../src/booth/live-geometry.ts";
+import { BAR_ROOM_NEEDED_PX, TOP_BAR, fxFitsTheBar, liveGeometry, liveTouch } from "../src/booth/live-geometry.ts";
 import type { Rect } from "../src/booth/gear.ts";
 
 // 1152 x 720 is Zé's 1440 x 900 screen with the browser at 100 % (Chrome follows the 1.25 text scaling here); 1130 x 650 the same window with the tab bar.
@@ -216,6 +216,13 @@ describe("LIVE layout", () => {
     assert.ok(liveGeometry(1152, 720, { left: 363, right: 700 }).fxInBar, "337 px between them is enough");
     assert.ok(!liveGeometry(1920, 1080, { left: 700, right: 960 }).fxInBar, "a crowded bar in a wide window");
     assert.ok(liveGeometry(1100, 700, { left: 363, right: 1100 - 330 }).fxInBar === fxFitsTheBar(1100, { left: 363, right: 1100 - 330 }));
+  });
+
+  test("the room the page asks for (BAR_ROOM_NEEDED_PX) is exactly what makes the effects fit: one pixel less and they go to the strip", () => {
+    assert.ok(liveGeometry(1920, 1080, { left: 200, right: 200 + BAR_ROOM_NEEDED_PX }).fxInBar);
+    assert.ok(!liveGeometry(1920, 1080, { left: 200, right: 200 + BAR_ROOM_NEEDED_PX - 1 }).fxInBar);
+    const g = liveGeometry(1920, 1080, { left: 200, right: 200 + BAR_ROOM_NEEDED_PX });
+    assert.ok(g.fx.rect.x >= 210 - E && g.fx.rect.x + g.fx.rect.w <= 200 + BAR_ROOM_NEEDED_PX - 10 + E, "inside it, a gap each side");
   });
 
   test("in the bar the controls keep their size however big the window is (pixels, not units), and stay inside the top 28 px so the page's message fits under them", () => {

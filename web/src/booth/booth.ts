@@ -62,6 +62,9 @@ type PartnerMove =
 const TURN = 2 * Math.PI * (100 / 3) / 60;
 /** The pitch fader covers ±8 %, like a classic turntable. */
 const PITCH_RANGE = 0.08;
+/** What LIVE's tempo fader can be set to cover (SETTINGS): for very fast records, more than a turntable's 8 %. The game's booth always keeps 8 %. */
+export const PITCH_RANGES: readonly number[] = [0.08, 0.12, 0.16, 0.25, 0.35, 0.5];
+const PITCH_RANGE_STORE = "headliner.pitchRange";
 /** The cue mix and headphones level knobs sit this far (in units) either side of the mixer's middle. */
 const KNOB_GAP = 11;
 /** What the loop buttons do (`Kind.band` of a "loop"). */
@@ -203,6 +206,10 @@ export class Booth {
   private roomHidden = false;
   /** "game": the iPhone's desk (lessons, nights, free play). "live": the DJ's booth with its own layout. */
   mode: "game" | "live" = "game";
+  /** How far LIVE's tempo fader goes either side (a fraction: 0.08 = ±8 %); kept in this browser. */
+  private liveRange = ((): number => { try { const r = Number(localStorage.getItem(PITCH_RANGE_STORE)); return PITCH_RANGES.includes(r) ? r : PITCH_RANGE; } catch { return PITCH_RANGE; } })();
+  /** What the tempo fader covers now: the setting in LIVE, a turntable's 8 % everywhere else (lessons and nights are tuned to it). */
+  get pitchRange(): number { return this.mode === "live" ? this.liveRange : PITCH_RANGE; }
   private live: LiveGeometry | null = null;
   private readonly liveRenderer = new LiveRenderer();
   /** LIVE's master knob while the game's booth is showing. */
@@ -317,7 +324,7 @@ export class Booth {
     for (const d of [0, 1]) {
       const deck = this.decks[d];
       deck.motorOn = false;
-      deck.pitch = (0.5 - this.pitchFader[d]) * 2 * PITCH_RANGE;
+      deck.pitch = (0.5 - this.pitchFader[d]) * 2 * this.pitchRange;
       deck.bend = 0;
       deck.cuePoint = this.cueAt(desk.cueBar, d);
       deck.seek(deck.cuePoint);
@@ -515,11 +522,15 @@ export class Booth {
   /** Where the top bar has room for the effects: from the end of the stream bar's text (GROOVELINE LIVE, OFF AIR, the time) to the left edge of the page's buttons.
    * Measured, so a longer label (EXIT FULLSCREEN) or a font that loads late counts; none if the bar is not there (the unit tests give the geometry no room). */
   private barRoom(): BarRoom | undefined {
+    this.fitBar(); // the page sheds what the bar can spare (the clock, the brand's name) before it is measured
     const bar = document.getElementById("livebar"), buttons = document.getElementById("top");
     if (!bar || !buttons || bar.hidden) return undefined;
     const left = bar.getBoundingClientRect().right, right = buttons.getBoundingClientRect().left;
     return left > 0 && right > left ? { left, right } : undefined;
   }
+
+  /** Set by the page: makes the top bar's text as short as the room needs, so the effects fit between it and the buttons. Called before every measure. */
+  fitBar: () => void = () => {};
 
   /** Lay the booth out again at the next frame (the top bar's text or buttons changed size; main.ts watches them). */
   relayout(): void { this.L = null; }
@@ -575,8 +586,7 @@ export class Booth {
     // The effects strip: the name (the left third goes to the effect before, the rest to the next), the four knobs, the LEVEL fader. The effect is
     // switched on for a channel by the FX button beside its FILTER.
     const F = g.fx, lvl = F.level;
-    document.body.classList.toggle("fxbar", g.fxInBar); // the page's orange message makes room for them:
-    document.body.style.setProperty("--fx-left", `${g.fxInBar ? Math.round(g.fx.rect.x) : 0}px`); // ... it stops before the effects
+    document.body.classList.toggle("fxbar", g.fxInBar); // the page's orange message makes room for them
     first({ t: "fxType", d: -1 }, F.name);
     first({ t: "fxType", d: -2 }, { x: F.name.x, y: F.name.y, w: F.name.w * 0.3, h: F.name.h });
     first({ t: "fxAmount" }, lvl.touch);
@@ -607,7 +617,9 @@ export class Booth {
   setMode(mode: "game" | "live"): void {
     if (mode === this.mode) return;
     this.endCueHolds();
+    const rangeBefore = this.pitchRange;
     this.mode = mode;
+    this.rescalePitch(rangeBefore); // LIVE's travel may differ from the game's 8 %
     document.body.classList.toggle("live", mode === "live");
     // LIVE has no room: a crowd clip a night left playing would go on decoding behind `display: none`. The game's own `showRoom` plays it again.
     if (mode === "live") for (const v of this.roomVideos) if (v && !v.paused) v.pause();
@@ -619,6 +631,26 @@ export class Booth {
     else { this.liveMaster = this.engine.roomVolume; this.engine.roomVolume = ROOM_UNITY; }
     this.padMode = ["cues", "cues"];
     this.L = null;
+  }
+
+  /** A new travel for LIVE's tempo fader. The tempo each deck plays at stays (the fader moves to where that tempo now is); if the new travel is shorter than that tempo, the fader stops at its end. */
+  setPitchRange(range: number): void {
+    if (!PITCH_RANGES.includes(range)) return;
+    try { localStorage.setItem(PITCH_RANGE_STORE, String(range)); } catch { /* private window */ }
+    const before = this.pitchRange;
+    this.liveRange = range;
+    this.rescalePitch(before);
+  }
+
+  /** The travel changed from `before` to `pitchRange`: keep each deck's tempo where it can. */
+  private rescalePitch(before: number): void {
+    const now = this.pitchRange;
+    if (now === before) return;
+    for (const d of [0, 1]) {
+      const tempo = (0.5 - this.pitchFader[d]) * 2 * before;
+      this.pitchFader[d] = clamp01(0.5 - tempo / (2 * now));
+      if (!this.sync[d]) this.decks[d].pitch = (0.5 - this.pitchFader[d]) * 2 * now; // (a deck in sync follows the other one: runSync clamps it to the new travel)
+    }
   }
 
   /** A message over a deck, for a few seconds (for example: a record cannot be changed while it plays). */
@@ -1286,7 +1318,7 @@ export class Booth {
     const v = detent && Math.abs(raw - 0.5) < 0.012 ? 0.5 : raw; // a detent in the middle
     this.pitchFader[d] = v;
     if (this.sync[d]) { this.sync[d] = false; this.decks[d].bend = 0; } // touching the pitch takes over from sync
-    this.decks[d].pitch = (0.5 - v) * 2 * PITCH_RANGE;
+    this.decks[d].pitch = (0.5 - v) * 2 * this.pitchRange;
   }
 
   private setEQ(d: number, band: number, raw: number): void {
@@ -1430,7 +1462,7 @@ export class Booth {
     if (w && !this.sync[w.deck]) {
       const t = now - w.since;
       const drift = 0.0035 * Math.sin(t * 2 * Math.PI / 23) + 0.002 * Math.sin(t * 2 * Math.PI / 7.3);
-      decks[w.deck].pitch = (0.5 - this.pitchFader[w.deck]) * 2 * PITCH_RANGE + drift;
+      decks[w.deck].pitch = (0.5 - this.pitchFader[w.deck]) * 2 * this.pitchRange + drift;
     }
     // Two records heard together in keys that fight (or pitched apart: no key lock).
     const a = decks[0].info?.camelot, b = decks[1].info?.camelot;
@@ -1620,10 +1652,10 @@ export class Booth {
   private partnerMatchTempo(h: number): void {
     const her = this.decks[h], you = this.decks[1 - h];
     if (!her.isLoaded || !you.isLoaded) return;
-    const p = Math.max(-PITCH_RANGE, Math.min(PITCH_RANGE, pitchToPlay(her.grid.bpm, you.bpm)));
+    const p = Math.max(-this.pitchRange, Math.min(this.pitchRange, pitchToPlay(her.grid.bpm, you.bpm)));
     if (Math.abs(p - her.pitch) <= 1e-7) return;
     her.pitch = p;
-    this.pitchFader[h] = 0.5 - p / (2 * PITCH_RANGE);
+    this.pitchFader[h] = 0.5 - p / (2 * this.pitchRange);
   }
 
   /** Her answer: a record from her bag she has not played, in a key that fits yours and close to
@@ -1752,10 +1784,10 @@ export class Booth {
       if (!this.sync[d]) continue;
       const other = this.decks[1 - d], deck = this.decks[d];
       if (!deck.isLoaded || !other.isLoaded) continue;
-      const p = Math.max(-PITCH_RANGE, Math.min(PITCH_RANGE, pitchToPlay(deck.grid.bpm, other.bpm)));
+      const p = Math.max(-this.pitchRange, Math.min(this.pitchRange, pitchToPlay(deck.grid.bpm, other.bpm)));
       if (Math.abs(p - deck.pitch) > 1e-7) {
         deck.pitch = p;
-        this.pitchFader[d] = 0.5 - p / (2 * PITCH_RANGE);
+        this.pitchFader[d] = 0.5 - p / (2 * this.pitchRange);
       }
       // Back to back: never chase the partner's deck while her fader is down (her silent spin-up
       // would pull your record on air).

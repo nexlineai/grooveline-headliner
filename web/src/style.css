@@ -307,21 +307,21 @@ button.quiet[hidden] { display: none; }
   font: 800 13px system-ui, sans-serif; letter-spacing: 0.15em; }
 
 /* PHONES: the modes and the devices. */
-#phones-body .mode { display: flex; gap: 12px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--edge); }
-#phones-body .mode .pill { flex: none; min-width: 130px; }
-#phones-body .mode .pill:disabled { opacity: 0.35; cursor: default; }
-#phones-body .mode p { margin: 0; font-size: 14px; }
-#phones-body .device { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; color: var(--dim); font: 800 11px system-ui, sans-serif; letter-spacing: 0.15em; }
-#phones-body select { padding: 8px; border-radius: 8px; background: var(--slot); color: var(--ink); border: 1px solid var(--edge); font: 500 14px system-ui, sans-serif; }
-#phones-body .quiet, #controls-body .pill { margin-top: 10px; }
-.sheet p.small, #controls-body p.small { color: var(--dim); font-size: 13px; margin: 6px 0; }
+#phones-body .mode, #settings-body.phones-tab .mode { display: flex; gap: 12px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--edge); }
+#phones-body .mode .pill, #settings-body.phones-tab .mode .pill { flex: none; min-width: 130px; }
+#phones-body .mode .pill:disabled, #settings-body.phones-tab .mode .pill:disabled { opacity: 0.35; cursor: default; }
+#phones-body .mode p, #settings-body.phones-tab .mode p { margin: 0; font-size: 14px; }
+#phones-body .device, #settings-body.phones-tab .device { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; color: var(--dim); font: 800 11px system-ui, sans-serif; letter-spacing: 0.15em; }
+#phones-body select, #settings-body.phones-tab select { padding: 8px; border-radius: 8px; background: var(--slot); color: var(--ink); border: 1px solid var(--edge); font: 500 14px system-ui, sans-serif; }
+#phones-body .quiet, #controls-body .pill, #settings-body.phones-tab .quiet, #settings-body.keys-tab .pill { margin-top: 10px; }
+.sheet p.small, #controls-body p.small, #settings-body p.small { color: var(--dim); font-size: 13px; margin: 6px 0; }
 .sheet.small { max-height: 90vh; overflow-y: auto; }
 
 /* KEYS & MIDI */
-#controls-body { overflow-y: auto; display: flex; gap: 22px; flex-wrap: wrap; }
-#controls-body h3 { margin: 4px 0; color: var(--teal); font: 700 13px "Orbitron", sans-serif; letter-spacing: 0.2em; }
-#controls-body h4 { margin: 12px 0 4px; font: 700 14px system-ui, sans-serif; }
-#controls-body .keys, #controls-body .midi { flex: 1 1 240px; }
+#controls-body, #settings-body.keys-tab { overflow-y: auto; display: flex; gap: 22px; flex-wrap: wrap; }
+#controls-body h3, #settings-body.keys-tab h3 { margin: 4px 0; color: var(--teal); font: 700 13px "Orbitron", sans-serif; letter-spacing: 0.2em; }
+#controls-body h4, #settings-body.keys-tab h4 { margin: 12px 0 4px; font: 700 14px system-ui, sans-serif; }
+#controls-body .keys, #controls-body .midi, #settings-body.keys-tab .keys, #settings-body.keys-tab .midi { flex: 1 1 240px; }
 .keytable { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; align-items: center; }
 .keytable kbd { min-width: 26px; text-align: center; padding: 3px 6px; border-radius: 6px; background: var(--slot); border: 1px solid rgba(255, 255, 255, 0.25);
   font: 700 13px system-ui, sans-serif; }
@@ -349,12 +349,12 @@ button.quiet[hidden] { display: none; }
 #learn-choice:empty { display: none; }
 #learn-choice .pill { font-size: 11px; padding: 0.6em 1em; }
 
-#phones-body .timing { margin-top: 10px; padding: 10px 0; border-bottom: 1px solid var(--edge); }
-#phones-body .timing .head { color: var(--teal); font: 800 11px system-ui, sans-serif; letter-spacing: 0.15em; }
-#phones-body .trim { display: flex; align-items: center; gap: 8px; }
-#phones-body .trim input { flex: 1; accent-color: var(--teal); }
-#phones-body .trim .end { color: var(--dim); font: 800 9px system-ui, sans-serif; letter-spacing: 0.08em; white-space: nowrap; }
-#phones-body .trim .ms { min-width: 58px; text-align: right; font: 700 13px system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+#phones-body .timing, #settings-body.phones-tab .timing { margin-top: 10px; padding: 10px 0; border-bottom: 1px solid var(--edge); }
+#phones-body .timing .head, #settings-body.phones-tab .timing .head { color: var(--teal); font: 800 11px system-ui, sans-serif; letter-spacing: 0.15em; }
+#phones-body .trim, #settings-body.phones-tab .trim { display: flex; align-items: center; gap: 8px; }
+#phones-body .trim input, #settings-body.phones-tab .trim input { flex: 1; accent-color: var(--teal); }
+#phones-body .trim .end, #settings-body.phones-tab .trim .end { color: var(--dim); font: 800 9px system-ui, sans-serif; letter-spacing: 0.08em; white-space: nowrap; }
+#phones-body .trim .ms, #settings-body.phones-tab .trim .ms { min-width: 58px; text-align: right; font: 700 13px system-ui, sans-serif; font-variant-numeric: tabular-nums; }
 
 /* MY MUSIC: your own files in the crate (free play). */
 .tabs { display: flex; gap: 8px; margin-bottom: 10px; }
@@ -492,8 +492,8 @@ body.live #top .pill .icon { width: 1.1em; height: 1.1em; margin-right: 0.5em; }
 body.live #livebar { align-items: flex-start; padding-top: 6px; box-sizing: border-box; }
 body.live #note { top: 22px; left: 48px; font-size: 10px; line-height: 11px; max-width: max(180px, calc(100vw - 48px - 540px)); max-height: 22px; overflow: hidden;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; z-index: 4; }
-/* The effects controls are in the bar (a wide window): the message is one line under the title and stops before the effects (--fx-left is their left edge, set by the booth). */
-body.live.fxbar #note { top: 28px; line-height: 12px; max-height: 12px; max-width: calc(var(--fx-left, 400px) - 56px); -webkit-line-clamp: 1; }
+/* The effects controls are in the bar (a wide window): the message is one line under them (they use the top 28 px), from the left edge to the buttons. */
+body.live.fxbar #note { top: 28px; line-height: 12px; max-height: 12px; max-width: calc(100vw - 48px - 410px); -webkit-line-clamp: 1; }
 #deck-tip { position: fixed; z-index: 50; max-width: 70vw; padding: 6px 10px; border-radius: 7px; background: rgba(8, 11, 16, 0.96); border: 1px solid rgba(255, 255, 255, 0.25);
   font: 600 13px system-ui, sans-serif; color: var(--ink); pointer-events: none; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6); }
 #deck-tip[hidden] { display: none; }
@@ -504,6 +504,7 @@ body.live.fxbar #note { top: 28px; line-height: 12px; max-height: 12px; max-widt
 #livebar .onair { display: flex; align-items: center; gap: 7px; font: 700 10px system-ui, sans-serif; letter-spacing: 0.16em; color: var(--dim); }
 #livebar .onair i { width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 255, 255, 0.16); }
 #livebar .time { font: 600 11px ui-monospace, Menlo, monospace; color: var(--dim); }
+#livebar .clock { font: 600 11px ui-monospace, Menlo, monospace; letter-spacing: 0.06em; color: var(--ink); }
 body.live #wall { left: var(--lib-left); top: var(--lib-top); right: auto; width: var(--lib-w); height: var(--lib-h); border: 1px solid var(--edge); border-radius: 8px;
   background: radial-gradient(120% 90% at 50% 0%, rgba(38, 198, 240, 0.05), transparent 60%), linear-gradient(#10141b, #090c11); }
 body.live #wall { --teal: #26c6f0; --magenta: #ffac28; }
@@ -690,3 +691,22 @@ body.live #wall .w-room { display: none; }
 .load-pop .lp-add { width: 100%; margin-top: 9px; padding: 8px 8px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.25); background: #0a0d11; color: var(--ink); font: 700 10px "Orbitron", sans-serif; letter-spacing: 0.1em; }
 .load-pop .lp-add[hidden] { display: none; }
 .load-pop .lp-say { margin: 7px 0 0; min-height: 13px; font: 600 11px system-ui, sans-serif; color: #7be3a1; }
+
+/* SETTINGS: in LIVE it holds the tempo range, KEYS & MIDI and PHONES, so the bar spares two buttons; the game's booth keeps its own buttons. */
+#settings-button { display: none; }
+body.live #settings-button { display: inline-block; }
+body.live #controls-button, body.live #phones-button { display: none; }
+#settings-tabs { flex-wrap: wrap; }
+#settings-body { overflow-y: auto; }
+#settings-body.tempo-tab h3 { margin: 4px 0; color: var(--teal); font: 700 13px "Orbitron", sans-serif; letter-spacing: 0.2em; }
+#settings-tabs .pill, .tempo-options .pill, .midi-file .pill { font-size: 11px; padding: 0.55em 1.1em; }
+.tempo-options { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.tempo-options .pill { min-width: 72px; }
+.tempo-example { color: var(--ink); font-size: 14px; }
+.midi-file { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.midi-status { margin: 8px 0 0; font-size: 13px; color: var(--teal); }
+.midi-status.bad { color: var(--orange); }
+.binding-device { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+
+/* The bar sheds what it can spare when the effects need the room (see fitBar in main.ts): first the brand's name, then the clock, then the words OFF AIR (the dot stays). */
+body.live.bar-nobrand #livebar .brand, body.live.bar-noclock #livebar .clock, body.live.bar-nostate #livebar .onair span { display: none; }

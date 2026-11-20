@@ -43,6 +43,7 @@
 
   <div id="top">
     <button id="jingle-button" class="pill" hidden>JINGLE</button>
+    <button id="settings-button" class="pill">SETTINGS</button>
     <button id="controls-button" class="pill">KEYS &amp; MIDI</button>
     <button id="phones-button" class="pill"><svg class="icon" viewBox="0 0 24 24" width="1.2em" height="1.2em" aria-hidden="true"><path d="M4 15v-3a8 8 0 0 1 16 0v3" fill="none" stroke="currentColor" stroke-width="2.4"/><rect x="2.5" y="13.5" width="5" height="8" rx="2" fill="currentColor"/><rect x="16.5" y="13.5" width="5" height="8" rx="2" fill="currentColor"/></svg>PHONES</button>
     <button id="share-button" class="pill" aria-haspopup="dialog">SHARE</button>
@@ -53,6 +54,7 @@
   <div id="wall" hidden></div>
   <div id="livebar" hidden>
     <span class="brand">GROOVELINE<b>LIVE</b></span>
+    <span class="clock" title="The time of day">--:--</span>
     <span class="onair"><i></i><span>OFF AIR</span></span>
     <span class="time">00:00:00</span>
   </div>
@@ -87,6 +89,17 @@
   <div id="controls" class="sheet" hidden>
     <div class="head"><h2>KEYS &amp; MIDI</h2><button id="controls-close" class="pill">CLOSE</button></div>
     <div id="controls-body"></div>
+  </div>
+
+  <!-- SETTINGS (LIVE): tempo range, KEYS & MIDI and PHONES under one button of the bar; the game's booth keeps its own buttons for the last two. -->
+  <div id="settings" class="sheet" hidden>
+    <div class="head"><h2>SETTINGS</h2><button id="settings-close" class="pill">CLOSE</button></div>
+    <div id="settings-tabs" class="tabs">
+      <button class="pill on" data-tab="tempo">TEMPO</button>
+      <button class="pill" data-tab="keys">KEYS &amp; MIDI</button>
+      <button class="pill" data-tab="phones">PHONES</button>
+    </div>
+    <div id="settings-body"></div>
   </div>
 
   <div id="learn" hidden><span id="learn-text"></span><span id="learn-choice"></span><button id="learn-done" class="pill">DONE</button></div>

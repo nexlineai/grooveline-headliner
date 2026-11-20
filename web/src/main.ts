@@ -37,10 +37,11 @@ import { monoForAnalysis } from "./library/beats.ts";
 import { trackId } from "./library/search.ts";
 import { probeDuration } from "./library/duration.ts";
 import type { LibraryTrack } from "./library/store.ts";
-import { LOOP_ACTIONS, keyOf } from "./booth/booth.ts";
+import { LOOP_ACTIONS, PITCH_RANGES, keyOf } from "./booth/booth.ts";
+import { BAR_ROOM_NEEDED_PX } from "./booth/live-geometry.ts";
 import type { Kind } from "./booth/booth.ts";
 import { KEYS, attachKeys } from "./input/keys.ts";
-import { MidiInput } from "./input/midi.ts";
+import { MidiInput, parseMidiConfig } from "./input/midi.ts";
 import type { Binding, TargetKind } from "./input/midi.ts";
 import { Credits } from "./game/credits.ts";
 import { createShare } from "./share.ts";
@@ -49,7 +50,7 @@ import { IdbStore } from "./library/store.ts";
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const engine = new DeckEngine();
 const booth = new Booth($<HTMLCanvasElement>("booth"), $("room"), engine);
-const title = $("start"), chapterScreen = $("chapter"), crate = $("crate"), crateList = $("crate-list"), phonesPanel = $("phones"), note = $("note");
+const title = $("start"), chapterScreen = $("chapter"), crate = $("crate"), crateList = $("crate-list"), phonesPanel = $("phones"), settingsSheet = $("settings"), note = $("note");
 const lessonOverlay = $("lesson"), nightOverlay = $("night"), result = $("result");
 const params = new URLSearchParams(location.search);
 
@@ -69,6 +70,19 @@ Object.assign(window, { headliner: { engine, booth, progress, credits: () => ope
 document.fonts.load(`600 16px "Barlow Condensed"`).catch(() => {});
 // The effects in the top bar are placed by where the stream bar's text ends and where the page's buttons begin: lay the booth out again whenever either changes size
 // (a late font, EXIT FULLSCREEN, the bar showing, a button added).
+/** The top bar sheds what it can spare, in this order, until the effects fit between its text and its buttons: the brand's name, the clock, the words OFF AIR (the dot stays). If they cannot fit
+ * even then (a very narrow window: the effects go in a strip) it sheds only what stops the text running into the buttons. CSS: `body.live.bar-nobrand/-noclock/-nostate`. */
+function fitBar(): void {
+  const bar = $("livebar"), buttons = $("top"), body = document.body;
+  if (bar.hidden || !body.classList.contains("live")) return;
+  const levels: string[][] = [[], ["bar-nobrand"], ["bar-nobrand", "bar-noclock"], ["bar-nobrand", "bar-noclock", "bar-nostate"]];
+  const set = (l: string[]): void => { for (const c of ["bar-nobrand", "bar-noclock", "bar-nostate"]) body.classList.toggle(c, l.includes(c)); };
+  const room = (): number => buttons.getBoundingClientRect().left - bar.getBoundingClientRect().right;
+  const pick = (need: number): string[] | null => { for (const l of levels) { set(l); if (room() >= need) return l; } return null; };
+  set(pick(BAR_ROOM_NEEDED_PX) ?? pick(10) ?? levels[levels.length - 1]);
+}
+booth.fitBar = fitBar;
+window.addEventListener("resize", () => booth.relayout());
 if (typeof ResizeObserver !== "undefined") {
   const barWatch = new ResizeObserver(() => booth.relayout());
   barWatch.observe($("livebar"));
@@ -343,7 +357,7 @@ function showMode(mode: "free" | "live" | "lesson" | "night" | "story" | "menu")
   nightOverlay.hidden = mode !== "night";
   result.hidden = true;
   grid.hide();
-  for (const s of [crate, phonesPanel]) s.hidden = true;
+  for (const s of [crate, phonesPanel, settingsSheet]) s.hidden = true;
   if (mode !== "menu") { title.hidden = true; chapterScreen.hidden = true; }
 }
 
@@ -767,7 +781,7 @@ function leave(): void {
 
 // MARK: - Buttons
 
-const sheets = [crate, phonesPanel, $("controls")];
+const sheets = [crate, phonesPanel, $("controls"), settingsSheet];
 const toggle = (sheet: HTMLElement) => { const open = sheet.hidden; for (const s of sheets) s.hidden = true; sheet.hidden = !open; };
 $("back").addEventListener("click", leave);
 $("crate-button").addEventListener("click", () => {
@@ -781,6 +795,46 @@ $("crate-close").addEventListener("click", () => { crate.hidden = true; });
 $("phones-close").addEventListener("click", () => { phonesPanel.hidden = true; });
 $("jingle-button").addEventListener("click", playJingle);
 $("controls-button").addEventListener("click", () => { fillControls(); toggle($("controls")); });
+
+// SETTINGS (LIVE): the tempo range, KEYS & MIDI and PHONES under one button.
+type SettingsTab = "tempo" | "keys" | "phones";
+let settingsTab: SettingsTab = "tempo";
+function showSettingsTab(tab: SettingsTab): void {
+  settingsTab = tab;
+  for (const b of $("settings-tabs").querySelectorAll<HTMLElement>("button")) b.classList.toggle("on", b.dataset.tab === tab);
+  const body = $("settings-body");
+  body.className = `${tab}-tab`;
+  if (tab === "tempo") fillTempo(body); else if (tab === "keys") fillControls(body); else fillPhones(body).catch(failed);
+}
+function openSettings(tab: SettingsTab = settingsTab): void {
+  for (const s of sheets) s.hidden = true;
+  settingsSheet.hidden = false;
+  showSettingsTab(tab);
+}
+$("settings-button").addEventListener("click", () => { if (settingsSheet.hidden) openSettings(); else settingsSheet.hidden = true; });
+$("settings-close").addEventListener("click", () => { settingsSheet.hidden = true; });
+for (const b of $("settings-tabs").querySelectorAll<HTMLElement>("button")) b.addEventListener("click", () => showSettingsTab(b.dataset.tab as SettingsTab));
+/** The page's KEYS & MIDI wherever it lives: in LIVE a tab of SETTINGS, in the game's booth its own sheet. */
+const refreshKeys = (): void => {
+  if (!$("controls").hidden) fillControls();
+  if (!settingsSheet.hidden && settingsTab === "keys") fillControls($("settings-body"));
+};
+
+/** TEMPO: how far the tempo fader goes either side, for very fast records. */
+function fillTempo(body: HTMLElement): void {
+  body.replaceChildren();
+  body.append(el("h3", "", "TEMPO FADER RANGE"),
+    el("p", "small", "How far each deck's tempo fader goes either side of the record's own tempo. 8 % is a classic turntable; a very fast record, or a big tempo jump, needs more. The wider it is, the more the tempo changes with every bit of the fader, so the fine touch gets coarser."));
+  const row = el("div", "tempo-options");
+  const range = booth.pitchRange;
+  for (const r of PITCH_RANGES) {
+    const b = el("button", `pill${Math.abs(r - range) < 1e-9 ? " on" : ""}`, `±${Math.round(r * 100)} %`);
+    b.addEventListener("click", () => { booth.setPitchRange(r); fillTempo(body); });
+    row.append(b);
+  }
+  body.append(row, el("p", "tempo-example", `A 128 BPM record goes from ${(128 * (1 - range)).toFixed(0)} to ${(128 * (1 + range)).toFixed(0)} BPM, a 170 BPM one from ${(170 * (1 - range)).toFixed(0)} to ${(170 * (1 + range)).toFixed(0)}.`),
+    el("p", "small", "The tempo each deck plays at stays where it is when you change this. Kept in this browser. The game's booth always uses 8 %."));
+}
 createShare($("share-button")); // LIVE's SHARE: copy the link, the share sheet, a few networks
 
 // FULLSCREEN: the whole page (the booth redraws to the new size by itself). Not offered where the
@@ -793,6 +847,11 @@ if (document.fullscreenEnabled) {
   });
   document.addEventListener("fullscreenchange", () => { fullscreenButton.textContent = document.fullscreenElement ? "EXIT FULLSCREEN" : "FULLSCREEN"; });
 }
+// The clock in the stream bar: the time of day (hours and minutes, the browser's own format), for a DJ who watches the room's clock, not the stream's.
+const barClock = document.querySelector<HTMLElement>("#livebar .clock")!;
+const tickClock = (): void => { const t = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }); if (barClock.textContent !== t) barClock.textContent = t; };
+tickClock();
+setInterval(tickClock, 1000);
 $("controls-close").addEventListener("click", () => { $("controls").hidden = true; });
 $("phones-button").addEventListener("click", () => { fillPhones().then(() => toggle(phonesPanel)).catch(failed); });
 
@@ -809,11 +868,11 @@ engine.onOutputsChanged = (why) => {
   note.textContent = why;
   setTimeout(() => { if (note.textContent === why) note.textContent = ""; }, 6000);
   if (!phonesPanel.hidden) fillPhones().catch(() => {});
+  if (!settingsSheet.hidden && settingsTab === "phones") fillPhones($("settings-body")).catch(() => {});
 };
 
 /** The modes this browser and this hardware can do, and the sound devices to choose from. */
-async function fillPhones(): Promise<void> {
-  const body = $("phones-body");
+async function fillPhones(body: HTMLElement = $("phones-body")): Promise<void> {
   body.replaceChildren();
   const modes: { mode: PhonesMode; title: string; about: string; can: boolean; why?: string }[] = [
     { mode: "off", title: "OFF", about: "The room in stereo. No headphone feed.", can: true },
@@ -828,7 +887,7 @@ async function fillPhones(): Promise<void> {
     const b = el("button", `pill${engine.phones === m.mode ? " on" : ""}`, m.title) as HTMLButtonElement;
     b.disabled = !m.can;
     b.addEventListener("click", () => {
-      engine.setPhones(m.mode).then(() => fillPhones()).catch((e) => { note.textContent = e instanceof Error ? e.message : String(e); });
+      engine.setPhones(m.mode).then(() => fillPhones(body)).catch((e) => { note.textContent = e instanceof Error ? e.message : String(e); });
     });
     row.append(b, el("p", "", m.can ? m.about : `${m.about} ${m.why ?? ""}`));
     body.append(row);
@@ -869,7 +928,7 @@ async function fillPhones(): Promise<void> {
         opt.selected = o.id === current;
         select.append(opt);
       }
-      select.addEventListener("change", () => { set(select.value).then(() => fillPhones()).catch(failed); });
+      select.addEventListener("change", () => { set(select.value).then(() => fillPhones(body)).catch(failed); });
       wrap.append(select);
       return wrap;
     };
@@ -877,7 +936,7 @@ async function fillPhones(): Promise<void> {
     if (DeckEngine.canChoosePhones) body.append(pick("HEADPHONES", engine.phonesDevice, (id) => engine.setPhonesDevice(id)));
     if (!named) {
       const ask = el("button", "quiet", "SHOW MY SOUND DEVICES");
-      ask.addEventListener("click", () => { engine.allowDeviceNames().then(() => fillPhones()).catch(failed); });
+      ask.addEventListener("click", () => { engine.allowDeviceNames().then(() => fillPhones(body)).catch(failed); });
       body.append(ask, el("p", "small", "The browser asks for the microphone only to show the names of your sound devices. It is switched off at once; nothing is recorded."));
     }
   }
@@ -948,7 +1007,7 @@ const midi = new MidiInput({
     booth.nudgeKey(Number(d), on ? Number(dir) : 0);
   },
 });
-midi.onChange = () => { if (!$("controls").hidden) fillControls(); };
+midi.onChange = () => refreshKeys();
 
 const describe = (b: Binding): string => {
   const [type, ch, num] = b.source.split(":");
@@ -992,10 +1051,35 @@ midi.onLearned = (b, device) => {
   const how = b.kind === "button" || b.kind === "hold" ? (b.mode === "toggle" ? " (toggle button)" : " (push button)") : "";
   $("learn-text").textContent = `Learned: ${describe(b)} on ${device} → ${labelOf(b.target)}${how}. Click the next control, or DONE.`;
 };
-$("learn-done").addEventListener("click", () => { setLearn(false); fillControls(); });
+$("learn-done").addEventListener("click", () => { setLearn(false); refreshKeys(); });
 
-function fillControls(): void {
-  const body = $("controls-body");
+/** What the last MIDI config file said (kept over the redraws of the sheet). */
+let midiStatus: { text: string; bad: boolean } | null = null;
+
+/** SAVE CONFIG: what was learned, as a small file. */
+function saveMidiConfig(): void {
+  const url = URL.createObjectURL(new Blob([midi.configText()], { type: "application/json" }));
+  const a = document.createElement("a");
+  a.href = url; a.download = "headliner-midi-config.json";
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  const n = Object.values(midi.allBindings()).reduce((sum, l) => sum + l.length, 0);
+  midiStatus = { text: n ? `Saved ${n} control${n === 1 ? "" : "s"} to headliner-midi-config.json (your downloads folder).` : "Nothing learned yet: the file is empty. Use LEARN first.", bad: !n };
+  refreshKeys();
+}
+
+/** IMPORT CONFIG: a file saved by SAVE CONFIG (here, on another computer, or by someone with the same controller). */
+function importMidiConfig(file: File): void {
+  file.text().then((text) => {
+    const r = parseMidiConfig(text, targetKind);
+    if (!r.ok) { midiStatus = { text: r.error, bad: true }; return; }
+    midi.importBindings(r.bindings);
+    const names = Object.keys(r.bindings).join(", ");
+    midiStatus = { text: `Loaded ${r.bound} control${r.bound === 1 ? "" : "s"} for ${names}${r.skipped ? ` (${r.skipped} skipped: not known to this version)` : ""}.${midi.devices().some((d) => d in r.bindings) ? "" : " If your controller shows up under another name, use the USE FOR button below."}`, bad: false };
+  }).catch(() => { midiStatus = { text: "That file could not be read.", bad: true }; }).finally(() => refreshKeys());
+}
+
+function fillControls(body: HTMLElement = $("controls-body")): void {
   body.replaceChildren();
   const keys = el("div", "keys");
   keys.append(el("h3", "", "KEYBOARD"), el("p", "small", "Shift: small steps. ?: this sheet. CUE: stopped, it marks the spot and plays while you hold it, then goes back to the mark. Playing, it stops at the mark. PLAY during the hold keeps it playing."));
@@ -1008,17 +1092,44 @@ function fillControls(): void {
     m.append(el("p", "small", "This browser has no MIDI (Safari). Chrome, Edge, Firefox and Opera do."));
   } else if (!midi.connected) {
     const connect = el("button", "pill", "CONNECT MIDI");
-    connect.addEventListener("click", () => { midi.connect().then(() => fillControls()).catch(failed); });
+    connect.addEventListener("click", () => { midi.connect().then(() => refreshKeys()).catch(failed); });
     m.append(el("p", "small", "Any MIDI controller, or a USB one that speaks MIDI. The browser asks once."), connect);
   } else {
     const devices = midi.devices();
     m.append(el("p", "small", devices.length ? `Connected: ${devices.join(", ")}` : "No controller connected. Plug one in (it shows up here)."));
     const learn = el("button", "pill", "LEARN");
-    learn.addEventListener("click", () => { $("controls").hidden = true; setLearn(true); });
+    learn.addEventListener("click", () => { $("controls").hidden = true; settingsSheet.hidden = true; setLearn(true); });
     m.append(learn);
+  }
+  if (MidiInput.supported) {
+    // The learning can be kept in a file and loaded again (another browser, another computer, a friend with the same controller).
+    const files = el("div", "midi-file");
+    const save = el("button", "pill", "SAVE CONFIG");
+    save.title = "Save everything learned so far as a file";
+    save.addEventListener("click", saveMidiConfig);
+    const load = el("button", "pill", "IMPORT CONFIG");
+    load.title = "Load a file made by SAVE CONFIG";
+    const picker = document.createElement("input");
+    picker.type = "file"; picker.accept = ".json,application/json"; picker.hidden = true;
+    picker.addEventListener("change", () => { const f = picker.files?.[0]; picker.value = ""; if (f) importMidiConfig(f); });
+    load.addEventListener("click", () => picker.click());
+    files.append(save, load, picker);
+    m.append(files);
+    if (midiStatus) m.append(el("p", `midi-status${midiStatus.bad ? " bad" : ""}`, midiStatus.text));
+  }
+  if (MidiInput.supported && midi.connected) {
     for (const [device, list] of Object.entries(midi.allBindings())) {
       if (!list.length) continue;
-      m.append(el("h4", "", device));
+      // A file made on another system names the same controller differently: offer its bindings for the controllers that are plugged in now.
+      const head = el("div", "binding-device");
+      head.append(el("h4", "", device));
+      for (const other of midi.devices().filter((d) => d !== device)) {
+        const use = el("button", "mini", `USE FOR ${other}`);
+        use.title = `Copy these bindings to ${other} (replaces what it has)`;
+        use.addEventListener("click", () => { midi.copyBindings(device, other); midiStatus = { text: `${other} now has the ${list.length} controls of ${device}.`, bad: false }; refreshKeys(); });
+        head.append(use);
+      }
+      m.append(head);
       for (const b of list) {
         const row = el("div", "binding");
         row.append(el("span", "src", describe(b)), el("span", "dst", labelOf(b.target)));
@@ -1079,7 +1190,10 @@ if (typeof ResizeObserver !== "undefined") {
   $("livebar").hidden = !live;
   requestAnimationFrame(liveLoop);
 })();
-attachKeys(booth, boothActive, () => { fillControls(); toggle($("controls")); });
+attachKeys(booth, boothActive, () => {
+  if (booth.mode === "live") { if (!settingsSheet.hidden && settingsTab === "keys") settingsSheet.hidden = true; else openSettings("keys"); return; }
+  fillControls(); toggle($("controls"));
+});
 
 if (params.has("autostart")) autostart().catch(failed); // screenshots (the browser allows sound without a click)
 else showTitle();

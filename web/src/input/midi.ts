@@ -36,6 +36,63 @@ export type BindingMode = "push" | "toggle" | "twos" | "offset" | "abs";
 
 export interface Binding { source: string; target: string; kind: TargetKind; mode: BindingMode; }
 
+// MARK: - A configuration file: what was learned, saved as a small text file and read again (on another computer, or by someone else with the same controller)
+
+/** The file's own mark, so a file of something else is not taken for one of these. */
+export const MIDI_CONFIG_APP = "grooveline-headliner-midi";
+export interface MidiConfig { app: typeof MIDI_CONFIG_APP; version: 1; saved: string; bindings: Record<string, Binding[]> }
+
+/** The bindings as the text of a config file (pretty, so it can be read and edited by hand). */
+export function midiConfigText(bindings: Record<string, Binding[]>, saved = new Date().toISOString()): string {
+  const clean: Record<string, Binding[]> = {};
+  for (const [device, list] of Object.entries(bindings)) if (list.length) clean[device] = list.map((b) => ({ source: b.source, target: b.target, kind: b.kind, mode: b.mode }));
+  const file: MidiConfig = { app: MIDI_CONFIG_APP, version: 1, saved, bindings: clean };
+  return `${JSON.stringify(file, null, 2)}\n`;
+}
+
+const SOURCE = /^(note|cc|bend):([0-9]|1[0-5]):([0-9]|[1-9][0-9]|1[0-1][0-9]|12[0-7])$/;
+const MODES: Record<TargetKind, readonly BindingMode[]> = { button: ["push", "toggle"], hold: ["push", "toggle"], absolute: ["abs"], relative: ["twos", "offset"] };
+/** Files and what is in them are bounded: nobody has more than a few hundred controls. */
+const CONFIG_MAX = { chars: 400_000, devices: 64, perDevice: 600 };
+
+export type MidiConfigResult =
+  | { ok: true; bindings: Record<string, Binding[]>; devices: number; bound: number; skipped: number }
+  | { ok: false; error: string };
+
+/** Reads a config file's text. Every binding is checked: a source like `cc:0:16`, a target this page knows (`kindOf`), a mode that fits that target. What does not pass is
+ * skipped and counted (a file from a newer version may have controls this one lacks), never half-applied. `kindOf` is the page's own, so the kind is never taken from the file. */
+export function parseMidiConfig(text: string, kindOf: (target: string) => TargetKind | null): MidiConfigResult {
+  if (text.length > CONFIG_MAX.chars) return { ok: false, error: "That file is too big to be a MIDI config." };
+  let file: unknown;
+  try { file = JSON.parse(text); } catch { return { ok: false, error: "That is not a MIDI config file (it is not readable as JSON)." }; }
+  const f = file as Partial<MidiConfig> | null;
+  if (!f || typeof f !== "object" || f.app !== MIDI_CONFIG_APP) return { ok: false, error: "That is not a Headliner MIDI config file." };
+  if (f.version !== 1) return { ok: false, error: "That config comes from a newer version of Headliner." };
+  if (!f.bindings || typeof f.bindings !== "object" || Array.isArray(f.bindings)) return { ok: false, error: "That MIDI config has no controllers in it." };
+  const out: Record<string, Binding[]> = {};
+  let bound = 0, skipped = 0;
+  const entries = Object.entries(f.bindings as Record<string, unknown>);
+  if (entries.length > CONFIG_MAX.devices) return { ok: false, error: "That MIDI config has too many controllers in it." };
+  for (const [device, raw] of entries) {
+    if (!device || device === "__proto__" || device.length > 200 || !Array.isArray(raw)) { skipped += Array.isArray(raw) ? raw.length : 1; continue; }
+    const list: Binding[] = [];
+    for (const item of raw.slice(0, CONFIG_MAX.perDevice)) {
+      const b = item as Partial<Binding> | null;
+      const kind = b && typeof b.target === "string" ? kindOf(b.target) : null;
+      if (!b || !kind || typeof b.source !== "string" || !SOURCE.test(b.source)) { skipped++; continue; }
+      const mode = (MODES[kind] as readonly string[]).includes(b.mode as string) ? (b.mode as BindingMode) : MODES[kind][0];
+      // One control, one target: a later line wins over an earlier one for the same control or the same target (as learning does).
+      const at = list.filter((x) => x.source !== b.source && x.target !== b.target);
+      at.push({ source: b.source, target: b.target as string, kind, mode });
+      list.length = 0; list.push(...at);
+    }
+    skipped += Math.max(0, raw.length - CONFIG_MAX.perDevice);
+    if (list.length) { out[device] = list; bound += list.length; }
+  }
+  if (!bound) return { ok: false, error: skipped ? "Nothing in that MIDI config fits this version of Headliner." : "That MIDI config is empty." };
+  return { ok: true, bindings: out, devices: Object.keys(out).length, bound, skipped };
+}
+
 /** 0...1 from an absolute knob or fader. */
 export function absoluteValue(e: MidiEvent): number {
   if (e.type === "bend") return e.value / 16383;
@@ -187,6 +244,24 @@ export class MidiInput {
   }
 
   clear(): void { this.bindings = {}; this.save(); }
+
+  /** The bindings as the text of a config file. */
+  configText(): string { return midiConfigText(this.bindings); }
+
+  /** Puts a read config in: each controller in it gets the file's bindings (replacing its own); other controllers are left alone. */
+  importBindings(bindings: Record<string, Binding[]>): void {
+    for (const [device, list] of Object.entries(bindings)) this.bindings[device] = list.map((b) => ({ ...b }));
+    this.takeover.reset();
+    this.save();
+  }
+
+  /** A controller's bindings for another controller (the same device under another name: ALSA, Windows and macOS each name a USB controller differently). */
+  copyBindings(from: string, to: string): void {
+    if (from === to || !this.bindings[from]?.length) return;
+    this.bindings[to] = this.bindings[from].map((b) => ({ ...b }));
+    this.takeover.reset();
+    this.save();
+  }
 
   /** A new lesson or night set the desk: faders must catch up with the screen again. */
   resetTakeover(): void { this.takeover.reset(); }
