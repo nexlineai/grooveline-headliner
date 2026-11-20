@@ -63,6 +63,8 @@ export class GoLive {
   /** The server's time now. */
   get serverNow(): number { return this.nowMs() + this.offset; }
   get busy(): boolean { return BUSY.has(this.state); }
+  /** The booking being sent for while the connection is up (the page tells the Worker what is playing for it), else null. */
+  get sendingBookingId(): string | null { return (this.state === "sending" || this.state === "onair") && this.slot ? this.slot.id : null; }
   /** Nothing is running and no second click is awaited (a method, so a check after an await is a fresh one). */
   private idle(): boolean { return !this.busy && this.state !== "confirming"; }
 

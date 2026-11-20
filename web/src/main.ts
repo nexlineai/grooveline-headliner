@@ -44,6 +44,7 @@ import { SoundCheck } from "./stream/soundcheck.ts";
 import type { CheckView } from "./stream/soundcheck.ts";
 import { Meter } from "./audio/meter.ts";
 import { GoLive } from "./stream/golive.ts";
+import { NowPlaying } from "./stream/nowplaying.ts";
 import type { LiveView } from "./stream/golive.ts";
 import { WhipPublisher } from "./stream/whip.ts";
 import type { Kind } from "./booth/booth.ts";
@@ -1250,7 +1251,12 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) stre
 window.addEventListener("pagehide", () => { void soundCheck.stop(); void goLive.stop(); });
 // While the panel is on screen: the slot's countdown and the timer every second, the slot read again every half minute, and the radio asked every 5 s whether it lists this booking.
 let streamShown = false, streamAwaySince = 0;
-setInterval(() => { if (streamShown) { goLive.tick(); renderOnAirTimer(); } }, 1000);
+// What the booth is playing goes to the Worker while the show is sending, so the site's player can show it (stream/nowplaying.ts).
+const nowPlaying = new NowPlaying({
+  session: readStreamSession, fetchFn: streamFetch, bookingId: () => goLive.sendingBookingId,
+  decks: () => [0, 1].map((d) => { const t = userOnDeck[d]; return { playing: deckPlaying(d), level: engine.decks[d].volume, artist: t?.artist ?? "", title: t ? (t.title || t.name.replace(/\.[^.]+$/, "")) : "" }; }),
+});
+setInterval(() => { if (streamShown) { goLive.tick(); renderOnAirTimer(); void nowPlaying.tick(); } }, 1000);
 setInterval(() => { if (streamShown) void goLive.refresh(); }, 30_000);
 setInterval(() => { if (streamShown) void goLive.pollLive(); }, 5_000);
 /** Called every frame with "the booth is in LIVE and on screen". Leaving it (another mode, a title, a card over the booth) ends a test or a show, but not for a blink: it must be gone for a second. */
