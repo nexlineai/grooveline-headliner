@@ -76,9 +76,13 @@ let cutPattern: DrumPattern | null = progress.track ? new DrumPattern(progress.t
 const trackFor = (id: string): TrackInfo | null => (id === "your-dubplate" ? cutInfo() : tracks.find((t) => t.id === id) ?? null);
 
 /** A record is not changed under a playing needle: in LIVE a message comes up over that deck. True when the deck is busy. */
+/** A deck is PLAYING a record, not merely turning: its motor runs and the needle has not reached the end (a record that has finished keeps the motor on, in
+ * silence, and must not stop a playlist from loading the next one). */
+const deckPlaying = (d: number): boolean => { const deck = engine.decks[d]; return deck.motorOn && Math.abs(deck.rate) > 0.1 && !(deck.progress >= 0.995); };
+
 function deckBusy(d: number): boolean {
   const deck = engine.decks[d];
-  if (booth.lesson || booth.night || !deck.motorOn || Math.abs(deck.rate) <= 0.1) return false;
+  if (booth.lesson || booth.night || !deckPlaying(d)) return false;
   if (booth.mode === "live") booth.alertDeck(d, `STOP THE ${d === 0 ? "LEFT" : "RIGHT"} DECK BEFORE LOADING A NEW RECORD`);
   else note.textContent = "Stop the deck before you change its record."; // free play: the small note, as before
   return true;
@@ -131,7 +135,7 @@ const wall = buildWall($("wall"), library, bigSleeves, {
   // Free play shows the game's records in its crates; LIVE's library is your own music only.
   game: () => (booth.mode === "live" ? [] : gameRecords),
   toRoom: () => setFront("room"),
-  busy: (d) => !booth.lesson && !booth.night && engine.decks[d].motorOn && Math.abs(engine.decks[d].rate) > 0.1,
+  busy: (d) => !booth.lesson && !booth.night && deckPlaying(d),
   // The heart: kept with the track; the wall's shelf shows favourites (and what you play most) first.
   toggleFav: (item) => { const t = item.track; if (!t) return; t.fav = !t.fav; library.update(t).catch(() => {}); wall.refresh(); },
 });

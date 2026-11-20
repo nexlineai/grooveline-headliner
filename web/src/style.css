@@ -407,10 +407,10 @@ button.mini.on { border-color: var(--orange); color: var(--orange); }
     linear-gradient(#171b2c, #0a0c15); }
 #wall[hidden] { display: none; }
 #wall-open { position: fixed; z-index: 3; top: 9vh; left: 2vw; }
-#wall .mini { padding: 5px 10px; border-radius: 7px; background: rgba(5, 6, 10, 0.7); color: var(--ink); border: 1px solid var(--edge); font: 700 calc(var(--ws) * 11px) system-ui, sans-serif;
+#wall .mini { padding: 5px 10px; border-radius: 7px; background: rgba(5, 6, 10, 0.7); color: var(--ink); border: 1px solid var(--edge); font: 700 calc(var(--wz) * 11px) system-ui, sans-serif;
   letter-spacing: 0.1em; cursor: pointer; }
 #wall .mini.on { background: var(--teal); color: #000; border-color: var(--teal); }
-#wall .w-top { flex: none; display: flex; align-items: center; gap: 8px; height: calc(var(--ws) * 48px); padding: 0 calc(var(--top-w, 460px) + 2vw + 16px) 0 max(88px, 6vw); overflow: hidden; white-space: nowrap; }
+#wall .w-top { flex: none; display: flex; align-items: center; gap: 8px; height: calc(var(--wz) * 48px); padding: 0 calc(var(--top-w, 460px) + 2vw + 16px) 0 max(88px, 6vw); overflow: hidden; white-space: nowrap; }
 #wall .w-group { display: flex; align-items: center; gap: 5px; margin-right: 8px; }
 #wall .w-cap { color: var(--dim); font: 700 calc(var(--ws) * 10px) system-ui, sans-serif; letter-spacing: 0.14em; margin-right: 3px; }
 @media (max-width: 1180px) { #wall .w-cap { display: none; } }
@@ -528,17 +528,17 @@ body.live #wall .d-left { padding-left: 18px; }
   color: var(--ink); border: 1px solid var(--edge); font: 600 calc(var(--ws) * 11px) system-ui, sans-serif; letter-spacing: 0.08em; }
 #wall .w-search:focus { outline: none; border-color: #26c6f0; }
 #wall.listing .w-shelf, #wall.listing .w-floor { display: none; }
-#wall .w-list { display: none; flex: 1; min-height: 0; flex-direction: column; padding: 0 14px 8px; --l-cols: minmax(0, 2fr) minmax(0, 3fr) calc(var(--ws) * 46px) calc(var(--ws) * 42px) calc(var(--ws) * 36px) calc(var(--ws) * 44px) calc(var(--ws) * 78px) minmax(0, 1fr) calc(var(--ws) * 86px); }
+#wall .w-list { display: none; flex: 1; min-height: 0; flex-direction: column; padding: 0 14px 8px; --l-cols: minmax(0, 2fr) minmax(0, 3fr) calc(var(--wz) * 46px) calc(var(--wz) * 42px) calc(var(--wz) * 36px) calc(var(--wz) * 44px) calc(var(--wz) * 78px) minmax(0, 1fr) calc(var(--wz) * 86px); }
 #wall.listing .w-list { display: flex; }
 #wall .l-head { flex: none; display: grid; grid-template-columns: var(--l-cols); gap: 10px; padding: 0 8px 4px; border-bottom: 1px solid var(--edge); }
-#wall .l-col { background: none; border: 0; padding: 4px 0; text-align: left; color: var(--dim); font: 700 calc(var(--ws) * 10px) system-ui, sans-serif; letter-spacing: 0.14em; cursor: pointer; }
+#wall .l-col { background: none; border: 0; padding: 4px 0; text-align: left; color: var(--dim); font: 700 calc(var(--wz) * 10px) system-ui, sans-serif; letter-spacing: 0.14em; cursor: pointer; }
 #wall .l-col:disabled { cursor: default; }
 #wall .l-col.on { color: #26c6f0; }
 #wall .l-col.end { text-align: right; padding: 4px 0; }
 #wall .l-scroll { position: relative; flex: 1; min-height: 0; overflow-y: auto; }
 #wall .l-spacer { width: 1px; }
 #wall .l-row { position: absolute; left: 0; right: 0; display: grid; grid-template-columns: var(--l-cols); gap: 10px; align-items: center; padding: 0 8px; box-sizing: border-box;
-  font-size: calc(var(--ws) * 13px); border-bottom: 1px solid rgba(255, 255, 255, 0.035); }
+  font-size: calc(var(--wz) * 13px); border-bottom: 1px solid rgba(255, 255, 255, 0.035); }
 #wall .l-row:hover { background: rgba(255, 255, 255, 0.04); }
 /* On a deck now: the row is lit in that deck's colour, with a bar at its left, so it can be found in a long list. */
 #wall .l-row.on { background: rgba(38, 198, 240, 0.14); box-shadow: inset 3px 0 0 #26c6f0; font-weight: 700; }
@@ -555,10 +555,10 @@ body.live #wall .d-left { padding-left: 18px; }
 #wall .mark.a { background: #26c6f0; }
 #wall .mark.b { background: #ffac28; }
 #wall .l-load { display: flex; gap: 4px; justify-content: flex-end; overflow: visible !important; }
-#wall .l-load button { width: calc(var(--ws) * 26px); padding: calc(var(--ws) * 3px) 0; border-radius: 5px; background: rgba(8, 10, 18, 0.9); font: 800 calc(var(--ws) * 10px) system-ui, sans-serif; border: 1.5px solid; cursor: pointer; }
+#wall .l-load button { width: calc(var(--wz) * 26px); padding: calc(var(--wz) * 3px) 0; border-radius: 5px; background: rgba(8, 10, 18, 0.9); font: 800 calc(var(--wz) * 10px) system-ui, sans-serif; border: 1.5px solid; cursor: pointer; }
 #wall .l-load button.left { color: #26c6f0; border-color: #26c6f0; }
 #wall .l-load button.right { color: #ffac28; border-color: #ffac28; }
-#wall .l-count { flex: none; padding: 6px 8px 0; color: var(--dim); font-size: calc(var(--ws) * 11px); }
+#wall .l-count { flex: none; padding: 6px 8px 0; color: var(--dim); font-size: calc(var(--wz) * 11px); }
 #wall .w-floor { justify-content: safe center; }
 #wall.listing .w-group, #wall.listing .w-shuffle { display: none; }
 
@@ -623,7 +623,7 @@ body.live #wall .d-left { padding-left: 18px; }
 .load-pop .lp-heart { flex: none; width: 30px; height: 30px; border-radius: 50%; border: 1.5px solid rgba(255, 255, 255, 0.25); background: #0a0d11; color: rgba(236, 240, 245, 0.6); font-size: 16px; line-height: 1; cursor: pointer; }
 .load-pop .lp-heart.on { color: #ff6a5a; border-color: #ff6a5a; background: rgba(255, 106, 90, 0.12); }
 .load-pop .lp-heart:hover { border-color: rgba(255, 255, 255, 0.55); }
-#wall .l-load button.heart { width: calc(var(--ws) * 22px); border-color: rgba(255, 255, 255, 0.2); color: rgba(236, 240, 245, 0.5); font-size: calc(var(--ws) * 12px); }
+#wall .l-load button.heart { width: calc(var(--wz) * 22px); border-color: rgba(255, 255, 255, 0.2); color: rgba(236, 240, 245, 0.5); font-size: calc(var(--wz) * 12px); }
 #wall .l-load button.heart.on { color: #ff6a5a; border-color: #ff6a5a; }
 #wall .w-fav { position: absolute; top: 3px; right: 5px; font-size: calc(var(--ws) * 13px); color: #ff6a5a; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8); pointer-events: none; }
 
@@ -648,16 +648,16 @@ body.live #top .pill.on { background: rgba(38, 198, 240, 0.2); color: #fff; bord
 body.live #wall .w-room { display: none; }
 
 /* The PLAYLISTS view of the library: the playlists on the left, the records of the one picked on the right. */
-#wall .w-plays { display: none; flex: 1; min-height: 0; padding: 0 14px 8px; gap: 14px; font-size: calc(var(--ws) * 13px); }
+#wall .w-plays { display: none; flex: 1; min-height: 0; padding: 0 14px 8px; gap: 14px; font-size: calc(var(--wz) * 13px); }
 #wall.playlisting .w-shelf, #wall.playlisting .w-floor { display: none; }
 #wall.playlisting .w-plays { display: flex; }
 #wall.listing .w-plays { display: none; }
-#wall .pl-side { flex: none; width: calc(var(--ws) * 230px); display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--edge); padding-right: 12px; }
+#wall .pl-side { flex: none; width: calc(var(--wz) * 230px); display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--edge); padding-right: 12px; }
 #wall .pl-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 0 8px; }
-#wall .pl-cap { font: 700 calc(var(--ws) * 10px) system-ui, sans-serif; letter-spacing: 0.16em; color: var(--dim); }
+#wall .pl-cap { font: 700 calc(var(--wz) * 10px) system-ui, sans-serif; letter-spacing: 0.16em; color: var(--dim); }
 #wall .pl-bar, #wall .pl-actions { display: flex; gap: 6px; }
 #wall .pl-lists { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; }
-#wall .pl-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: calc(var(--ws) * 7px) calc(var(--ws) * 10px); border-radius: 7px; border: 1px solid transparent; background: rgba(255, 255, 255, 0.03); color: var(--ink); cursor: pointer; text-align: left; font: inherit; }
+#wall .pl-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: calc(var(--wz) * 7px) calc(var(--wz) * 10px); border-radius: 7px; border: 1px solid transparent; background: rgba(255, 255, 255, 0.03); color: var(--ink); cursor: pointer; text-align: left; font: inherit; }
 #wall .pl-item:hover { background: rgba(255, 255, 255, 0.07); }
 #wall .pl-item.on { background: rgba(38, 198, 240, 0.14); border-color: #26c6f0; }
 #wall .pl-item .pl-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -665,12 +665,12 @@ body.live #wall .w-room { display: none; }
 #wall .pl-none, #wall .pl-empty { color: var(--dim); font-size: 0.95em; padding: 10px 4px; margin: 0; }
 #wall .pl-main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 #wall .pl-title { flex: none; display: flex; align-items: center; gap: 12px; padding: 0 0 8px; border-bottom: 1px solid var(--edge); }
-#wall .pl-title h3 { margin: 0; font: 700 calc(var(--ws) * 16px) system-ui, sans-serif; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#wall .pl-title h3 { margin: 0; font: 700 calc(var(--wz) * 16px) system-ui, sans-serif; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #wall .pl-count { color: var(--dim); font-size: 0.9em; white-space: nowrap; }
 #wall .pl-actions { margin-left: auto; }
-#wall .pl-rename { flex: 1; min-width: 0; padding: 5px 9px; border-radius: 6px; border: 1px solid #26c6f0; background: #080a0e; color: var(--ink); font: 700 calc(var(--ws) * 15px) system-ui, sans-serif; }
+#wall .pl-rename { flex: 1; min-width: 0; padding: 5px 9px; border-radius: 6px; border: 1px solid #26c6f0; background: #080a0e; color: var(--ink); font: 700 calc(var(--wz) * 15px) system-ui, sans-serif; }
 #wall .pl-rows { flex: 1; min-height: 0; overflow-y: auto; }
-#wall .pl-row { display: grid; grid-template-columns: calc(var(--ws) * 28px) minmax(0, 2fr) minmax(0, 3fr) calc(var(--ws) * 46px) calc(var(--ws) * 64px) calc(var(--ws) * 78px); gap: 10px; align-items: center; padding: calc(var(--ws) * 6px) 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.035); cursor: pointer; }
+#wall .pl-row { display: grid; grid-template-columns: calc(var(--wz) * 28px) minmax(0, 2fr) minmax(0, 3fr) calc(var(--wz) * 46px) calc(var(--wz) * 64px) calc(var(--wz) * 78px); gap: 10px; align-items: center; padding: calc(var(--wz) * 6px) 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.035); cursor: pointer; }
 #wall .pl-row:hover { background: rgba(255, 255, 255, 0.04); }
 #wall .pl-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #wall .pl-row .pl-n, #wall .pl-row .pl-time { color: var(--dim); font-variant-numeric: tabular-nums; }
@@ -679,10 +679,10 @@ body.live #wall .w-room { display: none; }
 #wall .pl-row.on.onb { background: rgba(255, 172, 40, 0.14); box-shadow: inset 3px 0 0 #ffac28; }
 #wall .pl-row.on.onb.ona { background: linear-gradient(90deg, rgba(38, 198, 240, 0.16), rgba(255, 172, 40, 0.16)); box-shadow: inset 3px 0 0 #26c6f0, inset -3px 0 0 #ffac28; }
 #wall .pl-load, #wall .pl-move { display: flex; gap: 4px; justify-content: flex-end; overflow: visible !important; }
-#wall .pl-load button { width: calc(var(--ws) * 26px); padding: calc(var(--ws) * 3px) 0; border-radius: 5px; background: rgba(8, 10, 18, 0.9); font: 800 calc(var(--ws) * 10px) system-ui, sans-serif; border: 1.5px solid; cursor: pointer; }
+#wall .pl-load button { width: calc(var(--wz) * 26px); padding: calc(var(--wz) * 3px) 0; border-radius: 5px; background: rgba(8, 10, 18, 0.9); font: 800 calc(var(--wz) * 10px) system-ui, sans-serif; border: 1.5px solid; cursor: pointer; }
 #wall .pl-load button.left { color: #26c6f0; border-color: #26c6f0; }
 #wall .pl-load button.right { color: #ffac28; border-color: #ffac28; }
-#wall .pl-move button.arrow { width: calc(var(--ws) * 22px); padding: calc(var(--ws) * 3px) 0; border-radius: 5px; border: 1px solid rgba(255, 255, 255, 0.2); background: transparent; color: var(--dim); font-size: calc(var(--ws) * 10px); cursor: pointer; }
+#wall .pl-move button.arrow { width: calc(var(--wz) * 22px); padding: calc(var(--wz) * 3px) 0; border-radius: 5px; border: 1px solid rgba(255, 255, 255, 0.2); background: transparent; color: var(--dim); font-size: calc(var(--wz) * 10px); cursor: pointer; }
 #wall .pl-move button.arrow:hover { color: var(--ink); border-color: rgba(255, 255, 255, 0.5); }
 #wall .pl-move button.arrow.x:hover { color: #ff6a5a; border-color: #ff6a5a; }
 #wall .w-status.flash { color: #7be3a1; }

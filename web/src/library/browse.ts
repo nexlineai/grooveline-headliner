@@ -205,7 +205,7 @@ export function buildList(host: HTMLElement, hooks: ListHooks): ListView {
       if (signature(first, last) !== marks) render();
     },
     resize(): void {
-      const ws = parseFloat(getComputedStyle(host).getPropertyValue("--ws")) || 1;
+      const ws = parseFloat(getComputedStyle(host).getPropertyValue("--wz")) || 1;
       const next = Math.max(20, Math.round(26 * ws));
       if (next === rowH) { render(); return; }
       rowH = next;

@@ -37,6 +37,11 @@ export interface Wall {
 
 const GROUP_KEY = "headliner.wallBy";
 const VIEW_KEY = "headliner.libView";
+const ZOOM_KEY = "headliner.libZoom";
+/** The size of the library's text (the top row, the list, the playlists): 1 = as drawn for the wall's height; the default is a quarter bigger, since the text at a laptop's
+ * height was too small to read comfortably. The A- and A+ buttons step it. */
+const ZOOM_DEFAULT = 1.25, ZOOM_MIN = 0.75, ZOOM_MAX = 2.25, ZOOM_STEP = 0.125;
+const savedZoom = (): number => { try { const v = Number(localStorage.getItem(ZOOM_KEY)); return Number.isFinite(v) && v >= ZOOM_MIN && v <= ZOOM_MAX ? v : ZOOM_DEFAULT; } catch { return ZOOM_DEFAULT; } };
 const GROUP_LABELS: [Grouping, string][] = [["az", "A–Z"], ["genre", "GENRE"], ["tempo", "TEMPO"]];
 const MAX_PICKS = 14;
 /** The wall is drawn for a front area this high (CSS pixels); everything scales from there. */
@@ -96,7 +101,18 @@ export function buildWall(root: HTMLElement, lib: Library, sleeves: Sleeves, hoo
   const viewWall = pill("WALL", "mini", () => setView("wall"), "Covers on a shelf and in crates");
   const viewList = pill("LIST", "mini", () => setView("list"), "One line for each record, with the search and sorting");
   const viewPlays = pill("PLAYLISTS", "mini", () => setView("plays"), "Your playlists: make them, fill them, save them as files and open them again");
-  topRight.append(search, viewWall, viewList, viewPlays);
+  // Text size: A- and A+ (remembered).
+  let zoom = savedZoom();
+  function setZoom(z: number): void {
+    zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round(z / ZOOM_STEP) * ZOOM_STEP));
+    try { localStorage.setItem(ZOOM_KEY, String(zoom)); } catch { /* private window */ }
+    zoomOut.disabled = zoom <= ZOOM_MIN + 1e-9; zoomIn.disabled = zoom >= ZOOM_MAX - 1e-9;
+    zoomOut.title = zoomIn.title = `Text size of the library: ${Math.round(zoom * 100)} %`;
+    layout();
+  }
+  const zoomOut = pill("A\u2212", "mini w-zoom", () => setZoom(zoom - ZOOM_STEP), "Smaller text in the library");
+  const zoomIn = pill("A+", "mini w-zoom", () => setZoom(zoom + ZOOM_STEP), "Bigger text in the library");
+  topRight.append(search, viewWall, viewList, viewPlays, zoomOut, zoomIn);
   // A short message for the status line (a playlist was saved, or opened).
   let flash = "";
   function say(text: string): void { flash = text; drawTop(); setTimeout(() => { if (flash === text) { flash = ""; drawTop(); } }, 7000); }
@@ -471,6 +487,7 @@ export function buildWall(root: HTMLElement, lib: Library, sleeves: Sleeves, hoo
     // As big as the height allows, but never so big that the row of seven crates no longer fits the width.
     const ws = Math.max(0.6, Math.min(1.5, h / DESIGN_HEIGHT, (w - 24) / 1180));
     root.style.setProperty("--ws", String(ws));
+    root.style.setProperty("--wz", String(ws * zoom)); // the library's text: the wall's scale times the player's zoom
     // A short front (a phone held sideways): no shelf, just the crates.
     root.classList.toggle("compact", h < 175);
     const want = Math.max(4, Math.min(MAX_PICKS, Math.floor((w - 60) / (118 * ws))));
