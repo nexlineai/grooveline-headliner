@@ -108,8 +108,8 @@ describe("LIVE layout", () => {
         assert.equal(g.fxInBar, fxFitsTheBar(W));
         if (g.fxInBar) {
           assert.ok(F.rect.y >= H - TOP_BAR - E && F.rect.y + F.rect.h <= H + E, "inside the top bar");
-          assert.ok(F.rect.x >= 373, "after the stream bar's time");
-          assert.ok(F.rect.x + F.rect.w <= W - 416 + E, "clear of the buttons on the right (EXIT FULLSCREEN included)");
+          assert.ok(F.rect.x >= 455 - E, "after the stream bar's time");
+          assert.ok(F.rect.x + F.rect.w <= W - 423 + E, "clear of the buttons on the right (EXIT FULLSCREEN included)");
           assert.ok(g.gear.y + g.gear.h <= H - TOP_BAR - 2, "the gear row starts under the bar: the controls cost it no height");
         } else {
           assert.ok(F.rect.y > g.gear.y + g.gear.h, "above the gear row");
@@ -120,7 +120,7 @@ describe("LIVE layout", () => {
         assert.equal(F.knobs.length, 4);
         F.knobs.forEach((k, i) => {
           assert.ok(k.r < M.strip[0].knobR, "smaller than the mixer's knobs");
-          if (!g.fxInBar) assert.ok(k.r >= 0.5 * M.strip[0].knobR, "but not tiny"); else assert.ok(k.r >= 9, "in the bar: not smaller than 9 px");
+          if (!g.fxInBar) assert.ok(k.r >= 0.5 * M.strip[0].knobR, "but not tiny"); else assert.ok(k.r >= 10, "in the bar: not smaller than 10 px");
           assert.ok(inside(F.rect, box(k.c.x, k.c.y, k.r)) && inside(F.rect, k.touch), `knob ${i} inside`);
           assert.ok(k.value.x > k.c.x + k.r, "its step to the right of it");
           if (g.fxInBar) assert.ok(k.name.y < k.c.y - k.r + 2 && k.name.x < k.c.x, "in the bar its name is UNDER the knob, starting at its left edge");
@@ -140,19 +140,21 @@ describe("LIVE layout", () => {
         if (!g.fxInBar) assert.ok(F.name.x > F.rect.x + 40 * u && L.touch.x + L.touch.w < F.rect.x + F.rect.w - 40 * u, "the cluster in the middle of the strip");
       });
 
-      test("the FX buttons: a square one on the OUTER side of each FILTER knob, inside the mixer, clear of the knob and its ring, big enough to touch", () => {
-        const M = g.mixer;
-        M.strip.forEach((s, d) => {
-          const r = s.fxBtn;
-          assert.ok(Math.abs(r.w - r.h) < 1e-6 && r.w >= 15 * g.u, "square");
-          assert.ok(inside(M.rect, r));
-          assert.ok(apart(r, box(s.x, s.knobY[4], s.knobR + 3.5 * g.u)), "clear of the FILTER knob and its ring");
-          const cx = r.x + r.w / 2;
-          if (d === 0) assert.ok(cx < s.x, "channel A: left of its filter"); else assert.ok(cx > s.x, "channel B: right of its filter");
-          assert.ok(Math.abs(r.y + r.h / 2 - s.knobY[4]) < 1e-6, "level with the knob");
-          const fader: Rect = { x: s.fader.x - 12 * g.u, y: s.fader.y - s.fader.travel / 2 - 7 * g.u, w: 24 * g.u, h: s.fader.travel + 14 * g.u };
-          assert.ok(apart(r, fader), "clear of the channel fader");
-        });
+      test("the FX buttons are with the effects: channel A's at the LEFT end, channel B's at the RIGHT end, same size, inside, apart from the name and LEVEL, big enough to touch; none in the mixer", () => {
+        const F = g.fx, [a, b] = F.send, u = g.fxInBar ? 1 : g.u;
+        assert.equal(F.send.length, 2);
+        assert.ok(Math.abs(a.w - b.w) < E && Math.abs(a.h - b.h) < E && Math.abs(a.y - b.y) < E, "alike and level");
+        assert.ok(a.w >= 24 * u && a.h >= 20 * u, `big enough: ${a.w}x${a.h}`);
+        assert.ok(inside(F.rect, a) && inside(F.rect, b));
+        assert.ok(a.x + a.w <= F.name.x - 3 * u + E, "A's left of the name, with a gap");
+        assert.ok(b.x >= F.level.touch.x + F.level.touch.w - 4 * u - E && b.x >= F.level.x + F.level.travel / 2 + F.level.capW / 2, "B's right of LEVEL");
+        for (const k of F.knobs) { assert.ok(apart(a, k.touch) && apart(b, k.touch)); }
+        assert.ok(apart(a, F.level.touch) && apart(b, F.level.touch) && apart(a, b));
+        if (g.fxInBar) assert.ok(Math.abs(a.x - F.rect.x) < E && Math.abs(b.x + b.w - (F.rect.x + F.rect.w)) < E, "at the two ends of the cluster");
+        else assert.ok(a.x < F.name.x && b.x > F.level.x, "at the two ends of the strip's cluster");
+        assert.ok(a.x < b.x, "A is the left one");
+        // The mixer has nothing on the outer side of the FILTER knobs any more: it is narrower and the decks are wider.
+        for (const s of g.mixer.strip) assert.ok(!("fxBtn" in s));
       });
 
       test("the deck header, left to right: the title (cut short, never over the rest), the time, the four bar lamps, the key (a smaller type), the tempo at the corner; the pitch reads out under its fader", () => {
@@ -202,20 +204,21 @@ describe("LIVE layout", () => {
     assert.equal(b.mixer.rect.w, a.mixer.rect.w);
   });
 
-  test("Zé's 100 % window (1152 x 720, EXIT FULLSCREEN, measured on 20 Nov): the effects sit in the top bar between the time and the buttons, with and without the page's measure", () => {
-    const room = { left: 363, right: 739 }; // livebar ends at 363, #top starts at 739 (measured in the page)
-    for (const r of [undefined, room]) {
-      const g = liveGeometry(1152, 720, r);
-      assert.ok(g.fxInBar, "in the bar, not the strip above the decks");
-      assert.ok(g.fx.rect.x >= 363 + 10 - E && g.fx.rect.x + g.fx.rect.w <= 739 - 10 + E, "between 00:00:00 and KEYS & MIDI");
-    }
+  test("Zé's 100 % window (1152 x 720, EXIT FULLSCREEN, everything in the bar, measured on 20 Nov): the effects sit in the top bar between the time and the buttons", () => {
+    const room = { left: 445, right: 845 }; // #livebar ends at 445, #top starts at 845 (measured in the page)
+    const g = liveGeometry(1152, 720, room);
+    assert.ok(g.fxInBar, "in the bar, not the strip above the decks");
+    assert.ok(g.fx.rect.x >= 445 + 10 - E && g.fx.rect.x + g.fx.rect.w <= 845 - 10 + E, "between the time and SETTINGS");
+    assert.ok(845 - (g.fx.rect.x + g.fx.rect.w) >= 10 + 5 && g.fx.rect.x - 445 >= 10 + 5, "with room to spare, not touching");
+    // without the page's measure the worst case of the full bar is assumed: 1280 wide is enough, 1152 is not (the page measures and sheds words instead)
+    assert.ok(liveGeometry(1280, 720).fxInBar && !liveGeometry(1152, 720).fxInBar);
   });
 
   test("the page's measure decides: a bar with less room than the controls need puts them in the strip, and a wide window with a crowded bar too", () => {
-    assert.ok(!liveGeometry(1152, 720, { left: 363, right: 680 }).fxInBar, "317 px between the text and the buttons, 20 of them gaps: 297 is not enough");
-    assert.ok(liveGeometry(1152, 720, { left: 363, right: 700 }).fxInBar, "337 px between them is enough");
-    assert.ok(!liveGeometry(1920, 1080, { left: 700, right: 960 }).fxInBar, "a crowded bar in a wide window");
-    assert.ok(liveGeometry(1100, 700, { left: 363, right: 1100 - 330 }).fxInBar === fxFitsTheBar(1100, { left: 363, right: 1100 - 330 }));
+    assert.ok(!liveGeometry(1152, 720, { left: 445, right: 800 }).fxInBar, "355 px between the text and the buttons, 20 of them gaps: 335 is not enough");
+    assert.ok(liveGeometry(1152, 720, { left: 445, right: 845 }).fxInBar, "400 px between them is enough");
+    assert.ok(!liveGeometry(1920, 1080, { left: 700, right: 1000 }).fxInBar, "a crowded bar in a wide window");
+    assert.ok(liveGeometry(1100, 700, { left: 300, right: 800 }).fxInBar === fxFitsTheBar(1100, { left: 300, right: 800 }));
   });
 
   test("the room the page asks for (BAR_ROOM_NEEDED_PX) is exactly what makes the effects fit: one pixel less and they go to the strip", () => {
@@ -225,12 +228,22 @@ describe("LIVE layout", () => {
     assert.ok(g.fx.rect.x >= 210 - E && g.fx.rect.x + g.fx.rect.w <= 200 + BAR_ROOM_NEEDED_PX - 10 + E, "inside it, a gap each side");
   });
 
-  test("in the bar the controls keep their size however big the window is (pixels, not units), and stay inside the top 28 px so the page's message fits under them", () => {
-    const a = liveGeometry(1152, 720), b = liveGeometry(2560, 1440);
+  test("in the bar the controls keep their size however big the window is (pixels, not units), and stay inside the top 32 px so the page's message fits under them", () => {
+    const a = liveGeometry(1152, 720, { left: 445, right: 845 }), b = liveGeometry(2560, 1440);
     assert.ok(a.fxInBar && b.fxInBar);
     assert.equal(a.fx.text, b.fx.text);
     assert.equal(a.fx.rect.w, b.fx.rect.w);
-    assert.equal(b.fx.knobs[0].r, 9);
-    for (const g of [a, b]) assert.ok(g.fx.rect.y >= g.H - 28 - E && g.fx.rect.y + g.fx.rect.h <= g.H + E);
+    assert.equal(b.fx.knobs[0].r, 10);
+    for (const g of [a, b]) assert.ok(g.fx.rect.y >= g.H - 32 - E && g.fx.rect.y + g.fx.rect.h <= g.H + E);
+  });
+
+  test("the mixer is 196 units wide (the FX buttons left it) and its 30 units went to the decks: the unit u is what it was, each deck is 311 units, wider than the old 296", () => {
+    const g = liveGeometry(1152, 720, { left: 445, right: 845 });
+    assert.ok(Math.abs(g.mixer.rect.w / g.u - 196) < 1e-6);
+    assert.ok(Math.abs(g.u - (1152 - 20) / (226 + 2 * 5.333 + 2 * 296)) < 1e-9, "u is as before at this width: the total in units did not change");
+    assert.ok(g.deck[0].rect.w / g.u >= 311 - 1e-6, `${g.deck[0].rect.w / g.u} units`);
+    // the strips sit near the mixer's edges, but the CUE button, the faders and the knobs stay inside it with a margin
+    const M = g.mixer;
+    for (const s of M.strip) assert.ok(s.x - M.rect.x >= 26 * g.u - E && M.rect.x + M.rect.w - s.x >= 26 * g.u - E);
   });
 });

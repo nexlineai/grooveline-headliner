@@ -15,17 +15,20 @@
 import { centred } from "./gear.ts";
 import type { Point, Rect } from "./gear.ts";
 
-export const TOP_BAR = 40;
+export const TOP_BAR = 44;
 const GEAR_H = 300;
-const DECK_MIN = 296, MIXER_W = 226, GAP = 5.333;
+// The mixer lost the FX buttons (they are with the effects now), so its strips moved outwards and it is 30 units narrower: the decks get those 30 units (15 each),
+// so the unit `u` (and with it every knob) is what it was and the decks are wider.
+const DECK_MIN = 311, MIXER_W = 196, GAP = 5.333, STRIP_CX = 28;
 /** The effects strip above the gear row (a narrow window): its height and the gap under it (units). */
 const FX_STRIP_H = 30, FX_STRIP_GAP = 4;
-/** The effects controls sit in the TOP BAR, right after the stream bar's 00:00:00 and before the page's buttons (KEYS & MIDI ...), when there is room. The page
- * measures the room (`BarRoom`: where the bar's text ends and where the buttons begin, so a longer label like EXIT FULLSCREEN counts); without a measure these
- * are the worst case measured on 20 Nov at 1152 x 720 (a 1440 x 900 screen with the browser at 100 %, which is 1.25 here): the text ends at 363 px, the
- * buttons (FULLSCREEN as EXIT FULLSCREEN) start 413 px from the right edge. The controls need BAR_FX_PX; narrower than that the strip goes under the bar. */
+/** The effects controls sit in the TOP BAR, right after the stream bar's text and before the page's buttons (SETTINGS ...), when there is room. The page
+ * measures the room (`BarRoom`: where the bar's text ends and where the buttons begin, so a longer label like EXIT FULLSCREEN counts, and the bar sheds words
+ * until it fits: see `fitBar` in main.ts); without a measure these are what the page measured on 20 Nov at 1152 x 720 (a 1440 x 900 screen with the browser at
+ * 100 %, which is 1.25 here) with EVERYTHING shown: the text ends at 445 px, the buttons (FULLSCREEN as EXIT FULLSCREEN) start 413 px from the right edge.
+ * The controls need BAR_FX_PX; with less room than that the strip goes under the bar. */
 export interface BarRoom { left: number; right: number }
-const BAR_LEFT_PX = 376, BAR_RIGHT_PX = 416, BAR_FX_PX = 312, BAR_GAP_PX = 10;
+const BAR_LEFT_PX = 455, BAR_RIGHT_PX = 423, BAR_FX_PX = 368, BAR_GAP_PX = 10;
 const barRoom = (W: number, room?: BarRoom): BarRoom => room ? { left: room.left + BAR_GAP_PX, right: room.right - BAR_GAP_PX } : { left: BAR_LEFT_PX, right: W - BAR_RIGHT_PX };
 /** What the controls need between the bar's text and its buttons, gaps included (the page sheds what the bar can spare until this is free). */
 export const BAR_ROOM_NEEDED_PX = BAR_FX_PX + 2 * BAR_GAP_PX;
@@ -65,8 +68,6 @@ export interface LiveStrip {
   knobY: number[]; knobR: number;
   /** Where the FILTER's name goes (between the fader and the knob). */
   filterLabelY: number;
-  /** The square FX button beside the FILTER knob (on the outer side: left for channel A, right for B): the effect on this channel. */
-  fxBtn: Rect;
   cue: Point; cueW: number; cueH: number;
   fader: { x: number; y: number; travel: number };
 }
@@ -86,9 +87,11 @@ export interface LiveMixerGeometry {
  * does, and DIV, a vertical stepped selector for the note value. */
 /** The effects strip, a thin panel across the top of the gear row: the effect's name between two arrows, its four knobs (a little smaller than the
  * mixer's, each with its name and, for a stepped one, its value to the right) and a short horizontal LEVEL fader. Which channels it works on is
- * set by the FX buttons in the mixer. */
+ * set by the FX buttons at the two ends of it (`send`). */
 export interface LiveFxGeometry {
   rect: Rect;
+  /** The FX buttons that send a channel through the effect: channel A's at the LEFT end of the effects, channel B's at the RIGHT end. */
+  send: Rect[];
   /** What the text sizes are multiplied by (the strip: the booth's `u`; in the bar: a fixed number, since the bar is pixels, not units). */
   text: number;
   name: Rect;
@@ -194,10 +197,9 @@ function mixerGeometry(rect: Rect, u: number): LiveMixerGeometry {
   const top = rect.y + rect.h, w = MIXER_W;
   const P = (dx: number, dy: number): Point => ({ x: rect.x + dx * u, y: top - dy * u });
   const centre = w / 2;
-  const strip = [43, w - 43].map((cx): LiveStrip => ({
+  const strip = [STRIP_CX, w - STRIP_CX].map((cx): LiveStrip => ({
     x: rect.x + cx * u,
     knobY: [24, 58, 92, 126, 282].map((dy) => top - dy * u), knobR: KNOB_R * u, filterLabelY: top - 260 * u,
-    fxBtn: centred(rect.x + (cx + (cx < w / 2 ? -30 : 30)) * u, top - 282 * u, 16 * u, 16 * u),
     cue: P(cx, 162), cueW: 44 * u, cueH: 14 * u,
     fader: { x: rect.x + cx * u, y: top - 212 * u, travel: 64 * u },
   }));
@@ -216,17 +218,20 @@ function mixerGeometry(rect: Rect, u: number): LiveMixerGeometry {
 
 function fxGeometry(rect: Rect, u: number): LiveFxGeometry {
   const top = rect.y + rect.h, w = rect.w / u, cy = top - (FX_STRIP_H / 2) * u;
-  // The cluster is centred: the name (100), four knobs (64 each, with their words to the right), then LEVEL (150).
-  const NAME_W = 100, KNOB_PITCH = 64, LEVEL_W = 150, G = 14;
-  const total = NAME_W + G + 4 * KNOB_PITCH + G + LEVEL_W;
-  const x0 = Math.max(60, (w - total) / 2);
+  // The cluster is centred: FX of channel A, the name (100), four knobs (64 each, with their words to the right), LEVEL (150), FX of channel B.
+  const SEND_W = 30, NAME_W = 100, KNOB_PITCH = 64, LEVEL_W = 150, G = 14;
+  const total = SEND_W + G + NAME_W + G + 4 * KNOB_PITCH + G + LEVEL_W + G + SEND_W;
+  const x0 = Math.max(30, (w - total) / 2);
   const at = (dx: number): number => rect.x + dx * u;
-  const knobX = (i: number): number => x0 + NAME_W + G + i * KNOB_PITCH + 9;
-  const lx = x0 + NAME_W + G + 4 * KNOB_PITCH + G;
+  const nameX = x0 + SEND_W + G;
+  const knobX = (i: number): number => nameX + NAME_W + G + i * KNOB_PITCH + 9;
+  const lx = nameX + NAME_W + G + 4 * KNOB_PITCH + G;
   const travel = 44; // a short fader: a few units of the hand move it from end to end
+  const send = (dx: number): Rect => ({ x: at(dx), y: cy - 11 * u, w: SEND_W * u, h: 22 * u });
   return {
     rect, text: u,
-    name: { x: at(x0), y: cy - 11 * u, w: NAME_W * u, h: 22 * u },
+    send: [send(x0), send(lx + LEVEL_W + G)],
+    name: { x: at(nameX), y: cy - 11 * u, w: NAME_W * u, h: 22 * u },
     knobs: [0, 1, 2, 3].map((i) => ({
       c: { x: at(knobX(i)), y: cy }, r: 7.5 * u,
       touch: { x: at(knobX(i) - 10), y: cy - 13 * u, w: 62 * u, h: 26 * u },
@@ -237,26 +242,29 @@ function fxGeometry(rect: Rect, u: number): LiveFxGeometry {
   };
 }
 
-/** The effects controls in the top bar, left to right from `x0` (just after the stream bar's text): the name, four knobs, LEVEL. Everything is in pixels (the bar is
- * 40 px high whatever the scale) and inside the TOP 28 px: the page's orange message sits under the title below that. A knob's name is under the knob, its step
- * to the right, so four knobs take 42 px each; LEVEL is a short fader with its name under it. Total 310 px (`BAR_FX_PX`). */
+/** The effects controls in the top bar, left to right from `x0` (just after the stream bar's text): the FX button of channel A, the name, four knobs, LEVEL, the FX button
+ * of channel B. Everything is in pixels (the bar is 44 px high whatever the scale) and inside its TOP 32 px: the page's orange message sits under them. A knob's name is
+ * under the knob, its step to the right, so four knobs take 42 px each; LEVEL is a short fader with its name under it. Total `BAR_FX_PX`. */
 function fxBarGeometry(H: number, room: BarRoom): LiveFxGeometry {
   // Spare room is shared: a little after the time, the rest before the buttons.
-  const x0 = room.left + Math.min(24, (room.right - room.left - BAR_FX_PX) / 2);
-  const kcy = H - 12, lcy = H - 25.5, bcy = H - 13.5;
-  const NAME_W = 78, PITCH = 42, G = 8, R = 9;
-  const cell = (i: number): number => x0 + NAME_W + G + i * PITCH;
-  const lx = cell(4) + 6, travel = 38, capW = 9, fw = travel + capW;
-  const rect: Rect = { x: x0, y: H - 28, w: lx + fw + 2 - x0, h: 28 };
+  const x0 = room.left + Math.min(20, (room.right - room.left - BAR_FX_PX) / 2);
+  const kcy = H - 14.5, lcy = H - 29, bcy = H - 16.5;
+  const SEND_W = 26, SEND_H = 24, NAME_W = 76, PITCH = 42, G = 7, R = 10;
+  const nameX = x0 + SEND_W + G;
+  const cell = (i: number): number => nameX + NAME_W + G + i * PITCH;
+  const lx = cell(4) + 2, travel = 40, capW = 9, fw = travel + capW;
+  const sendB = lx + fw + G;
+  const rect: Rect = { x: x0, y: H - 32, w: sendB + SEND_W - x0, h: 32 };
+  const send = (x: number): Rect => ({ x, y: bcy - SEND_H / 2, w: SEND_W, h: SEND_H });
   return {
-    rect, text: 1.2,
-    name: { x: x0, y: bcy - 11, w: NAME_W, h: 22 },
+    rect, text: 1.3, send: [send(x0), send(sendB)],
+    name: { x: nameX, y: bcy - SEND_H / 2, w: NAME_W, h: SEND_H },
     knobs: [0, 1, 2, 3].map((i) => ({
-      c: { x: cell(i) + 13, y: kcy }, r: R,
-      touch: { x: cell(i) + 1, y: H - 28, w: PITCH - 2, h: 28 },
-      name: { x: cell(i) + 4, y: lcy }, value: { x: cell(i) + 25, y: kcy },
+      c: { x: cell(i) + 14, y: kcy }, r: R,
+      touch: { x: cell(i) + 1, y: H - 32, w: PITCH - 2, h: 32 },
+      name: { x: cell(i) + 4, y: lcy }, value: { x: cell(i) + 27, y: kcy },
     })),
-    level: { x: lx + fw / 2, y: kcy, travel, capW, capH: 16, label: { x: lx + fw / 2, y: lcy }, labelAlign: "center", touch: { x: lx - 2, y: H - 28, w: fw + 4, h: 28 } },
+    level: { x: lx + fw / 2, y: kcy, travel, capW, capH: 16, label: { x: lx + fw / 2, y: lcy }, labelAlign: "center", touch: { x: lx - 2, y: H - 32, w: fw + 4, h: 32 } },
   };
 }
 

@@ -591,7 +591,7 @@ export class Booth {
     first({ t: "fxType", d: -2 }, { x: F.name.x, y: F.name.y, w: F.name.w * 0.3, h: F.name.h });
     first({ t: "fxAmount" }, lvl.touch);
     F.knobs.forEach((k, i) => first({ t: "fxParam", d: i }, k.touch));
-    M.strip.forEach((s, d) => first({ t: "fxSend", d }, { x: s.fxBtn.x - 3 * u, y: s.fxBtn.y - 3 * u, w: s.fxBtn.w + 6 * u, h: s.fxBtn.h + 6 * u }));
+    F.send.forEach((r, d) => first({ t: "fxSend", d }, { x: r.x - 3, y: r.y - 3, w: r.w + 6, h: r.h + 6 }));
 
     this.hits = hits;
     const B0 = g.deck[0].buttons;

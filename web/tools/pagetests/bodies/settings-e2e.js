@@ -10,7 +10,7 @@ const key = (k) => window.dispatchEvent(new KeyboardEvent("keydown", { key: k, c
   await sleep(2500);
   ok("LIVE: the bar has SETTINGS, SHARE; KEYS & MIDI and PHONES are inside SETTINGS, not in the bar", booth.mode === "live" && shown($("settings-button")) && shown($("share-button")) && !shown($("controls-button")) && !shown($("phones-button")));
   const sb = $("settings-button").getBoundingClientRect();
-  ok("SETTINGS is the topmost thing at its place (a click reaches it)", document.elementFromPoint(sb.x + sb.width / 2, sb.y + sb.height / 2) === $("settings-button"));
+  ok("SETTINGS is the topmost thing at its place (a click reaches it)", $("settings-button").contains(document.elementFromPoint(sb.x + sb.width / 2, sb.y + sb.height / 2)));
 
   // the clock
   const clock = document.querySelector("#livebar .clock"), now = new Date();

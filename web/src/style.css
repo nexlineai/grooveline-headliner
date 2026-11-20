@@ -481,30 +481,30 @@ button.mini.on { border-color: var(--orange); color: var(--orange); }
 
 /* LIVE: the DJ's booth (free play). The canvas draws the gear row; the library and the stream panel are HTML under it. */
 body.live #room { display: none; }
-body.live #back { top: 5px; left: 8px; width: 30px; height: 30px; font-size: 20px; }
-body.live #top { top: 9px; right: 10px; gap: 6px; }
+body.live #back { top: 3px; left: 8px; width: 30px; height: 30px; font-size: 20px; }
+body.live #top { top: 6px; right: 10px; gap: 6px; }
 /* In LIVE the bar's buttons match the small caps of the rest of the booth: still glass, a tiny smaller. */
 body.live #top .pill { font-size: 9px; letter-spacing: 0.14em; padding: 0.5em 1.05em; line-height: 1.15; background: rgba(12, 16, 22, 0.55); border-color: rgba(255, 255, 255, 0.2); backdrop-filter: blur(6px); }
 body.live #top .pill:hover { border-color: rgba(255, 255, 255, 0.4); }
 body.live #top .pill .icon { width: 1.1em; height: 1.1em; margin-right: 0.5em; }
 /* The page's messages sit between the stream bar (its ON AIR time) and the buttons, and never over either. */
 /* The orange messages: small, under GROOVELINE LIVE, up to two lines, the whole text (and in the tooltip). */
-body.live #livebar { align-items: flex-start; padding-top: 6px; box-sizing: border-box; }
+body.live #livebar { align-items: flex-start; padding-top: 9px; box-sizing: border-box; }
 body.live #note { top: 22px; left: 48px; font-size: 10px; line-height: 11px; max-width: max(180px, calc(100vw - 48px - 540px)); max-height: 22px; overflow: hidden;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; z-index: 4; }
-/* The effects controls are in the bar (a wide window): the message is one line under them (they use the top 28 px), from the left edge to the buttons. */
-body.live.fxbar #note { top: 28px; line-height: 12px; max-height: 12px; max-width: calc(100vw - 48px - 410px); -webkit-line-clamp: 1; }
+/* The effects controls are in the bar (a wide window): the message is one line under them (they use the top 32 px), from the left edge to the buttons. */
+body.live.fxbar #note { top: 32px; line-height: 12px; max-height: 12px; max-width: calc(100vw - 48px - 410px); -webkit-line-clamp: 1; }
 #deck-tip { position: fixed; z-index: 50; max-width: 70vw; padding: 6px 10px; border-radius: 7px; background: rgba(8, 11, 16, 0.96); border: 1px solid rgba(255, 255, 255, 0.25);
   font: 600 13px system-ui, sans-serif; color: var(--ink); pointer-events: none; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6); }
 #deck-tip[hidden] { display: none; }
-#livebar { position: fixed; z-index: 3; top: 0; left: 48px; height: var(--bar-h, 40px); display: flex; align-items: center; gap: 18px; pointer-events: none; }
+#livebar { position: fixed; z-index: 3; top: 0; left: 48px; height: var(--bar-h, 44px); display: flex; align-items: center; gap: 14px; pointer-events: none; }
 #livebar[hidden] { display: none; }
-#livebar .brand { font: 700 11px "Orbitron", sans-serif; letter-spacing: 0.26em; color: var(--ink); }
+#livebar .brand { font: 700 12.5px "Orbitron", sans-serif; letter-spacing: 0.26em; color: var(--ink); }
 #livebar .brand b { color: #26c6f0; margin-left: 0.5em; }
-#livebar .onair { display: flex; align-items: center; gap: 7px; font: 700 10px system-ui, sans-serif; letter-spacing: 0.16em; color: var(--dim); }
-#livebar .onair i { width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 255, 255, 0.16); }
-#livebar .time { font: 600 11px ui-monospace, Menlo, monospace; color: var(--dim); }
-#livebar .clock { font: 600 11px ui-monospace, Menlo, monospace; letter-spacing: 0.06em; color: var(--ink); }
+#livebar .onair { display: flex; align-items: center; gap: 7px; font: 700 11px system-ui, sans-serif; letter-spacing: 0.16em; color: var(--dim); }
+#livebar .onair i { width: 9px; height: 9px; border-radius: 50%; background: rgba(255, 255, 255, 0.16); }
+#livebar .time { font: 600 12.5px ui-monospace, Menlo, monospace; color: var(--dim); }
+#livebar .clock { font: 600 12.5px ui-monospace, Menlo, monospace; letter-spacing: 0.06em; color: var(--ink); }
 body.live #wall { left: var(--lib-left); top: var(--lib-top); right: auto; width: var(--lib-w); height: var(--lib-h); border: 1px solid var(--edge); border-radius: 8px;
   background: radial-gradient(120% 90% at 50% 0%, rgba(38, 198, 240, 0.05), transparent 60%), linear-gradient(#10141b, #090c11); }
 body.live #wall { --teal: #26c6f0; --magenta: #ffac28; }
@@ -514,7 +514,7 @@ body.live #wall .d-left { padding-left: 18px; }
   display: flex; flex-direction: column; border: 1px solid var(--edge); border-radius: 8px; background: linear-gradient(#10141b, #090c11); overflow: hidden; }
 #stream[hidden] { display: none; }
 #stream .s-head { display: flex; justify-content: space-between; font: 700 11px "Orbitron", sans-serif; letter-spacing: 0.22em; color: var(--ink); }
-#stream .s-state { font: 700 10px system-ui, sans-serif; letter-spacing: 0.16em; color: var(--dim); }
+#stream .s-state { font: 700 11px system-ui, sans-serif; letter-spacing: 0.16em; color: var(--dim); }
 #stream dl { display: grid; grid-template-columns: auto 1fr; gap: 9px 14px; margin: 16px 0 0; font-size: 12px; }
 #stream dt { color: var(--dim); font: 700 9.5px system-ui, sans-serif; letter-spacing: 0.14em; align-self: center; }
 #stream dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
@@ -708,5 +708,10 @@ body.live #controls-button, body.live #phones-button { display: none; }
 .midi-status.bad { color: var(--orange); }
 .binding-device { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
 
-/* The bar sheds what it can spare when the effects need the room (see fitBar in main.ts): first the brand's name, then the clock, then the words OFF AIR (the dot stays). */
+/* The bar sheds what it can spare when the effects need the room (see fitBar in main.ts): the brand's name, the words on SETTINGS and FULLSCREEN, the clock, the words OFF AIR (the dot stays). */
 body.live.bar-nobrand #livebar .brand, body.live.bar-noclock #livebar .clock, body.live.bar-nostate #livebar .onair span { display: none; }
+/* SETTINGS and FULLSCREEN carry a small picture that shows only when the bar is tight: then the words go. */
+#top .pill .ico { display: none; }
+body.live.bar-icons #settings-button span, body.live.bar-icons #fullscreen-button span { display: none; }
+body.live.bar-icons #settings-button .ico, body.live.bar-icons #fullscreen-button .ico { display: block; width: 1.5em; height: 1.5em; margin: 0; }
+body.live.bar-icons #settings-button, body.live.bar-icons #fullscreen-button { padding: 0.4em 0.7em; }

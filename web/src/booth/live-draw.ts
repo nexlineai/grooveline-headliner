@@ -542,11 +542,7 @@ export class LiveRenderer {
         // The gain's pointer is red; the FILTER knob is under the fader (blue ring), so it is not taken for an EQ knob.
         knob(ctx, s.x, y, s.knobR, values[i], rings[i], bipolar[i], true, i === 0 ? LIVE.red : null);
         if (i < 4) small(ctx, names[i], s.x + (d === 0 ? 1 : -1) * 19 * u, y, 5.6 * u, { align: d === 0 ? "left" : "right" });
-        else {
-          small(ctx, "FILTER", s.x, s.filterLabelY, 5.6 * u, { color: rgba(LIVE.filter, 0.9) });
-          // The effect on this channel: a square button on the outer side of the FILTER knob.
-          button(ctx, s.fxBtn, "FX", v.fx.send[d], LIVE.play, u, { size: 6.2 * u });
-        }
+        else small(ctx, "FILTER", s.x, s.filterLabelY, 5.6 * u, { color: rgba(LIVE.filter, 0.9) });
       });
       // The gain, in dB, once it is not at zero.
       const db = Math.round(v.trimDb(d));
@@ -578,6 +574,12 @@ export class LiveRenderer {
     const F = g.fx, u = g.u, T = F.text; // the text follows `T`: the booth's u in the strip, a fixed number in the top bar
     // In a narrow window the controls are a strip above the gear row, on a panel of their own; in a wide one they sit in the top bar, right after the stream bar.
     if (!g.fxInBar) panel(ctx, F.rect, u);
+    // The effect on a channel: the FX buttons at the two ends (A's on the left, B's on the right), in the channel's colour.
+    F.send.forEach((r, d) => {
+      button(ctx, r, "FX", v.fx.send[d], LIVE.deck[d], T, { size: 7 * T });
+      ctx.fillStyle = rgba(LIVE.deck[d], v.fx.send[d] ? 0.0 : 0.85);
+      ctx.fillRect(r.x + 6, r.y + 3, r.w - 12, 1.6);
+    });
     // The effect's name between two arrows (a touch on the left third goes back, anywhere else forward).
     button(ctx, F.name, FX_TYPES[v.fx.type], v.fx.send[0] || v.fx.send[1], LIVE.play, T, { size: 7 * T });
     small(ctx, "\u2039", F.name.x + 7 * T, F.name.y + F.name.h / 2, 10 * T, { color: LIVE.ink });

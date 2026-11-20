@@ -23,7 +23,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     ["MASTER", M.mid.master.x, M.mid.master.y, { t: "master" }], ["CUE MIX", M.mid.mix.x, M.mid.mix.y, { t: "cueMix" }], ["PHONES LEVEL", M.mid.level.x, M.mid.level.y, { t: "phonesLevel" }],
     ["CROSSFADER", M.mid.cross.x, M.mid.cross.y, { t: "cross" }],
     ["FX name (next)", g.fx.name.x + g.fx.name.w * 0.6, g.fx.name.y + g.fx.name.h / 2, { t: "fxType", d: -1 }], ["FX name (back)", g.fx.name.x + g.fx.name.w * 0.1, g.fx.name.y + g.fx.name.h / 2, { t: "fxType", d: -2 }],
-    ["FX on channel A", S[0].fxBtn.x + S[0].fxBtn.w / 2, S[0].fxBtn.y + S[0].fxBtn.h / 2, { t: "fxSend", d: 0 }], ["FX on channel B", S[1].fxBtn.x + S[1].fxBtn.w / 2, S[1].fxBtn.y + S[1].fxBtn.h / 2, { t: "fxSend", d: 1 }],
+    ["FX on channel A", g.fx.send[0].x + g.fx.send[0].w / 2, g.fx.send[0].y + g.fx.send[0].h / 2, { t: "fxSend", d: 0 }], ["FX on channel B", g.fx.send[1].x + g.fx.send[1].w / 2, g.fx.send[1].y + g.fx.send[1].h / 2, { t: "fxSend", d: 1 }],
     ["FX level fader", g.fx.level.x, g.fx.level.y, { t: "fxAmount" }],
     ...g.fx.knobs.map((k, i) => [`FX knob ${i + 1}`, k.c.x, k.c.y, { t: "fxParam", d: i }]),
   ];

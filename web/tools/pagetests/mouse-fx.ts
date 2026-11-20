@@ -4,16 +4,16 @@
 import { liveGeometry } from "../../src/booth/live-geometry.ts";
 const W = Number(process.argv[2]), H = Number(process.argv[3]);
 const room = process.argv[4] && process.argv[5] ? { left: Number(process.argv[4]), right: Number(process.argv[5]) } : undefined;
-const g = liveGeometry(W, H, room), S = g.mixer.strip, F = g.fx, L = F.level;
+const g = liveGeometry(W, H, room), F = g.fx, L = F.level, S = F.send;
 const r = Math.round, cx = (b: { x: number; w: number }) => r(b.x + b.w / 2), cy = (b: { y: number; h: number }) => r(H - (b.y + b.h / 2));
 const ev = (x: string) => `eval ${x}`;
 const state = "JSON.stringify([booth.fx.send, +booth.fx.amount.toFixed(3), booth.fx.params.map((v)=>+v.toFixed(2)), booth.fx.type])";
 const capX = (amt: number) => L.x + (amt - 0.5) * L.travel, ly = r(H - L.y);
 const steps = [
   "wait 5", ev(state),
-  `click ${cx(S[0].fxBtn)} ${cy(S[0].fxBtn)}`, "wait 1", ev(state),
-  `click ${cx(S[1].fxBtn)} ${cy(S[1].fxBtn)}`, "wait 1", ev(state),
-  `click ${cx(S[0].fxBtn)} ${cy(S[0].fxBtn)}`, "wait 1", ev(state),
+  `click ${cx(S[0])} ${cy(S[0])}`, "wait 1", ev(state),
+  `click ${cx(S[1])} ${cy(S[1])}`, "wait 1", ev(state),
+  `click ${cx(S[0])} ${cy(S[0])}`, "wait 1", ev(state),
   // LEVEL: drag the cap 20 px to the right, then click the slot near its right end, then drag back 10 px
   `drag ${r(capX(0.5))} ${ly} ${r(capX(0.5)) + 20} ${ly}`, "wait 1", ev(state),
   `click ${r(L.x + 0.4 * L.travel)} ${ly}`, "wait 1", ev(state),

@@ -70,13 +70,13 @@ Object.assign(window, { headliner: { engine, booth, progress, credits: () => ope
 document.fonts.load(`600 16px "Barlow Condensed"`).catch(() => {});
 // The effects in the top bar are placed by where the stream bar's text ends and where the page's buttons begin: lay the booth out again whenever either changes size
 // (a late font, EXIT FULLSCREEN, the bar showing, a button added).
-/** The top bar sheds what it can spare, in this order, until the effects fit between its text and its buttons: the brand's name, the clock, the words OFF AIR (the dot stays). If they cannot fit
- * even then (a very narrow window: the effects go in a strip) it sheds only what stops the text running into the buttons. CSS: `body.live.bar-nobrand/-noclock/-nostate`. */
+/** The top bar sheds what it can spare, in this order, until the effects fit between its text and its buttons: the brand's name, the words on SETTINGS and FULLSCREEN (icons stay), the clock, the words OFF AIR (the dot stays). If they cannot fit
+ * even then (a very narrow window: the effects go in a strip) it sheds only what stops the text running into the buttons. CSS: `body.live.bar-nobrand/-icons/-noclock/-nostate`. */
 function fitBar(): void {
   const bar = $("livebar"), buttons = $("top"), body = document.body;
   if (bar.hidden || !body.classList.contains("live")) return;
-  const levels: string[][] = [[], ["bar-nobrand"], ["bar-nobrand", "bar-noclock"], ["bar-nobrand", "bar-noclock", "bar-nostate"]];
-  const set = (l: string[]): void => { for (const c of ["bar-nobrand", "bar-noclock", "bar-nostate"]) body.classList.toggle(c, l.includes(c)); };
+  const levels: string[][] = [[], ["bar-nobrand"], ["bar-nobrand", "bar-icons"], ["bar-nobrand", "bar-icons", "bar-noclock"], ["bar-nobrand", "bar-icons", "bar-noclock", "bar-nostate"]];
+  const set = (l: string[]): void => { for (const c of ["bar-nobrand", "bar-icons", "bar-noclock", "bar-nostate"]) body.classList.toggle(c, l.includes(c)); };
   const room = (): number => buttons.getBoundingClientRect().left - bar.getBoundingClientRect().right;
   const pick = (need: number): string[] | null => { for (const l of levels) { set(l); if (room() >= need) return l; } return null; };
   set(pick(BAR_ROOM_NEEDED_PX) ?? pick(10) ?? levels[levels.length - 1]);
@@ -839,13 +839,13 @@ createShare($("share-button")); // LIVE's SHARE: copy the link, the share sheet,
 
 // FULLSCREEN: the whole page (the booth redraws to the new size by itself). Not offered where the
 // browser has none (iPhone Safari).
-const fullscreenButton = $("fullscreen-button");
+const fullscreenButton = $("fullscreen-button"), fullscreenLabel = fullscreenButton.querySelector("span")!;
 if (document.fullscreenEnabled) {
   fullscreenButton.hidden = false;
   fullscreenButton.addEventListener("click", () => {
     (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {});
   });
-  document.addEventListener("fullscreenchange", () => { fullscreenButton.textContent = document.fullscreenElement ? "EXIT FULLSCREEN" : "FULLSCREEN"; });
+  document.addEventListener("fullscreenchange", () => { const on = !!document.fullscreenElement; fullscreenLabel.textContent = on ? "EXIT FULLSCREEN" : "FULLSCREEN"; fullscreenButton.title = on ? "Exit fullscreen" : "Fullscreen"; fullscreenButton.setAttribute("aria-label", fullscreenButton.title); });
 }
 // The clock in the stream bar: the time of day (hours and minutes, the browser's own format), for a DJ who watches the room's clock, not the stream's.
 const barClock = document.querySelector<HTMLElement>("#livebar .clock")!;
