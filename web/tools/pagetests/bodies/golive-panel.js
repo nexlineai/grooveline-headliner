@@ -89,8 +89,8 @@ G.p4 = () => {
   const p = panel();
   ok("END SHOW: the connection is closed, OFF AIR, GO LIVE offered again, the timer is back to 00:00:00", open() === 0 && p.chip === "OFF AIR" && p.go.textContent === "GO LIVE" && !p.go.disabled && p.timer === "00:00:00" && p.bar === "OFF AIR" && p.check.disabled === false, `${show(p)} | connections ${open()}`);
   G.liveOn = false;
-  // a slot that is running (one click) and ends in 22 s
-  setSlot(-60e3, 82e3); goLive.refresh();
+  // a slot that is running (one click) and ends 15 s from now (the wrapper looks 6 s after that)
+  setSlot(-60e3, 75e3); goLive.refresh();
 };
 
 // after the single click of a running slot

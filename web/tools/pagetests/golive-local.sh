@@ -9,7 +9,7 @@ cd "$WEB" || exit 1; "$HERE/build.sh" >/dev/null
 ALLOWED="$KEY,vcheck-0123456789abcdef0123" node "$HERE/whip-auth-stub.mjs" > "$OUT/golive-auth.log" 2>&1 & AP=$!
 trap 'kill $AP 2>/dev/null' EXIT
 # where the two buttons are (the panel is laid out for the window size)
-POS=$(node tools/shot.ts "$OUT/golive-probe.png" "$URL" --size $SIZE --wait 14 --do "wait 8; eval ['go-live','sound-check'].map(i=>{const r=document.getElementById(i).getBoundingClientRect();return [Math.round(r.x+r.width/2),Math.round(r.y+r.height/2)]})" 2>&1 | grep -oE '\[\[[0-9, ]+\]\]' | tail -1)
+POS=$(node tools/shot.ts "$OUT/golive-probe.png" "$URL" --size $SIZE --wait 14 --do "wait 8; eval ['go-live','sound-check'].map(i=>document.getElementById(i).getBoundingClientRect()).map(r=>[Math.round(r.x+r.width/2),Math.round(r.y+r.height/2)])" 2>&1 | grep -oE '\[\[[0-9]+,[0-9]+\],\[[0-9]+,[0-9]+\]\]' | tail -1)
 read -r GX GY SX SY <<< "$(echo "$POS" | tr -d '[]' | tr ',' ' ')"
 [ -n "$GX" ] && [ -n "$SY" ] || { echo "could not find the buttons: '$POS'"; exit 1; }
 echo "GO LIVE at $GX,$GY; SOUND CHECK at $SX,$SY"
