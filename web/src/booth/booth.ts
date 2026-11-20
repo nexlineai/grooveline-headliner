@@ -12,6 +12,7 @@ import {
 } from "./gear.ts";
 import type { Point, RGB, Rect } from "./gear.ts";
 import { liveGeometry, liveTouch } from "./live-geometry.ts";
+import type { BarRoom } from "./live-geometry.ts";
 import type { LiveGeometry } from "./live-geometry.ts";
 import { LiveRenderer } from "./live-draw.ts";
 import type { LiveView } from "./live-draw.ts";
@@ -511,9 +512,21 @@ export class Booth {
     this.placeRoom();
   }
 
+  /** Where the top bar has room for the effects: from the end of the stream bar's text (GROOVELINE LIVE, OFF AIR, the time) to the left edge of the page's buttons.
+   * Measured, so a longer label (EXIT FULLSCREEN) or a font that loads late counts; none if the bar is not there (the unit tests give the geometry no room). */
+  private barRoom(): BarRoom | undefined {
+    const bar = document.getElementById("livebar"), buttons = document.getElementById("top");
+    if (!bar || !buttons || bar.hidden) return undefined;
+    const left = bar.getBoundingClientRect().right, right = buttons.getBoundingClientRect().left;
+    return left > 0 && right > left ? { left, right } : undefined;
+  }
+
+  /** Lay the booth out again at the next frame (the bar's text or buttons changed size). */
+  relayout(): void { this.L = null; }
+
   /** The LIVE booth: free play's own layout. Everything is registered with the same pointer code as the game's gear. */
   private buildLive(W: number, H: number): void {
-    const g = liveGeometry(W, H), u = g.u, T = liveTouch(g), M = g.mixer;
+    const g = liveGeometry(W, H, this.barRoom()), u = g.u, T = liveTouch(g), M = g.mixer;
     this.live = g;
     this.liveRenderer.reset();
     const hits: { kind: Kind; rect: Rect }[] = [];

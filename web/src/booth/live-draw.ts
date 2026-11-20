@@ -575,26 +575,23 @@ export class LiveRenderer {
   // MARK: The effects
 
   private fxModule(ctx: Ctx, g: LiveGeometry, v: LiveView): void {
-    const F = g.fx, u = g.u;
+    const F = g.fx, u = g.u, T = F.text; // the text follows `T`: the booth's u in the strip, a fixed number in the top bar
     // In a narrow window the controls are a strip above the gear row, on a panel of their own; in a wide one they sit in the top bar, right after the stream bar.
-    if (!g.fxInBar) {
-      panel(ctx, F.rect, u);
-      small(ctx, "EFFECT", F.title.x, F.title.y, 6.4 * u, { color: LIVE.dim, align: "left" });
-    }
+    if (!g.fxInBar) panel(ctx, F.rect, u);
     // The effect's name between two arrows (a touch on the left third goes back, anywhere else forward).
-    button(ctx, F.name, FX_TYPES[v.fx.type], v.fx.send[0] || v.fx.send[1], LIVE.play, u, { size: 7 * u });
-    small(ctx, "\u2039", F.name.x + 7 * u, F.name.y + F.name.h / 2, 10 * u, { color: LIVE.ink });
-    small(ctx, "\u203a", F.name.x + F.name.w - 7 * u, F.name.y + F.name.h / 2, 10 * u, { color: LIVE.ink });
-    // The four knobs of this effect: no ring of dots, just the pointer; the name and (a stepped knob) the step to the right.
+    button(ctx, F.name, FX_TYPES[v.fx.type], v.fx.send[0] || v.fx.send[1], LIVE.play, T, { size: 7 * T });
+    small(ctx, "\u2039", F.name.x + 7 * T, F.name.y + F.name.h / 2, 10 * T, { color: LIVE.ink });
+    small(ctx, "\u203a", F.name.x + F.name.w - 7 * T, F.name.y + F.name.h / 2, 10 * T, { color: LIVE.ink });
+    // The four knobs of this effect: no ring of dots, just the pointer; the name and (a stepped knob) the step to the right (the name under the knob in the bar).
     FX_KNOBS[v.fx.type].forEach((def, i) => {
       const k = F.knobs[i], value = v.fx.params[i] ?? 0;
       knob(ctx, k.c.x, k.c.y, k.r, value, LIVE.fxRing, false, true, null, false);
-      small(ctx, def.name, k.name.x, k.name.y, 5.2 * u, { align: "left" });
-      if (def.steps) small(ctx, def.steps[stepIndex(value, def.steps.length)], k.value.x, k.value.y, 5.8 * u, { color: LIVE.ink, mono: true, align: "left" });
+      small(ctx, def.name, k.name.x, k.name.y, 5.2 * T, { align: "left" });
+      if (def.steps) small(ctx, def.steps[stepIndex(value, def.steps.length)], k.value.x, k.value.y, 5.8 * T, { color: LIVE.ink, mono: true, align: "left" });
     });
     // LEVEL: a short horizontal fader, how much of the effect there is.
     const L = F.level;
-    small(ctx, "LEVEL", L.label.x, L.label.y, 5.6 * u, { align: "left" });
-    fader(ctx, L.x, L.y, L.travel, v.fx.amount, false, L.capW, L.capH, LIVE.fxRing, u, { noScale: true });
+    small(ctx, "LEVEL", L.label.x, L.label.y, 5.6 * T, { align: L.labelAlign });
+    fader(ctx, L.x, L.y, L.travel, v.fx.amount, false, L.capW, L.capH, LIVE.fxRing, T, { noScale: true });
   }
 }

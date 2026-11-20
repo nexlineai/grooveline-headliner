@@ -1,7 +1,10 @@
 // Prints the shot.ts --do steps that drive the effect controls with the REAL mouse (CDP mouse events), computed from the geometry for W x H.
+// Optional 3rd and 4th arguments: where the page's top bar has room (the right edge of #livebar and the left edge of #top as the page measures them:
+// 363 and 739 at 1152 x 720 with EXIT FULLSCREEN), which put the effects in the same place as in the page.
 import { liveGeometry } from "../../src/booth/live-geometry.ts";
 const W = Number(process.argv[2]), H = Number(process.argv[3]);
-const g = liveGeometry(W, H), S = g.mixer.strip, F = g.fx, L = F.level;
+const room = process.argv[4] && process.argv[5] ? { left: Number(process.argv[4]), right: Number(process.argv[5]) } : undefined;
+const g = liveGeometry(W, H, room), S = g.mixer.strip, F = g.fx, L = F.level;
 const r = Math.round, cx = (b: { x: number; w: number }) => r(b.x + b.w / 2), cy = (b: { y: number; h: number }) => r(H - (b.y + b.h / 2));
 const ev = (x: string) => `eval ${x}`;
 const state = "JSON.stringify([booth.fx.send, +booth.fx.amount.toFixed(3), booth.fx.params.map((v)=>+v.toFixed(2)), booth.fx.type])";

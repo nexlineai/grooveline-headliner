@@ -4,7 +4,8 @@ import assert from "node:assert/strict";
 import { TOP_BAR, fxFitsTheBar, liveGeometry, liveTouch } from "../src/booth/live-geometry.ts";
 import type { Rect } from "../src/booth/gear.ts";
 
-const SIZES: [number, number][] = [[1024, 600], [1280, 720], [1366, 768], [1600, 800], [1920, 1080], [2560, 1440], [1440, 900]];
+// 1152 x 720 is Zé's 1440 x 900 screen with the browser at 100 % (Chrome follows the 1.25 text scaling here); 1130 x 650 the same window with the tab bar.
+const SIZES: [number, number][] = [[1024, 600], [1152, 720], [1130, 650], [1280, 720], [1366, 768], [1600, 800], [1920, 1080], [2560, 1440], [1440, 900]];
 const E = 0.01;
 const inside = (outer: Rect, r: Rect) => r.x >= outer.x - E && r.y >= outer.y - E && r.x + r.w <= outer.x + outer.w + E && r.y + r.h <= outer.y + outer.h + E;
 const apart = (a: Rect, b: Rect) => a.x + a.w <= b.x + E || b.x + b.w <= a.x + E || a.y + a.h <= b.y + E || b.y + b.h <= a.y + E;
@@ -107,8 +108,8 @@ describe("LIVE layout", () => {
         assert.equal(g.fxInBar, fxFitsTheBar(W));
         if (g.fxInBar) {
           assert.ok(F.rect.y >= H - TOP_BAR - E && F.rect.y + F.rect.h <= H + E, "inside the top bar");
-          assert.ok(F.rect.x >= 390, "after the stream bar's time");
-          assert.ok(F.rect.x + F.rect.w <= W - 400 + E, "clear of the buttons on the right");
+          assert.ok(F.rect.x >= 373, "after the stream bar's time");
+          assert.ok(F.rect.x + F.rect.w <= W - 416 + E, "clear of the buttons on the right (EXIT FULLSCREEN included)");
           assert.ok(g.gear.y + g.gear.h <= H - TOP_BAR - 2, "the gear row starts under the bar: the controls cost it no height");
         } else {
           assert.ok(F.rect.y > g.gear.y + g.gear.h, "above the gear row");
@@ -119,9 +120,11 @@ describe("LIVE layout", () => {
         assert.equal(F.knobs.length, 4);
         F.knobs.forEach((k, i) => {
           assert.ok(k.r < M.strip[0].knobR, "smaller than the mixer's knobs");
-          if (!g.fxInBar) assert.ok(k.r >= 0.5 * M.strip[0].knobR, "but not tiny");
+          if (!g.fxInBar) assert.ok(k.r >= 0.5 * M.strip[0].knobR, "but not tiny"); else assert.ok(k.r >= 9, "in the bar: not smaller than 9 px");
           assert.ok(inside(F.rect, box(k.c.x, k.c.y, k.r)) && inside(F.rect, k.touch), `knob ${i} inside`);
-          assert.ok(k.name.x > k.c.x + k.r && k.value.x > k.c.x + k.r, "its name and value to the right of it");
+          assert.ok(k.value.x > k.c.x + k.r, "its step to the right of it");
+          if (g.fxInBar) assert.ok(k.name.y < k.c.y - k.r + 2 && k.name.x < k.c.x, "in the bar its name is UNDER the knob, starting at its left edge");
+          else assert.ok(k.name.x > k.c.x + k.r, "its name to the right of it");
           if (i) { assert.ok(apart(F.knobs[i - 1].touch, k.touch), "touch areas apart"); assert.ok(k.c.x > F.knobs[i - 1].c.x + 2 * k.r + 4, "knobs apart"); }
         });
         assert.ok(apart(F.name, F.knobs[0].touch), "the name apart from the first knob");
@@ -129,7 +132,8 @@ describe("LIVE layout", () => {
         assert.ok(inside(F.rect, { x: L.x - L.travel / 2 - L.capW / 2, y: L.y - L.capH / 2, w: L.travel + L.capW, h: L.capH }), "the fader inside");
         assert.ok(inside(F.rect, L.touch));
         assert.ok(L.x - L.travel / 2 - L.capW / 2 > F.knobs[3].touch.x + F.knobs[3].touch.w - 1, "the fader right of the knobs");
-        assert.ok(L.label.x < L.x - L.travel / 2 - L.capW / 2, "its name to the left of it");
+        if (g.fxInBar) assert.ok(L.labelAlign === "center" && Math.abs(L.label.x - L.x) < E && L.label.y < L.y, "in the bar LEVEL's name is centred under the fader");
+        else assert.ok(L.label.x < L.x - L.travel / 2 - L.capW / 2, "its name to the left of it");
         assert.ok(apart(F.knobs[3].touch, L.touch));
         // Short: a hand's width, not a long slide (the channel faders are 74 units; this one at most about two thirds of the pixels of that).
         assert.ok(L.travel <= 0.75 * M.strip[0].fader.travel, `a short travel: ${L.travel} of ${M.strip[0].fader.travel}`);
@@ -196,5 +200,30 @@ describe("LIVE layout", () => {
     assert.equal(a.u, b.u, "same unit when the height limits it");
     assert.ok(b.deck[0].wave.w > a.deck[0].wave.w);
     assert.equal(b.mixer.rect.w, a.mixer.rect.w);
+  });
+
+  test("Zé's 100 % window (1152 x 720, EXIT FULLSCREEN, measured on 20 Nov): the effects sit in the top bar between the time and the buttons, with and without the page's measure", () => {
+    const room = { left: 363, right: 739 }; // livebar ends at 363, #top starts at 739 (measured in the page)
+    for (const r of [undefined, room]) {
+      const g = liveGeometry(1152, 720, r);
+      assert.ok(g.fxInBar, "in the bar, not the strip above the decks");
+      assert.ok(g.fx.rect.x >= 363 + 10 - E && g.fx.rect.x + g.fx.rect.w <= 739 - 10 + E, "between 00:00:00 and KEYS & MIDI");
+    }
+  });
+
+  test("the page's measure decides: a bar with less room than the controls need puts them in the strip, and a wide window with a crowded bar too", () => {
+    assert.ok(!liveGeometry(1152, 720, { left: 363, right: 680 }).fxInBar, "317 px between the text and the buttons, 20 of them gaps: 297 is not enough");
+    assert.ok(liveGeometry(1152, 720, { left: 363, right: 700 }).fxInBar, "337 px between them is enough");
+    assert.ok(!liveGeometry(1920, 1080, { left: 700, right: 960 }).fxInBar, "a crowded bar in a wide window");
+    assert.ok(liveGeometry(1100, 700, { left: 363, right: 1100 - 330 }).fxInBar === fxFitsTheBar(1100, { left: 363, right: 1100 - 330 }));
+  });
+
+  test("in the bar the controls keep their size however big the window is (pixels, not units), and stay inside the top 28 px so the page's message fits under them", () => {
+    const a = liveGeometry(1152, 720), b = liveGeometry(2560, 1440);
+    assert.ok(a.fxInBar && b.fxInBar);
+    assert.equal(a.fx.text, b.fx.text);
+    assert.equal(a.fx.rect.w, b.fx.rect.w);
+    assert.equal(b.fx.knobs[0].r, 9);
+    for (const g of [a, b]) assert.ok(g.fx.rect.y >= g.H - 28 - E && g.fx.rect.y + g.fx.rect.h <= g.H + E);
   });
 });

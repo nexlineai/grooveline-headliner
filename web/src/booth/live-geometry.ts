@@ -20,10 +20,14 @@ const GEAR_H = 300;
 const DECK_MIN = 296, MIXER_W = 226, GAP = 5.333;
 /** The effects strip above the gear row (a narrow window): its height and the gap under it (units). */
 const FX_STRIP_H = 30, FX_STRIP_GAP = 4;
-/** The effects controls sit in the TOP BAR, right after the stream bar's 00:00:00, when the window is wide enough: what the bar's HTML takes on the left
- * (GROOVELINE LIVE, OFF AIR, the time) and on the right (the buttons), and what the controls need, all in pixels. Narrower: the strip goes under the bar. */
-const BAR_LEFT_PX = 396, BAR_RIGHT_PX = 400, BAR_FX_PX = 470;
-export const fxFitsTheBar = (W: number): boolean => W - BAR_LEFT_PX - BAR_RIGHT_PX >= BAR_FX_PX;
+/** The effects controls sit in the TOP BAR, right after the stream bar's 00:00:00 and before the page's buttons (KEYS & MIDI ...), when there is room. The page
+ * measures the room (`BarRoom`: where the bar's text ends and where the buttons begin, so a longer label like EXIT FULLSCREEN counts); without a measure these
+ * are the worst case measured on 20 Nov at 1152 x 720 (a 1440 x 900 screen with the browser at 100 %, which is 1.25 here): the text ends at 363 px, the
+ * buttons (FULLSCREEN as EXIT FULLSCREEN) start 413 px from the right edge. The controls need BAR_FX_PX; narrower than that the strip goes under the bar. */
+export interface BarRoom { left: number; right: number }
+const BAR_LEFT_PX = 376, BAR_RIGHT_PX = 416, BAR_FX_PX = 312, BAR_GAP_PX = 10;
+const barRoom = (W: number, room?: BarRoom): BarRoom => room ? { left: room.left + BAR_GAP_PX, right: room.right - BAR_GAP_PX } : { left: BAR_LEFT_PX, right: W - BAR_RIGHT_PX };
+export const fxFitsTheBar = (W: number, room?: BarRoom): boolean => { const r = barRoom(W, room); return r.right - r.left >= BAR_FX_PX; };
 /** The knobs of the mixer strips and of the effect unit are all this size (units). */
 export const KNOB_R = 11;
 /** The right of a deck's header (time, lamps, key, tempo) takes this many units; the title stops before it. */
@@ -82,10 +86,13 @@ export interface LiveMixerGeometry {
  * mixer's, each with its name and, for a stepped one, its value to the right) and a short horizontal LEVEL fader. Which channels it works on is
  * set by the FX buttons in the mixer. */
 export interface LiveFxGeometry {
-  rect: Rect; title: Point;
+  rect: Rect;
+  /** What the text sizes are multiplied by (the strip: the booth's `u`; in the bar: a fixed number, since the bar is pixels, not units). */
+  text: number;
   name: Rect;
+  /** In the strip a knob's name and step sit to its right; in the bar the name is UNDER the knob (left aligned with it) and the step to its right. */
   knobs: { c: Point; r: number; touch: Rect; name: Point; value: Point }[];
-  level: { x: number; y: number; travel: number; capW: number; capH: number; label: Point; touch: Rect };
+  level: { x: number; y: number; travel: number; capW: number; capH: number; label: Point; labelAlign: "left" | "center"; touch: Rect };
 }
 
 export interface LiveGeometry {
@@ -100,11 +107,11 @@ export interface LiveGeometry {
 
 const clamp = (x: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, x));
 
-export function liveGeometry(W: number, H: number): LiveGeometry {
+export function liveGeometry(W: number, H: number, room?: BarRoom): LiveGeometry {
   const margin = 10;
   const fixedW = MIXER_W + 2 * GAP + 2 * DECK_MIN;
   const uW = (W - 2 * margin) / fixedW;
-  const fxInBar = fxFitsTheBar(W);
+  const fxInBar = fxFitsTheBar(W, room);
   // In the bar the effects cost the gear row no height; as a strip they cost its height and a gap.
   const stripUnits = fxInBar ? 0 : FX_STRIP_H + FX_STRIP_GAP;
   const uH = (H * (fxInBar ? 0.68 : 0.71) - TOP_BAR - 8) / (GEAR_H + stripUnits);
@@ -126,7 +133,7 @@ export function liveGeometry(W: number, H: number): LiveGeometry {
 
   const deck = [rectA, rectB].map((rect) => deckGeometry(rect, u));
   const mixer = mixerGeometry(rectM, u);
-  const fx = fxInBar ? fxBarGeometry(W, H) : fxGeometry({ x: (W - total) / 2, y: stripY, w: total, h: FX_STRIP_H * u }, u);
+  const fx = fxInBar ? fxBarGeometry(H, barRoom(W, room)) : fxGeometry({ x: (W - total) / 2, y: stripY, w: total, h: FX_STRIP_H * u }, u);
 
   const lowerTop = gearY - 8;
   const lower: Rect = { x: margin, y: 6, w: W - 2 * margin, h: Math.max(0, lowerTop - 6) };
@@ -216,36 +223,38 @@ function fxGeometry(rect: Rect, u: number): LiveFxGeometry {
   const lx = x0 + NAME_W + G + 4 * KNOB_PITCH + G;
   const travel = 44; // a short fader: a few units of the hand move it from end to end
   return {
-    rect, title: { x: at(10), y: cy },
+    rect, text: u,
     name: { x: at(x0), y: cy - 11 * u, w: NAME_W * u, h: 22 * u },
     knobs: [0, 1, 2, 3].map((i) => ({
       c: { x: at(knobX(i)), y: cy }, r: 7.5 * u,
       touch: { x: at(knobX(i) - 10), y: cy - 13 * u, w: 62 * u, h: 26 * u },
       name: { x: at(knobX(i) + 12), y: cy + 5 * u }, value: { x: at(knobX(i) + 12), y: cy - 5 * u },
     })),
-    level: { x: at(lx + 44 + travel / 2), y: cy, travel: travel * u, capW: 10 * u, capH: 16 * u, label: { x: at(lx), y: cy },
+    level: { x: at(lx + 44 + travel / 2), y: cy, travel: travel * u, capW: 10 * u, capH: 16 * u, label: { x: at(lx), y: cy }, labelAlign: "left",
              touch: { x: at(lx + 40), y: cy - 13 * u, w: (travel + 14) * u, h: 26 * u } },
   };
 }
 
-/** The effects controls in the top bar, left to right right after the stream bar: the name, four knobs (a name and a step to the right of each), LEVEL.
- * Sizes are in pixels (the bar is 40 px high whatever the scale). */
-function fxBarGeometry(W: number, H: number): LiveFxGeometry {
-  const cy = H - 15, x0 = BAR_LEFT_PX;
-  const PITCH = 62, NAME_W = 84;
-  const knobX = (i: number): number => x0 + NAME_W + 12 + i * PITCH + 10;
-  const lx = x0 + NAME_W + 12 + 4 * PITCH + 8, travel = 46;
-  const rect: Rect = { x: x0, y: cy - 14, w: lx + 36 + travel + 12 - x0, h: 28 };
-  void W;
+/** The effects controls in the top bar, left to right from `x0` (just after the stream bar's text): the name, four knobs, LEVEL. Everything is in pixels (the bar is
+ * 40 px high whatever the scale) and inside the TOP 28 px: the page's orange message sits under the title below that. A knob's name is under the knob, its step
+ * to the right, so four knobs take 42 px each; LEVEL is a short fader with its name under it. Total 310 px (`BAR_FX_PX`). */
+function fxBarGeometry(H: number, room: BarRoom): LiveFxGeometry {
+  // Spare room is shared: a little after the time, the rest before the buttons.
+  const x0 = room.left + Math.min(24, (room.right - room.left - BAR_FX_PX) / 2);
+  const kcy = H - 12, lcy = H - 25.5, bcy = H - 13.5;
+  const NAME_W = 78, PITCH = 42, G = 8, R = 9;
+  const cell = (i: number): number => x0 + NAME_W + G + i * PITCH;
+  const lx = cell(4) + 6, travel = 38, capW = 9, fw = travel + capW;
+  const rect: Rect = { x: x0, y: H - 28, w: lx + fw + 2 - x0, h: 28 };
   return {
-    rect, title: { x: x0, y: cy },
-    name: { x: x0, y: cy - 11, w: NAME_W, h: 22 },
+    rect, text: 1.2,
+    name: { x: x0, y: bcy - 11, w: NAME_W, h: 22 },
     knobs: [0, 1, 2, 3].map((i) => ({
-      c: { x: knobX(i), y: cy }, r: 9,
-      touch: { x: knobX(i) - 12, y: cy - 14, w: PITCH - 2, h: 28 },
-      name: { x: knobX(i) + 13, y: cy + 5 }, value: { x: knobX(i) + 13, y: cy - 6 },
+      c: { x: cell(i) + 13, y: kcy }, r: R,
+      touch: { x: cell(i) + 1, y: H - 28, w: PITCH - 2, h: 28 },
+      name: { x: cell(i) + 4, y: lcy }, value: { x: cell(i) + 25, y: kcy },
     })),
-    level: { x: lx + 36 + travel / 2, y: cy, travel, capW: 9, capH: 16, label: { x: lx, y: cy }, touch: { x: lx + 32, y: cy - 14, w: travel + 14, h: 28 } },
+    level: { x: lx + fw / 2, y: kcy, travel, capW, capH: 16, label: { x: lx + fw / 2, y: lcy }, labelAlign: "center", touch: { x: lx - 2, y: H - 28, w: fw + 4, h: 28 } },
   };
 }
 
