@@ -1287,9 +1287,12 @@ function renderCamera(): void {
 cameraForShow = () => (publishCamera ? camera.track : null);
 // With ?publishCamera the camera must be ON before the connection is made: a track is added once, at connect time, and a show that
 // started without it would go out as audio only (measured 21 Nov: "1 track (Opus)" in MediaMTX while Zé streamed a video slot).
-const ensureCameraForShow = async (): Promise<void> => {
-  if (!publishCamera || camera.view.on) return;
+// Refuses the start when the camera cannot come on: a "video" show that silently goes out as audio is worse than no show.
+const ensureCameraForShow = async (): Promise<boolean> => {
+  if (!publishCamera) return true;
+  if (camera.view.on) return true;
   await camera.start();
+  return camera.view.on; // when it did not start, the panel's note already says why (cameraWords)
 };
 cameraButton.addEventListener("click", () => { void camera.toggle().catch(() => {}); });
 cameraPick.addEventListener("change", () => { void camera.choose(cameraPick.value || null).catch(() => {}); });
@@ -1297,8 +1300,12 @@ cameraPick.addEventListener("change", () => { void camera.choose(cameraPick.valu
 mediaDevices?.addEventListener?.("devicechange", () => { void camera.refreshDevices().catch(() => {}); });
 void camera.refreshDevices().catch(() => {});
 const streamFailed = (e: unknown): void => { note.textContent = e instanceof Error ? e.message : String(e); };
-checkButton.addEventListener("click", () => { void ensureCameraForShow().then(() => soundCheck.toggle()).catch(streamFailed); });
-goButton.addEventListener("click", () => { void ensureCameraForShow().then(() => goLive.toggle()).catch(streamFailed); });
+const startWithCamera = async (start: () => Promise<void>): Promise<void> => {
+  if (!(await ensureCameraForShow())) return; // nothing was sent; the note says why
+  await start();
+};
+checkButton.addEventListener("click", () => { void startWithCamera(() => soundCheck.toggle()).catch(streamFailed); });
+goButton.addEventListener("click", () => { void startWithCamera(() => goLive.toggle()).catch(streamFailed); });
 // Signed in on another tab (the site's /broadcast), or coming back to this one: look again. Closing the page ends a test or a show at the server.
 const streamRefresh = (): void => { soundCheck.refresh(); void goLive.refresh(); };
 window.addEventListener("storage", (e) => { if (e.key === "gl_token") streamRefresh(); });
