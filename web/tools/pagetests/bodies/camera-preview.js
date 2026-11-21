@@ -25,6 +25,15 @@ window.fetch = (...a) => { calls++; return realFetch(...a); };
     `${btn.textContent} | hidden ${box.hidden} | on ${cam.view.on}`);
   ok("with one camera (the fake device) there is no select, and the panel says PREVIEW", $("camera-pick").hidden && /PREVIEW/.test(document.querySelector("#camera-bar .cam-label").textContent),
     `devices ${cam.view.devices.length}`);
+  // IN SHOW: does the picture go out with the show? Off by default, a click remembers it.
+  const send = $("camera-send");
+  ok("IN SHOW is off by default: a show from a plain link is audio only", !!send && !send.classList.contains("on") && send.getAttribute("aria-pressed") === "false" && localStorage.getItem("headliner.publishVideo") === null,
+    `${send && send.textContent} | stored ${JSON.stringify(localStorage.getItem("headliner.publishVideo"))}`);
+  send.click(); await sleep(300);
+  ok("IN SHOW turns on and is remembered in this browser", send.classList.contains("on") && send.getAttribute("aria-pressed") === "true" && localStorage.getItem("headliner.publishVideo") === "1");
+  send.click(); await sleep(300);
+  ok("and off again clears it", !send.classList.contains("on") && localStorage.getItem("headliner.publishVideo") === null);
+
   // the button is really there (not under the meter, the note or the buttons)
   const b = btn.getBoundingClientRect(), hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
   ok("the mouse reaches the ON button (nothing overlaps it)", hit === btn, `${hit && hit.id || hit && hit.className}`);

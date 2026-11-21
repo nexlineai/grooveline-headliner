@@ -1205,7 +1205,7 @@ function renderStream(): void {
   streamChip.classList.toggle("onair", lv.state === "onair");
   // Is the picture part of what is going out right now? (?publishCamera only; the row says so, the toggle keeps working.)
   const sending = cv.stops || lv.stops; // a check or a show has a connection (up, being made, or reconnecting)
-  cameraLabel.textContent = publishCamera ? (sending && camView?.on ? "PREVIEW \u00b7 IN SHOW" : "PREVIEW") : "PREVIEW";
+  cameraLabel.textContent = sendCamera && sending && camView?.on ? "PREVIEW \u00b7 IN SHOW" : "PREVIEW";
   streamNote.textContent = text;
   streamNote.hidden = !text;
   streamNote.classList.toggle("good", camSays ? false : checkSays ? cv.state === "sending" || cv.state === "signed-out" : CALM.has(lv.state));
@@ -1233,9 +1233,12 @@ function renderOnAirTimer(): void {
 
 /** The address the server gives is the real one (https, stream.grooveline.org); a page test points it at its own MediaMTX. */
 const goEndpoint = (url: string): string => (streamTest.whipBase !== undefined && url.startsWith(WHIP_BASE) ? streamTest.whipBase + url.slice(WHIP_BASE.length) : url);
-// SPIKE, page only (?publishCamera): send the camera's picture in the SAME WHIP connection as the mixer, H264 preferred. Off unless the flag is
-// given, so a normal show is exactly what it was; the preview still owns its track, so turning the preview off ends the video of a show.
-const publishCamera = params.has("publishCamera");
+// Does the camera's picture go out with the show? A setting in this browser, off at first: the IN SHOW button in the PREVIEW row turns it on
+// (the picture then rides in the SAME WHIP connection as the mixer, H264 preferred, so the server repackages instead of re-encoding).
+// `?publishCamera` turns it on once and remembers it, for the link Zé bookmarked before the button existed.
+const PUBLISH_KEY = "headliner.publishVideo";
+const readPublish = (): boolean => { try { return localStorage.getItem(PUBLISH_KEY) === "1"; } catch { return false; } };
+let sendCamera = readPublish() || params.has("publishCamera");
 let cameraForShow: () => MediaStreamTrack | null = () => null;
 const videoCodecs = (): RTCRtpCodec[] => RTCRtpSender.getCapabilities?.("video")?.codecs ?? [];
 const goLive = new GoLive({
@@ -1284,16 +1287,32 @@ function renderCamera(): void {
   cameraPick.hidden = v.devices.length < 2;
   if (v.deviceId) cameraPick.value = v.deviceId;
 }
-cameraForShow = () => (publishCamera ? camera.track : null);
+cameraForShow = () => (sendCamera ? camera.track : null);
 // With ?publishCamera the camera must be ON before the connection is made: a track is added once, at connect time, and a show that
 // started without it would go out as audio only (measured 21 Nov: "1 track (Opus)" in MediaMTX while Zé streamed a video slot).
 // Refuses the start when the camera cannot come on: a "video" show that silently goes out as audio is worse than no show.
 const ensureCameraForShow = async (): Promise<boolean> => {
-  if (!publishCamera) return true;
+  if (!sendCamera) return true;
   if (camera.view.on) return true;
   await camera.start();
   return camera.view.on; // when it did not start, the panel's note already says why (cameraWords)
 };
+// IN SHOW: does the picture go out with the show? Off by default, remembered in this browser; a show started without it is audio only.
+const cameraSend = $("camera-send") as HTMLButtonElement;
+function renderSend(): void {
+  cameraSend.classList.toggle("on", sendCamera);
+  cameraSend.setAttribute("aria-pressed", String(sendCamera));
+  cameraSend.title = sendCamera
+    ? "The camera's picture goes out with your show (H264, the server does not re-encode). Click to keep it off the air."
+    : "Send the camera's picture with your show (H264, the server does not re-encode). Off: the show is audio only.";
+}
+cameraSend.addEventListener("click", () => {
+  sendCamera = !sendCamera;
+  try { if (sendCamera) localStorage.setItem(PUBLISH_KEY, "1"); else localStorage.removeItem(PUBLISH_KEY); } catch { /* private window */ }
+  renderSend();
+  renderStream();
+});
+renderSend();
 cameraButton.addEventListener("click", () => { void camera.toggle().catch(() => {}); });
 cameraPick.addEventListener("change", () => { void camera.choose(cameraPick.value || null).catch(() => {}); });
 // Another camera plugged in (or taken out) is offered at once.
