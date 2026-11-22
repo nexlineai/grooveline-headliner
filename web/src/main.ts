@@ -244,7 +244,7 @@ $("title-play").addEventListener("click", () => {
 });
 $("title-free").addEventListener("click", () => { ensureStarted().then(() => openFreePlay()).catch(failed); });
 
-// Zé's hidden unlock, as on the iPhone: hold the Grooveline logo three seconds.
+// Zé's hidden unlock, as on the iPhone: hold the Grooveline logo ten seconds (the iPhone keeps three).
 {
   const logo = title.querySelector<HTMLElement>(".logo")!;
   let timer: number | null = null;
@@ -256,7 +256,7 @@ $("title-free").addEventListener("click", () => { ensureStarted().then(() => ope
       toast.hidden = false;
       setTimeout(() => { toast.hidden = true; }, 2000);
       timer = null;
-    }, 3000);
+    }, 10000);
   });
   const cancel = () => { if (timer !== null) { clearTimeout(timer); timer = null; } };
   logo.addEventListener("pointerup", cancel);

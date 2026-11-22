@@ -1,6 +1,6 @@
 // What the player has done (port of CareerProgress and the lock rules in App/Chapter.swift),
 // kept in this browser's local storage. Steps go in order; Zé's hidden unlock (hold the title's
-// Grooveline logo three seconds) opens everything, as on the iPhone.
+// Grooveline logo ten seconds) opens everything, as on the iPhone.
 
 import type { Chapter, ChapterStep } from "./content.ts";
 
