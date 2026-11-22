@@ -809,10 +809,10 @@ const toggle = (sheet: HTMLElement) => { const open = sheet.hidden; for (const s
 $("back").addEventListener("click", leave);
 $("crate-button").addEventListener("click", () => {
   toggle(crate);
-  // Your own music is free play's: in a lesson or a night the crate is the game's.
-  const free = !booth.lesson && !booth.night;
-  $("crate-tabs").hidden = !free;
-  if (!free) showCrateTab("records");
+  // The crate is the game's (22 Nov: free play is the iPhone game; your own music is LIVE's wall). MY MUSIC only with booth.freePlayExtras.
+  const mine = booth.freePlayExtras && !booth.lesson && !booth.night;
+  $("crate-tabs").hidden = !mine;
+  if (!mine) showCrateTab("records");
 });
 $("crate-close").addEventListener("click", () => { crate.hidden = true; });
 $("phones-close").addEventListener("click", () => { phonesPanel.hidden = true; });
@@ -1205,7 +1205,16 @@ function renderStream(): void {
   streamChip.classList.toggle("onair", lv.state === "onair");
   // Is the picture part of what is going out right now? (?publishCamera only; the row says so, the toggle keeps working.)
   const sending = cv.stops || lv.stops; // a check or a show has a connection (up, being made, or reconnecting)
-  cameraLabel.textContent = sendCamera && sending && camView?.on ? "PREVIEW \u00b7 IN SHOW" : "PREVIEW";
+  const inShow = sendCamera && sending && !!camView?.on;
+  cameraLabel.textContent = inShow ? "PREVIEW \u00b7 IN SHOW" : "PREVIEW";
+  // While the picture is going out its controls are locked: OFF or another camera would end the show's video (a track is added once, at
+  // connect time), and IN SHOW cannot change a connection that is already up. Stop the check or the show first.
+  // (looked up here: renderStream runs before the camera block below has made its constants)
+  const camButton = $("camera-toggle") as HTMLButtonElement, camPick = $("camera-pick") as HTMLSelectElement, camSend = $("camera-send") as HTMLButtonElement;
+  camButton.disabled = inShow;
+  camPick.disabled = inShow;
+  camSend.disabled = sending;
+  camButton.title = inShow ? "The picture is on air: end the show (or the check) first" : "";
   streamNote.textContent = text;
   streamNote.hidden = !text;
   streamNote.classList.toggle("good", camSays ? false : checkSays ? cv.state === "sending" || cv.state === "signed-out" : CALM.has(lv.state));
@@ -1323,8 +1332,12 @@ const startWithCamera = async (start: () => Promise<void>): Promise<void> => {
   if (!(await ensureCameraForShow())) return; // nothing was sent; the note says why
   await start();
 };
-checkButton.addEventListener("click", () => { void startWithCamera(() => soundCheck.toggle()).catch(streamFailed); });
-goButton.addEventListener("click", () => { void startWithCamera(() => goLive.toggle()).catch(streamFailed); });
+// Only a click that STARTS something waits for the camera. STOP CHECK / END SHOW / CANCEL must always work at once, whatever the camera
+// does (22 Nov review: with IN SHOW on and the camera off or failing, the stop click asked for the camera first and could not end the show).
+const checkStarts = (): boolean => !soundCheck.view.stops && soundCheck.state !== "signed-out";
+const goStarts = (): boolean => goLive.state === "on";
+checkButton.addEventListener("click", () => { void (checkStarts() ? startWithCamera(() => soundCheck.toggle()) : soundCheck.toggle()).catch(streamFailed); });
+goButton.addEventListener("click", () => { void (goStarts() ? startWithCamera(() => goLive.toggle()) : goLive.toggle()).catch(streamFailed); });
 // Signed in on another tab (the site's /broadcast), or coming back to this one: look again. Closing the page ends a test or a show at the server.
 const streamRefresh = (): void => { soundCheck.refresh(); void goLive.refresh(); };
 window.addEventListener("storage", (e) => { if (e.key === "gl_token") streamRefresh(); });
@@ -1394,7 +1407,7 @@ let lastTick = performance.now();
 let wallMode = booth.mode;
 (function frontLoop() {
   if (booth.mode !== wallMode) { wallMode = booth.mode; wall.refresh(); } // the game's records are in free play's crates, not in LIVE's
-  const free = booth.mode === "game" && !booth.lesson && !booth.night && boothActive();
+  const free = booth.freePlayExtras && booth.mode === "game" && !booth.lesson && !booth.night && boothActive();
   wall.setVisible((free && front === "wall") || (booth.mode === "live" && boothActive()));
   booth.setRoomHidden(free && front === "wall");
   $("wall-open").hidden = !(free && front === "room");

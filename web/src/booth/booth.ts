@@ -116,6 +116,9 @@ export class Booth {
   private phones = [false, false];
   /** The one-knob filter per channel (0.5 = off). */
   private filterSetting = [0.5, 0.5];
+  /** Web free play's extras (the effect bar under the gear and a GAIN knob above each fader, 19 Nov). OFF since 22 Nov (Zé: free play is the
+   * iPhone game; your own music and the DJ tools are LIVE's). true brings them back, nothing else changes. */
+  freePlayExtras = false;
   /** The gain knob per channel (0.5 = 0 dB); it only works in free play (a lesson or a night is the iPhone's desk). */
   private trimSetting = [0.5, 0.5];
   private syncAllowed = true;
@@ -406,7 +409,7 @@ export class Booth {
     const gx0 = left;
     const gw = W - left - right;
     // Free play has the effect bar as a third row under the decks and the mixer (36 units and a gap).
-    const fxBar = this.lesson === null && this.night === null;
+    const fxBar = this.freePlayExtras && this.lesson === null && this.night === null;
     const BAR = 36, BAR_GAP = 6;
     // The gear is drawn in units `u` (the iPhone's: 210 high, 816 wide with a mixer 224 wide): as big
     // as the height (at most the lower 58 %) and the width both allow. On a tall screen (fullscreen
@@ -1340,7 +1343,7 @@ export class Booth {
 
   /** The gain knobs act in LIVE and in free play; in a lesson or a night every channel is at 0 dB (the knob keeps its place). */
   private applyTrim(): void {
-    const on = this.mode === "live" || (this.lesson === null && this.night === null);
+    const on = this.mode === "live" || (this.freePlayExtras && this.lesson === null && this.night === null);
     for (const d of [0, 1]) this.decks[d].trim = on ? this.trimSetting[d] : 0.5;
   }
 
@@ -1426,7 +1429,7 @@ export class Booth {
     // The layout changes with the mode (the game's booth is the iPhone's desk; LIVE has its own).
     if (this.L && (this.L.live !== null) !== (this.mode === "live")) this.L = null;
     // The effect bar and the gain knobs come and go with free play (a lesson or a night is the iPhone's desk).
-    if (this.L && this.L.live === null && (this.L.fx !== null) !== (this.lesson === null && this.night === null)) this.L = null;
+    if (this.L && this.L.live === null && (this.L.fx !== null) !== (this.freePlayExtras && this.lesson === null && this.night === null)) this.L = null;
     if (!this.L) this.build();
     this.applyTrim();
     if (this.L) {
