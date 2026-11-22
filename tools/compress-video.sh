@@ -8,18 +8,28 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 APPLY=0
-if [[ "${1:-}" == "--apply" ]]; then APPLY=1; fi
+SKIP_MODIFIED=0
+for arg in "$@"; do
+  case "$arg" in
+    --apply) APPLY=1 ;;
+    --skip-modified) SKIP_MODIFIED=1 ;;
+  esac
+done
 
 command -v ffmpeg >/dev/null || { echo "ffmpeg not found" >&2; exit 1; }
 command -v ffprobe >/dev/null || { echo "ffprobe not found" >&2; exit 1; }
 
 ROOM_CRF="${ROOM_CRF:-27}"
 STORY_CRF="${STORY_CRF:-26}"
-PRESET="${PRESET:-slow}"
+PRESET="${PRESET:-medium}"
 
 reencode() {
   local src=$1 mode=$2
   local before after tmp w0 h0 w1 h1 d0 d1
+  if [[ "$SKIP_MODIFIED" -eq 1 ]] && ! git diff --quiet -- "$src"; then
+    printf "  %-44s skipped (already modified in working tree)\n" "$src"
+    return 0
+  fi
   before=$(stat -c%s "$src")
   if [[ "$APPLY" -eq 0 ]]; then
     printf "  [dry-run] %-44s (%6.2f MiB, %s)\n" "$src" "$(awk "BEGIN{print $before/1048576}")" "$mode"
@@ -28,7 +38,7 @@ reencode() {
 
   tmp="${src}.tmp.mp4"
   rm -f "$tmp"
-  read -r w0 h0 d0 < <(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -show_entries format=duration -of default=nw=1:nk=1 "$src" | tr '\n' ' ')
+  read -r w0 h0 d0 <<< "$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -show_entries format=duration -of default=nw=1:nk=1 "$src" | tr '\n' ' ')"
 
   if [[ "$mode" == "room" ]]; then
     ffmpeg -hide_banner -loglevel error -y -i "$src" \
@@ -40,7 +50,7 @@ reencode() {
       -pix_fmt yuv420p -tag:v avc1 -c:a aac -b:a 96k -movflags +faststart "$tmp"
   fi
 
-  read -r w1 h1 d1 < <(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -show_entries format=duration -of default=nw=1:nk=1 "$tmp" | tr '\n' ' ')
+  read -r w1 h1 d1 <<< "$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -show_entries format=duration -of default=nw=1:nk=1 "$tmp" | tr '\n' ' ')"
   if [[ "$w0" != "$w1" || "$h0" != "$h1" ]]; then
     rm -f "$tmp"
     echo "ERROR: dimension mismatch on $src ($w0 x $h0 -> $w1 x $h1)" >&2
