@@ -99,14 +99,14 @@ final class Game: ObservableObject {
     init() {
         let defaults = UserDefaults.standard
         demo = defaults.bool(forKey: "demo")
+        studioPage = defaults.integer(forKey: "studioPage")
+        phonesMode = defaults.integer(forKey: "phonesMode")
+        cueMix = defaults.double(forKey: "cueMix")
         if defaults.bool(forKey: "demoPattern") {
             pattern = .house
         } else if let saved = progress.studioPattern {
             pattern = saved
         }
-        studioPage = defaults.integer(forKey: "studioPage")
-        phonesMode = defaults.integer(forKey: "phonesMode")
-        cueMix = defaults.double(forKey: "cueMix")
         engine.phones = PhonesMode(rawValue: phonesMode) ?? .off
         engine.cueMix = cueMix
         // Something was plugged in or pulled out: let the screens that show the outputs redraw.
