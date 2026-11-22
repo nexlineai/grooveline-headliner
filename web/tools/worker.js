@@ -24,31 +24,22 @@ export default {
       url.pathname = "/headliner/";
       return Response.redirect(url.toString(), 308);
     }
-    // Grooveline Booth (22 Nov 2026): the DJ software at its own address, grooveline.org/booth/. For now it is the same build as the
-    // Headliner (the files are served from /headliner/), and the page opens straight in the booth when its address starts with /booth.
-    if (url.pathname === "/booth") {
-      url.pathname = "/booth/";
-      return Response.redirect(url.toString(), 308);
-    }
-    // The old LIVE links go to the Booth: /headliner/live and /headliner/?live (other parameters, e.g. ?publishCamera, are kept).
+    // Grooveline Booth (the DJ software) has its own repo, Worker and route: grooveline.org/booth/ is no longer served here (22 Nov 2026).
+    // The old LIVE links go to it: /headliner/live and /headliner/?live (other parameters, e.g. ?publishCamera, are kept).
     if (url.pathname === "/headliner/live" || url.pathname === "/headliner/live/" || (url.pathname === "/headliner/" && url.searchParams.has("live"))) {
       url.pathname = "/booth/";
       const kept = url.search.slice(1).split("&").filter((p) => p && p.split("=")[0] !== "live"); // the rest exactly as written (?publishCamera stays bare)
       url.search = kept.length ? `?${kept.join("&")}` : "";
       return Response.redirect(url.toString(), 302);
     }
-    const booth = url.pathname.startsWith("/booth/");
-    if (!booth && !url.pathname.startsWith("/headliner/")) return fetch(request); // a neighbouring path stays with the site
+    if (!url.pathname.startsWith("/headliner/")) return fetch(request); // a neighbouring path stays with the site
     if (request.method !== "GET" && request.method !== "HEAD") {
       return new Response("Method not allowed", { status: 405, headers: { Allow: "GET, HEAD" } });
     }
     // Static assets always answer a Range request with the whole file (Cloudflare's docs); the
     // media players need byte ranges (Safari probes bytes=0-1 and plays video only with them).
-    // The Booth's files are the Headliner's: /booth/<file> is read from /headliner/<file>.
-    const assetPath = booth ? `/headliner/${url.pathname.slice("/booth/".length)}` : url.pathname;
-    const assetUrl = new URL(url);
-    assetUrl.pathname = assetPath;
-    const plain = new Request(assetUrl.toString(), { method: request.method, headers: withoutRange(request.headers) });
+    const assetPath = url.pathname;
+    const plain = new Request(url.toString(), { method: request.method, headers: withoutRange(request.headers) });
     const response = await env.ASSETS.fetch(plain);
     const headers = new Headers(response.headers);
     for (const [k, v] of Object.entries(HEADERS)) headers.set(k, v);
