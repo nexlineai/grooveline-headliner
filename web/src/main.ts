@@ -3,9 +3,7 @@
 //   ?lesson=<id>[&step=<n>]   start straight in a lesson
 //   ?night=<id>[&length=<s>]  start straight in a night (a short length for tests)
 //   ?demo                     free play with both records turning (screenshots)
-//   ?live                     the page opens straight in the DJ's booth (LIVE), no title (the link for the website: /headliner/live)
 //   &playcount=<s>            how many seconds make a play (30), for the tests
-//   ?autostart&live[&records] straight into LIVE (screenshots, tests); &records puts the game's first two records on the decks
 //   ?autostart                no click needed (screenshots; the browser must allow sound)
 //   ?unlockAll=1|0            the hidden unlock, for tests
 
@@ -26,47 +24,19 @@ import { groovelineLogo } from "./logo.ts";
 import { fade } from "./fade.ts";
 import { BagScreen } from "./game/bag.ts";
 import type { PhonesMode } from "./audio/engine.ts";
-import { FX_DIVISIONS, FX_TYPES } from "./audio/fx.ts";
-import { Library } from "./library/library.ts";
-import { buildPanel } from "./library/panel.ts";
-import { Sleeves } from "./library/sleeves.ts";
-import { buildWall } from "./library/wall.ts";
-import type { GridFix } from "./library/panel.ts";
-import { analyse } from "./library/analyse.ts";
-import { monoForAnalysis } from "./library/beats.ts";
-import { trackId } from "./library/search.ts";
-import { probeDuration } from "./library/duration.ts";
-import type { LibraryTrack } from "./library/store.ts";
-import { LOOP_ACTIONS, PITCH_RANGES, keyOf } from "./booth/booth.ts";
-import { BAR_ROOM_NEEDED_PX } from "./booth/live-geometry.ts";
-import { SIGN_IN_URL, WHIP_BASE, readSession } from "./stream/account.ts";
-import { SoundCheck } from "./stream/soundcheck.ts";
-import type { CheckView } from "./stream/soundcheck.ts";
-import { Meter } from "./audio/meter.ts";
-import { GoLive } from "./stream/golive.ts";
-import { NowPlaying } from "./stream/nowplaying.ts";
-import type { LiveView } from "./stream/golive.ts";
-import { WhipPublisher } from "./stream/whip.ts";
-import { CameraPreview } from "./stream/camera.ts";
-import type { CameraView } from "./stream/camera.ts";
+import { keyOf } from "./booth/booth.ts";
 import type { Kind } from "./booth/booth.ts";
 import { KEYS, attachKeys } from "./input/keys.ts";
 import { MidiInput, parseMidiConfig } from "./input/midi.ts";
 import type { Binding, TargetKind } from "./input/midi.ts";
 import { Credits } from "./game/credits.ts";
-import { createShare } from "./share.ts";
-import { IdbStore } from "./library/store.ts";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const engine = new DeckEngine();
 const booth = new Booth($<HTMLCanvasElement>("booth"), $("room"), engine);
-const title = $("start"), chapterScreen = $("chapter"), crate = $("crate"), crateList = $("crate-list"), phonesPanel = $("phones"), settingsSheet = $("settings"), note = $("note");
+const title = $("start"), chapterScreen = $("chapter"), crate = $("crate"), crateList = $("crate-list"), phonesPanel = $("phones"), note = $("note");
 const lessonOverlay = $("lesson"), nightOverlay = $("night"), result = $("result");
 const params = new URLSearchParams(location.search);
-/** Grooveline Booth (22 Nov 2026): the DJ software at grooveline.org/booth/ (the same build, served by the Worker from /headliner/). It opens
- * straight in the LIVE booth, with its own name, and never shows the game: no title, no back arrow. `?booth` does the same on the dev server. */
-const boothApp = location.pathname.startsWith("/booth") || params.has("booth");
-
 let content: Content | null = null;
 let tracks: TrackInfo[] = [];
 let scenes = new Map<string, StoryScene>();
@@ -81,26 +51,7 @@ Object.assign(window, { headliner: { engine, booth, progress, credits: () => ope
 
 // The canvas only uses a web font once it has loaded; ask for it now.
 document.fonts.load(`600 16px "Barlow Condensed"`).catch(() => {});
-// The effects in the top bar are placed by where the stream bar's text ends and where the page's buttons begin: lay the booth out again whenever either changes size
-// (a late font, EXIT FULLSCREEN, the bar showing, a button added).
-/** The top bar sheds what it can spare, in this order, until the effects fit between its text and its buttons: the brand's name, the words on SETTINGS and FULLSCREEN (icons stay), the clock, the words OFF AIR (the dot stays). If they cannot fit
- * even then (a very narrow window: the effects go in a strip) it sheds only what stops the text running into the buttons. CSS: `body.live.bar-nobrand/-icons/-noclock/-nostate`. */
-function fitBar(): void {
-  const bar = $("livebar"), buttons = $("top"), body = document.body;
-  if (bar.hidden || !body.classList.contains("live")) return;
-  const levels: string[][] = [[], ["bar-nobrand"], ["bar-nobrand", "bar-icons"], ["bar-nobrand", "bar-icons", "bar-noclock"], ["bar-nobrand", "bar-icons", "bar-noclock", "bar-nostate"]];
-  const set = (l: string[]): void => { for (const c of ["bar-nobrand", "bar-icons", "bar-noclock", "bar-nostate"]) body.classList.toggle(c, l.includes(c)); };
-  const room = (): number => buttons.getBoundingClientRect().left - bar.getBoundingClientRect().right;
-  const pick = (need: number): string[] | null => { for (const l of levels) { set(l); if (room() >= need) return l; } return null; };
-  set(pick(BAR_ROOM_NEEDED_PX) ?? pick(10) ?? levels[levels.length - 1]);
-}
-booth.fitBar = fitBar;
 window.addEventListener("resize", () => booth.relayout());
-if (typeof ResizeObserver !== "undefined") {
-  const barWatch = new ResizeObserver(() => booth.relayout());
-  barWatch.observe($("livebar"));
-  barWatch.observe($("top"));
-}
 
 // MARK: - Records
 
@@ -109,16 +60,14 @@ let cutPattern: DrumPattern | null = progress.track ? new DrumPattern(progress.t
 
 const trackFor = (id: string): TrackInfo | null => (id === "your-dubplate" ? cutInfo() : tracks.find((t) => t.id === id) ?? null);
 
-/** A record is not changed under a playing needle: in LIVE a message comes up over that deck. True when the deck is busy. */
+/** A record is not changed under a playing needle: a small note says so. True when the deck is busy. */
 /** A deck is PLAYING a record, not merely turning: its motor runs and the needle has not reached the end (a record that has finished keeps the motor on, in
  * silence, and must not stop a playlist from loading the next one). */
 const deckPlaying = (d: number): boolean => { const deck = engine.decks[d]; return deck.motorOn && Math.abs(deck.rate) > 0.1 && !(deck.progress >= 0.995); };
 
 function deckBusy(d: number): boolean {
-  const deck = engine.decks[d];
   if (booth.lesson || booth.night || !deckPlaying(d)) return false;
-  if (booth.mode === "live") booth.alertDeck(d, `STOP THE ${d === 0 ? "LEFT" : "RIGHT"} DECK BEFORE LOADING A NEW RECORD`);
-  else note.textContent = "Stop the deck before you change its record."; // free play: the small note, as before
+  note.textContent = "Stop the deck before you change its record.";
   return true;
 }
 
@@ -134,143 +83,10 @@ async function loadRecord(d: number, track: TrackInfo): Promise<void> {
     await engine.load(d, track, `assets/Tracks/${track.file}`);
     note.textContent = "";
   }
-  userOnDeck[d] = null;
-  myMusicPanel?.refresh();
   booth.recordChanged(d);
 }
 
-// MARK: - Your own music (free play): the MY MUSIC tab of the crate
-
-const library = new Library();
-const sleeves = new Sleeves(library);
-
-// The record room: under the gear row of LIVE, a wall with a shelf and crates.
-const bigSleeves = new Sleeves(library, 150, 4, 320);
-let gameRecords: TrackInfo[] = [];
-function openMusicFolder(): void {
-  if (Library.canPickFolder) { library.init().then(() => library.pickFolder()).catch(failed); return; }
-  const input = document.createElement("input");
-  input.type = "file"; input.multiple = true; input.setAttribute("webkitdirectory", "");
-  input.addEventListener("change", () => { library.init().then(() => library.addFromFiles([...(input.files ?? [])])).catch(failed); });
-  input.click();
-}
-// The record room (free play): the front of the booth is a wall with a shelf and crates, or the crowd if you choose; in LIVE the wall is under the gear row.
-const FRONT_KEY = "headliner.front";
-let front: "wall" | "room" = (() => { try { return localStorage.getItem(FRONT_KEY) === "room" ? "room" : "wall"; } catch { return "wall"; } })();
-const setFront = (f: "wall" | "room") => { front = f; try { localStorage.setItem(FRONT_KEY, f); } catch { /* private window */ } };
-const wall = buildWall($("wall"), library, bigSleeves, {
-  load: (d, item) => {
-    if (booth.refuseLoad(d)) return; // back to back: her deck is hers
-    if (item.track) loadUserTrack(d, item.track).catch(failed);
-    else if (item.game) loadRecord(d, item.game).catch(failed);
-  },
-  onDeck: (item) => [0, 1].filter((d) => engine.decks[d].info?.id === item.id),
-  openFolder: openMusicFolder,
-  // Free play shows the game's records in its crates; LIVE's library is your own music only.
-  game: () => (booth.mode === "live" ? [] : gameRecords),
-  toRoom: () => setFront("room"),
-  busy: (d) => !booth.lesson && !booth.night && deckPlaying(d),
-  // The heart: kept with the track; the wall's shelf shows favourites (and what you play most) first.
-  toggleFav: (item) => { const t = item.track; if (!t) return; t.fav = !t.fav; library.update(t).catch(() => {}); wall.refresh(); },
-});
-/** The library track on each deck (null: a record of the game, or nothing). */
-const userOnDeck: (LibraryTrack | null)[] = [null, null];
-/** A track longer than this is too big to hold decoded (48 kHz stereo float: about 23 MB a minute, and a copy while loading). */
-const MAX_MINUTES = 15;
-let myMusicPanel: { refresh(): void } | null = null;
-
-/** Opens a track of your library on a deck: decode, find its grid (your correction, an earlier analysis, or analysis now), play. */
-async function loadUserTrack(d: number, t: LibraryTrack): Promise<void> {
-  const deck = engine.decks[d];
-  if (deckBusy(d)) return;
-  const name = t.artist ? `${t.artist} - ${t.title}` : t.title;
-  try {
-    note.textContent = `Opening ${name}…`;
-    const file = await library.fileOf(t);
-    // Ask the file how long it is before decoding it: an hour of music is two gigabytes in memory.
-    const length = await probeDuration(file);
-    if (length !== null && length > MAX_MINUTES * 60) { note.textContent = `${name} is ${Math.round(length / 60)} minutes long: too big to hold (the limit is ${MAX_MINUTES}).`; return; }
-    let audio: AudioBuffer;
-    try { audio = await engine.decode(await file.arrayBuffer()); }
-    catch { note.textContent = `${name}: this browser cannot decode this ${t.ext.toUpperCase()} file.`; return; }
-    if (audio.duration > MAX_MINUTES * 60) { note.textContent = `${name} is ${Math.round(audio.duration / 60)} minutes long: too big to hold (the limit is ${MAX_MINUTES}).`; return; }
-    let grid: { bpm: number; firstBeat: number } | null = t.grid ?? (t.analysis ? { bpm: t.analysis.bpm, firstBeat: t.analysis.firstBeat } : null);
-    if (!grid) {
-      note.textContent = `Finding the beat of ${name}…`;
-      const mono = monoForAnalysis(audio.getChannelData(0), audio.getChannelData(Math.min(1, audio.numberOfChannels - 1)), audio.sampleRate);
-      const tempo = await analyse(mono.data, mono.rate, t.tagBpm);
-      if (tempo) {
-        t.analysis = { bpm: tempo.bpm, firstBeat: tempo.firstBeat, confidence: tempo.confidence };
-        grid = { bpm: tempo.bpm, firstBeat: tempo.firstBeat };
-        await library.update(t);
-      }
-    }
-    const info: TrackInfo = {
-      id: trackId(t), title: t.title, artist: t.artist, label: t.album, genre: t.genre, bpm: grid?.bpm ?? (t.tagBpm || 120),
-      key: t.musicKey, camelot: t.camelot, bars: 0, seconds: audio.duration, file: "", chapter: null,
-    };
-    deck.loadDecoded(info, audio, grid ?? undefined);
-    userOnDeck[d] = t;
-    playedFor[d] = 0; counted[d] = false;
-    // Its hot cues and saved loops come back, and what is set or cleared from now on is kept with the track.
-    deck.setMarks({ cues: t.cues, loops: t.loops });
-    deck.onMarks = () => { const m = deck.marks(); t.cues = m.cues; t.loops = m.loops; library.update(t).catch(() => {}); };
-    // Its cover on the record's label, when the picture is read (the booth shows it only while this very record is on the deck).
-    booth.setLabelArt(d, null, null);
-    sleeves.request(t, (s) => { if (s instanceof HTMLCanvasElement && userOnDeck[d] === t) booth.setLabelArt(d, info.id, s); });
-    booth.recordChanged(d);
-    const unsure = !grid || (!t.grid && !!t.analysis && t.analysis.confidence < 0.25);
-    // The grid is corrected in the CRATE sheet's MY MUSIC (free play); LIVE has no such sheet yet, so it does not point there.
-    note.textContent = unsure ? `${name}: the beat is not clear.${booth.mode === "live" ? "" : " Check the grid (CRATE, MY MUSIC)."}` : "";
-  } catch (e) {
-    note.textContent = `${name}: ${e instanceof Error ? e.message : "could not be opened"}`;
-  }
-  myMusicPanel?.refresh();
-}
-
-// For the screenshot tool's `eval` (tools/shot.ts): the library and its loader.
-Object.assign((window as unknown as { headliner: object }).headliner, { library, sleeves, loadUserTrack: (d: number, t: LibraryTrack) => loadUserTrack(d, t), userOnDeck, fixGrid, showCrateTab });
-
-function userLoaded(): ({ track: LibraryTrack; bpm: number; unsure: boolean } | null)[] {
-  return [0, 1].map((d) => {
-    const track = userOnDeck[d];
-    if (!track || !engine.decks[d].isLoaded) return null;
-    return { track, bpm: engine.decks[d].grid.bpm, unsure: !track.grid && (!track.analysis || track.analysis.confidence < 0.25) };
-  });
-}
-
-/** The buttons under the list: half or double the tempo, a hundredth of a BPM either way, the first beat to the CUE mark. */
-function fixGrid(d: number, what: GridFix): void {
-  const t = userOnDeck[d], deck = engine.decks[d];
-  if (!t || !deck.isLoaded) return;
-  let bpm = deck.grid.bpm, first = deck.grid.firstBeat;
-  if (what === "half") bpm /= 2;
-  else if (what === "double") bpm *= 2;
-  else if (what === "down") bpm -= 0.1;
-  else if (what === "up") bpm += 0.1;
-  else first = deck.cuePoint;
-  bpm = Math.max(30, Math.min(300, Math.round(bpm * 100) / 100));
-  deck.setGrid(bpm, first);
-  t.grid = { bpm, firstBeat: deck.grid.firstBeat };
-  library.update(t).catch(() => {});
-  myMusicPanel?.refresh();
-}
-
-function showCrateTab(tab: "records" | "mine"): void {
-  $("crate-list").hidden = tab !== "records";
-  $("mymusic").hidden = tab !== "mine";
-  $("tab-records").classList.toggle("on", tab === "records");
-  $("tab-mine").classList.toggle("on", tab === "mine");
-  if (tab !== "mine") return;
-  myMusicPanel ??= buildPanel($("mymusic"), library, {
-    load: (d, t) => { crate.hidden = true; if (booth.refuseLoad(d)) return; loadUserTrack(d, t).catch(failed); },
-    loaded: userLoaded,
-    fix: fixGrid,
-  }, sleeves);
-  library.init().then(() => myMusicPanel?.refresh()).catch(failed);
-}
-$("tab-records").addEventListener("click", () => showCrateTab("records"));
-$("tab-mine").addEventListener("click", () => showCrateTab("mine"));
+// MARK: - Records on the decks (the page knows where records live)
 
 booth.loadRecord = async (d, id) => {
   const track = trackFor(id);
@@ -334,8 +150,6 @@ function ensureStarted(): Promise<void> {
   return starting;
 }
 
-// Another tab of the page still holds the library's database open and blocks its upgrade: say so, and it goes on by itself once that tab is closed.
-IdbStore.onBlocked = () => { note.textContent = "Close the other Headliner tab: your library has to be updated first."; };
 const failed = (e: unknown) => { note.textContent = String(e).replace(/^Error: /, ""); console.error(e); };
 // A message too long for its place is cut short on the page; the whole of it shows when the pointer rests on it.
 new MutationObserver(() => { note.title = note.textContent ?? ""; }).observe(note, { childList: true, characterData: true, subtree: true });
@@ -347,7 +161,6 @@ async function autostart(): Promise<void> {
   title.hidden = true;
   if (lesson) await startLesson(lesson, Number(params.get("step") ?? 0));
   else if (night) await startNight(night, Number(params.get("length") ?? 0) || null);
-  else if (params.has("live") || boothApp) await openLive();
   else {
     await openFreePlay();
     if (params.has("demo")) booth.demo();
@@ -361,16 +174,13 @@ const newestFirst = (list: TrackInfo[]) =>
   list.map((t, i) => ({ t, i })).sort((x, y) => (y.t.chapter ?? 1) - (x.t.chapter ?? 1) || x.i - y.i).map((x) => x.t);
 const upTo = (chapter: number) => newestFirst(tracks.filter((t) => (t.chapter ?? 1) <= chapter && t.id !== "white-label"));
 
-function showMode(mode: "free" | "live" | "lesson" | "night" | "story" | "menu"): void {
-  // LIVE is the DJ's booth; free play, lessons and nights are the game's (the iPhone's desk, with its room).
-  if (mode === "live") booth.setMode("live");
-  else if (mode === "free" || mode === "lesson" || mode === "night") booth.setMode("game");
+function showMode(mode: "free" | "lesson" | "night" | "story" | "menu"): void {
   setMenuMusic(mode === "menu");
   lessonOverlay.hidden = mode !== "lesson";
   nightOverlay.hidden = mode !== "night";
   result.hidden = true;
   grid.hide();
-  for (const s of [crate, phonesPanel, settingsSheet]) s.hidden = true;
+  for (const s of [crate, phonesPanel]) s.hidden = true;
   if (mode !== "menu") { title.hidden = true; chapterScreen.hidden = true; }
 }
 
@@ -410,24 +220,6 @@ function showTitle(): void {
   showMode("menu");
   chapterScreen.hidden = true;
   title.hidden = false;
-}
-
-/** The link for the website (?live, /headliner/live): straight into the DJ's booth, no game title. Browsers start sound only after a click or a key, so when the
- * sound is not allowed yet a one-line prompt sits on the booth (after a moment, so a browser that allows it never shows it) until the first click. */
-function openLiveLink(): void {
-  title.hidden = true;
-  showMode("live");
-  const gate = $("sound-gate");
-  const wait = window.setTimeout(() => { gate.hidden = false; }, 700);
-  const unlock = (): void => { engine.context?.resume().catch(() => {}); ensureStarted().catch(failed); };
-  window.addEventListener("pointerdown", unlock);
-  window.addEventListener("keydown", unlock);
-  ensureStarted().then(() => openLive()).catch(failed).finally(() => {
-    clearTimeout(wait);
-    gate.hidden = true;
-    window.removeEventListener("pointerdown", unlock);
-    window.removeEventListener("keydown", unlock);
-  });
 }
 
 function openChapter(n: number): void {
@@ -473,18 +265,6 @@ $("title-free").addEventListener("click", () => { ensureStarted().then(() => ope
 
 // MARK: - Free play and the crate
 
-/** LIVE: the DJ's booth. Its library is your own music only; the decks start empty (the game's records stay in the game). */
-async function openLive(): Promise<void> {
-  showMode("live");
-  sequence = null;
-  booth.clearSession();
-  midi.resetTakeover();
-  $("crate-button").hidden = true; // the wall under the gear row is LIVE's crate
-  $("jingle-button").hidden = true;
-  // For the page tests: the first two records of the game on the decks, so there is something to play.
-  if (params.has("records") && (!engine.decks[0].isLoaded || !engine.decks[1].isLoaded)) await Promise.all([loadRecord(0, tracks[0]), loadRecord(1, tracks[1])]);
-}
-
 async function openFreePlay(): Promise<void> {
   showMode("free");
   // Lessons rely on the first two records (122 and 124 BPM); free play starts with them too.
@@ -509,8 +289,6 @@ function freePlay(): void {
 
 /** The crate: onto the left or the right deck. */
 function fillCrate(list: TrackInfo[]): void {
-  gameRecords = list;
-  wall.refresh();
   crateList.replaceChildren();
   for (const t of list) {
     const row = document.createElement("div");
@@ -787,9 +565,8 @@ $("result-continue").addEventListener("click", () => {
   leave();
 });
 
-/** Back: leaves the lesson, night or story (and whatever was lined up after it). The Booth has nothing to go back to. */
+/** Back: leaves the lesson, night or story (and whatever was lined up after it). */
 function leave(): void {
-  if (boothApp) return;
   bag?.close();
   bag = null;
   credits?.stop();
@@ -807,77 +584,15 @@ function leave(): void {
 
 // MARK: - Buttons
 
-const sheets = [crate, phonesPanel, $("controls"), settingsSheet];
+const sheets = [crate, phonesPanel, $("controls")];
 const toggle = (sheet: HTMLElement) => { const open = sheet.hidden; for (const s of sheets) s.hidden = true; sheet.hidden = !open; };
 $("back").addEventListener("click", leave);
-$("crate-button").addEventListener("click", () => {
-  toggle(crate);
-  // The crate is the game's (22 Nov: free play is the iPhone game; your own music is LIVE's wall). MY MUSIC only with booth.freePlayExtras.
-  const mine = booth.freePlayExtras && !booth.lesson && !booth.night;
-  $("crate-tabs").hidden = !mine;
-  if (!mine) showCrateTab("records");
-});
+$("crate-button").addEventListener("click", () => toggle(crate));
 $("crate-close").addEventListener("click", () => { crate.hidden = true; });
 $("phones-close").addEventListener("click", () => { phonesPanel.hidden = true; });
 $("jingle-button").addEventListener("click", playJingle);
 $("controls-button").addEventListener("click", () => { fillControls(); toggle($("controls")); });
 
-// SETTINGS (LIVE): the tempo range, KEYS & MIDI and PHONES under one button.
-type SettingsTab = "tempo" | "keys" | "phones";
-let settingsTab: SettingsTab = "tempo";
-function showSettingsTab(tab: SettingsTab): void {
-  settingsTab = tab;
-  for (const b of $("settings-tabs").querySelectorAll<HTMLElement>("button")) b.classList.toggle("on", b.dataset.tab === tab);
-  const body = $("settings-body");
-  body.className = `${tab}-tab`;
-  if (tab === "tempo") fillTempo(body); else if (tab === "keys") fillControls(body); else fillPhones(body).catch(failed);
-}
-function openSettings(tab: SettingsTab = settingsTab): void {
-  for (const s of sheets) s.hidden = true;
-  settingsSheet.hidden = false;
-  showSettingsTab(tab);
-}
-$("settings-button").addEventListener("click", () => { if (settingsSheet.hidden) openSettings(); else settingsSheet.hidden = true; });
-$("settings-close").addEventListener("click", () => { settingsSheet.hidden = true; });
-for (const b of $("settings-tabs").querySelectorAll<HTMLElement>("button")) b.addEventListener("click", () => showSettingsTab(b.dataset.tab as SettingsTab));
-/** The page's KEYS & MIDI wherever it lives: in LIVE a tab of SETTINGS, in the game's booth its own sheet. */
-const refreshKeys = (): void => {
-  if (!$("controls").hidden) fillControls();
-  if (!settingsSheet.hidden && settingsTab === "keys") fillControls($("settings-body"));
-};
-
-/** TEMPO: how far the tempo fader goes either side, for very fast records. */
-function fillTempo(body: HTMLElement): void {
-  body.replaceChildren();
-  body.append(el("h3", "", "TEMPO FADER RANGE"),
-    el("p", "small", "How far each deck's tempo fader goes either side of the record's own tempo. 8 % is a classic turntable; a very fast record, or a big tempo jump, needs more. The wider it is, the more the tempo changes with every bit of the fader, so the fine touch gets coarser."));
-  const row = el("div", "tempo-options");
-  const range = booth.pitchRange;
-  for (const r of PITCH_RANGES) {
-    const b = el("button", `pill${Math.abs(r - range) < 1e-9 ? " on" : ""}`, `±${Math.round(r * 100)} %`);
-    b.addEventListener("click", () => { booth.setPitchRange(r); fillTempo(body); });
-    row.append(b);
-  }
-  body.append(row, el("p", "tempo-example", `A 128 BPM record goes from ${(128 * (1 - range)).toFixed(0)} to ${(128 * (1 + range)).toFixed(0)} BPM, a 170 BPM one from ${(170 * (1 - range)).toFixed(0)} to ${(170 * (1 + range)).toFixed(0)}.`),
-    el("p", "small", "The tempo each deck plays at stays where it is when you change this. Kept in this browser. The game's booth always uses 8 %."));
-}
-createShare($("share-button")); // LIVE's SHARE: copy the link, the share sheet, a few networks
-
-// FULLSCREEN: the whole page (the booth redraws to the new size by itself). Not offered where the
-// browser has none (iPhone Safari).
-const fullscreenButton = $("fullscreen-button"), fullscreenLabel = fullscreenButton.querySelector("span")!;
-if (document.fullscreenEnabled) {
-  fullscreenButton.hidden = false;
-  fullscreenButton.addEventListener("click", () => {
-    (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {});
-  });
-  document.addEventListener("fullscreenchange", () => { const on = !!document.fullscreenElement; fullscreenLabel.textContent = on ? "EXIT FULLSCREEN" : "FULLSCREEN"; fullscreenButton.title = on ? "Exit fullscreen" : "Fullscreen"; fullscreenButton.setAttribute("aria-label", fullscreenButton.title); });
-}
-// The clock in the stream bar: the time of day (hours and minutes, the browser's own format), for a DJ who watches the room's clock, not the stream's.
-const barClock = document.querySelector<HTMLElement>("#livebar .clock")!;
-const tickClock = (): void => { const t = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }); if (barClock.textContent !== t) barClock.textContent = t; };
-tickClock();
-setInterval(tickClock, 1000);
 $("controls-close").addEventListener("click", () => { $("controls").hidden = true; });
 $("phones-button").addEventListener("click", () => { fillPhones().then(() => toggle(phonesPanel)).catch(failed); });
 
@@ -894,7 +609,6 @@ engine.onOutputsChanged = (why) => {
   note.textContent = why;
   setTimeout(() => { if (note.textContent === why) note.textContent = ""; }, 6000);
   if (!phonesPanel.hidden) fillPhones().catch(() => {});
-  if (!settingsSheet.hidden && settingsTab === "phones") fillPhones($("settings-body")).catch(() => {});
 };
 
 /** The modes this browser and this hardware can do, and the sound devices to choose from. */
@@ -970,51 +684,40 @@ async function fillPhones(body: HTMLElement = $("phones-body")): Promise<void> {
 
 // MARK: - KEYS & MIDI
 
+/** Draws the KEYS & MIDI sheet again when it is open. */
+const refreshKeys = (): void => { if (!$("controls").hidden) fillControls(); };
+
 /** "play:0:" and the like back into a control of the booth. */
 function kindFromKey(key: string): Kind | null {
   const [t, ds, bs] = key.split(":");
   const d = Number(ds), band = Number(bs);
   switch (t) {
-    case "play": case "cue": case "sync": case "phones": case "pitch": case "channel": case "filter": case "trim": case "jog":
+    case "play": case "cue": case "sync": case "phones": case "pitch": case "channel": case "filter": case "jog":
       return { t, d } as Kind;
-    case "master": return { t: "master" };
-    case "pad": case "loop": case "zoom": return { t, d, band } as Kind;
     case "eq": return { t: "eq", d, band };
     case "cross": return { t: "cross" };
     case "cueMix": return { t: "cueMix" };
     case "phonesLevel": return { t: "phonesLevel" };
-    case "fxOn": return { t: "fxOn" };
-    case "fxAmount": return { t: "fxAmount" };
-    case "fxType": case "fxDiv": case "fxParam": case "fxSend": return { t, d } as Kind;
     default: return null;
   }
 }
 
 function targetKind(key: string): TargetKind | null {
   const t = key.split(":")[0];
-  if (["play", "sync", "phones", "fxOn", "fxType", "fxDiv", "fxSend", "pad", "loop", "zoom"].includes(t)) return "button";
+  if (["play", "sync", "phones"].includes(t)) return "button";
   if (t === "jog") return "relative";
   if (t === "nudge" || t === "cue") return "hold"; // held down: a nudge pushes, CUE plays from its mark
-  if (["pitch", "channel", "cross", "eq", "filter", "trim", "master", "cueMix", "phonesLevel", "fxAmount", "fxParam"].includes(t)) return "absolute";
+  if (["pitch", "channel", "cross", "eq", "filter", "cueMix", "phonesLevel"].includes(t)) return "absolute";
   return null;
 }
 
 /** "LEFT PITCH", "RIGHT LOW", "CROSSFADER" for a control. */
 function labelOf(key: string): string {
   const [t, ds, bs] = key.split(":");
-  if (t === "fxOn") return "EFFECT ON";
-  if (t === "fxAmount") return "EFFECT LEVEL";
-  if (t === "fxParam") return `EFFECT KNOB ${Number(ds) + 1}`;
-  if (t === "fxSend") return `${ds === "0" ? "LEFT " : "RIGHT "}CHANNEL EFFECT ON`;
-  if (t === "fxType") return `EFFECT ${FX_TYPES[Number(ds)] ?? "(NEXT)"}`;
-  if (t === "fxDiv") return `NOTE ${FX_DIVISIONS[Number(ds)]?.label ?? "(NEXT)"}`;
   const side = ds === "0" ? "LEFT " : ds === "1" ? "RIGHT " : "";
   const names: Record<string, string> = { play: "PLAY", cue: "CUE", sync: "SYNC", phones: "PHONES", pitch: "PITCH", channel: "FADER",
-    filter: "FILTER", trim: "GAIN", master: "MASTER VOLUME", jog: "JOG (THE RECORD)", cross: "CROSSFADER", cueMix: "CUE MIX", phonesLevel: "HEADPHONES LEVEL" };
+    filter: "FILTER", jog: "JOG (THE RECORD)", cross: "CROSSFADER", cueMix: "CUE MIX", phonesLevel: "HEADPHONES LEVEL" };
   if (t === "eq") return `${side}${["LOW", "MID", "HI"][Number(bs)] ?? "EQ"}`;
-  if (t === "pad") return `${side}PAD ${Number(bs) + 1}`;
-  if (t === "loop") return `${side}LOOP: ${({ cues: "PADS = CUES", loops: "PADS = LOOPS", in: "IN", out: "OUT", half: "HALF", double: "DOUBLE", toggle: "ON/OFF", auto4: "4 BEATS", auto8: "8 BEATS", auto16: "16 BEATS", auto32: "32 BEATS" } as Record<string, string>)[LOOP_ACTIONS[Number(bs)]] ?? ""}`;
-  if (t === "zoom") return `${side}WAVEFORM ZOOM ${bs === "-1" ? "OUT" : "IN"}`;
   if (t === "nudge") return `${side}NUDGE ${bs === "-1" ? "BACK" : "FORWARD"} (BUTTON)`;
   return `${side}${names[t] ?? t.toUpperCase()}`;
 }
@@ -1124,7 +827,7 @@ function fillControls(body: HTMLElement = $("controls-body")): void {
     const devices = midi.devices();
     m.append(el("p", "small", devices.length ? `Connected: ${devices.join(", ")}` : "No controller connected. Plug one in (it shows up here)."));
     const learn = el("button", "pill", "LEARN");
-    learn.addEventListener("click", () => { $("controls").hidden = true; settingsSheet.hidden = true; setLearn(true); });
+    learn.addEventListener("click", () => { $("controls").hidden = true; setLearn(true); });
     m.append(learn);
   }
   if (MidiInput.supported) {
@@ -1177,275 +880,11 @@ function fillControls(body: HTMLElement = $("controls-body")): void {
 
 Object.assign((window as unknown as { headliner: object }).headliner, { midi, learn: setLearn, menu: () => menuMusic });
 
-// MARK: - The STREAM panel: SOUND CHECK (a private test stream, nobody hears it: stream/soundcheck.ts) and GO LIVE (the booked slot, on the radio: stream/golive.ts)
-
-/** Seams for the page tests (a stand-in server, another proxy address); never set by the page itself. */
-const streamTest: { fetchFn?: (url: string, init?: RequestInit) => Promise<Response>; whipBase?: string } = {};
-const checkButton = $("sound-check"), goButton = $("go-live"), streamNote = $("stream-note"), streamChip = document.querySelector<HTMLElement>("#stream .s-state")!;
-const streamSlot = $("stream-slot"), streamOnAir = $("stream-onair"), barOnAir = $("bar-onair"), barTime = $("bar-time");
-// The PREVIEW row's label: it says "IN SHOW" while the picture is part of what is being sent (see renderStream).
-const cameraLabel = document.querySelector<HTMLElement>("#camera-bar .cam-label")!;
-const readStreamSession = () => { try { return readSession(localStorage); } catch { return null; } };
-const streamFetch = (url: string, init?: RequestInit): Promise<Response> => (streamTest.fetchFn ?? fetch)(url, init);
-// What each part last said; the panel is drawn from both (the views are kept here, so a part that reports while the other is still being made cannot reach an unmade one).
-let checkView: CheckView | null = null, liveView: LiveView | null = null, camView: CameraView | null = null;
-const CALM = new Set(["signed-out", "loading", "none", "later", "on", "sending", "onair", "ended"]);
-const clockText = (ms: number): string => { const s = Math.max(0, Math.floor(ms / 1000)); return [Math.floor(s / 3600), Math.floor(s / 60) % 60, s % 60].map((n) => String(n).padStart(2, "0")).join(":"); };
-
-function renderStream(): void {
-  const lv = liveView, cv = checkView;
-  if (!lv || !cv) return;
-  // The show wins the chip and the note while it runs or waits for its second click; otherwise the sound check's words win while it has any (it is running, failed, or needs a sign-in), else the slot's.
-  const liveWins = lv.stops || lv.state === "confirming";
-  const checkSays = !liveWins && cv.note !== "";
-  // A camera message ("blocked: allow it in the address bar") is the answer to what he just clicked, so it comes first; the camera clears it.
-  const camNote = camView?.note ?? "";
-  const camSays = camNote !== "";
-  const text = camSays ? camNote : liveWins ? lv.note : checkSays ? cv.note : lv.note;
-  const chip = lv.stops ? lv.chip : cv.chip;
-  streamChip.textContent = chip;
-  streamChip.classList.toggle("checking", lv.stops ? lv.state !== "onair" : cv.state === "sending" || cv.state === "connecting" || cv.state === "asking");
-  streamChip.classList.toggle("onair", lv.state === "onair");
-  // Is the picture part of what is going out right now? (?publishCamera only; the row says so, the toggle keeps working.)
-  const sending = cv.stops || lv.stops; // a check or a show has a connection (up, being made, or reconnecting)
-  const inShow = sendCamera && sending && !!camView?.on;
-  cameraLabel.textContent = inShow ? "PREVIEW \u00b7 IN SHOW" : "PREVIEW";
-  // While the picture is going out its controls are locked: OFF or another camera would end the show's video (a track is added once, at
-  // connect time), and IN SHOW cannot change a connection that is already up. Stop the check or the show first.
-  // (looked up here: renderStream runs before the camera block below has made its constants)
-  const camButton = $("camera-toggle") as HTMLButtonElement, camPick = $("camera-pick") as HTMLSelectElement, camSend = $("camera-send") as HTMLButtonElement;
-  camButton.disabled = inShow;
-  camPick.disabled = inShow;
-  camSend.disabled = sending;
-  camButton.title = inShow ? "The picture is on air: end the show (or the check) first" : "";
-  streamNote.textContent = text;
-  streamNote.hidden = !text;
-  streamNote.classList.toggle("good", camSays ? false : checkSays ? cv.state === "sending" || cv.state === "signed-out" : CALM.has(lv.state));
-  streamNote.title = text;
-  checkButton.textContent = cv.button;
-  checkButton.classList.toggle("stops", cv.stops);
-  (checkButton as HTMLButtonElement).disabled = lv.stops; // the master is going out as a show: a test would only get in the way
-  goButton.textContent = lv.button;
-  goButton.classList.toggle("stops", lv.stops);
-  goButton.classList.toggle("confirm", lv.state === "confirming");
-  (goButton as HTMLButtonElement).disabled = !lv.enabled;
-  streamSlot.textContent = lv.slot;
-  streamSlot.title = lv.slot;
-  // The top bar says the same as the panel (it used to be a fixed OFF AIR and 00:00:00).
-  barOnAir.classList.toggle("live", lv.state === "onair");
-  barOnAir.classList.toggle("warm", lv.stops && lv.state !== "onair");
-  barOnAir.querySelector("span")!.textContent = lv.stops ? lv.chip : "OFF AIR";
-  renderOnAirTimer();
-}
-function renderOnAirTimer(): void {
-  const t = liveView?.onAirSince != null ? clockText(Date.now() - liveView.onAirSince) : "00:00:00";
-  if (streamOnAir.textContent !== t) streamOnAir.textContent = t;
-  if (barTime.textContent !== t) barTime.textContent = t;
-}
-
-/** The address the server gives is the real one (https, stream.grooveline.org); a page test points it at its own MediaMTX. */
-const goEndpoint = (url: string): string => (streamTest.whipBase !== undefined && url.startsWith(WHIP_BASE) ? streamTest.whipBase + url.slice(WHIP_BASE.length) : url);
-// Does the camera's picture go out with the show? A setting in this browser, off at first: the IN SHOW button in the PREVIEW row turns it on
-// (the picture then rides in the SAME WHIP connection as the mixer, H264 preferred, so the server repackages instead of re-encoding).
-// `?publishCamera` turns it on once and remembers it, for the link Zé bookmarked before the button existed.
-const PUBLISH_KEY = "headliner.publishVideo";
-const readPublish = (): boolean => { try { return localStorage.getItem(PUBLISH_KEY) === "1"; } catch { return false; } };
-let sendCamera = readPublish() || params.has("publishCamera");
-let cameraForShow: () => MediaStreamTrack | null = () => null;
-const videoCodecs = (): RTCRtpCodec[] => RTCRtpSender.getCapabilities?.("video")?.codecs ?? [];
-const goLive = new GoLive({
-  session: readStreamSession,
-  fetchFn: streamFetch,
-  stream: () => engine.broadcastStream(),
-  makePublisher: (endpoint, stream, onState) => new WhipPublisher({ endpoint: goEndpoint(endpoint), stream, onState, video: cameraForShow(), videoCodecs }),
-  beforeGo: async () => { if (soundCheck.view.stops) await soundCheck.stop(); },
-  onChange: (v) => { liveView = v; renderStream(); },
-});
-const soundCheck = new SoundCheck({
-  session: readStreamSession,
-  fetchFn: streamFetch,
-  stream: () => engine.broadcastStream(),
-  makePublisher: (endpoint, stream, onState) => new WhipPublisher({ endpoint, stream, onState, video: cameraForShow(), videoCodecs }),
-  whipBase: () => streamTest.whipBase,
-  openSignIn: () => { window.open(SIGN_IN_URL, "_blank", "noopener"); },
-  onChange: (v) => { checkView = v; renderStream(); },
-});
-liveView = goLive.view; checkView = soundCheck.view; renderStream();
-
-// The camera preview in the PREVIEW row: a picture of this browser, shown here and NOWHERE else (stream/camera.ts). Nothing is
-// published (the stream keeps sending the mixer's audio only), and the microphone is never opened. The tracks stop when he
-// switches it off, picks another camera, leaves LIVE (the panel's 1 s rule) or closes the page.
-const cameraBox = $("camera"), cameraVideo = $("camera-video") as HTMLVideoElement, streamPanel = $("stream");
-const cameraButton = $("camera-toggle") as HTMLButtonElement, cameraPick = $("camera-pick") as HTMLSelectElement;
-const cameraStore = (() => { try { return window.localStorage; } catch { return null; } })();
-const mediaDevices = typeof navigator !== "undefined" ? navigator.mediaDevices ?? null : null;
-let cameraList = "";
-const camera = new CameraPreview({
-  media: mediaDevices, video: cameraVideo, store: cameraStore,
-  onChange: (v) => { camView = v; renderCamera(); renderStream(); },
-});
-function renderCamera(): void {
-  const v = camView;
-  if (!v) return;
-  cameraBox.hidden = !v.on;
-  streamPanel.classList.toggle("camera-on", v.on);
-  cameraButton.textContent = v.button;
-  // The cameras are in a select only where there is a choice; before the first allow their names are empty, so there is one.
-  const list = v.devices.map((d) => `${d.deviceId}\u0000${d.name}`).join("\u0001");
-  if (list !== cameraList) {
-    cameraList = list;
-    cameraPick.replaceChildren(...v.devices.map((d) => { const o = document.createElement("option"); o.value = d.deviceId; o.textContent = d.name; return o; }));
-  }
-  cameraPick.hidden = v.devices.length < 2;
-  if (v.deviceId) cameraPick.value = v.deviceId;
-}
-cameraForShow = () => (sendCamera ? camera.track : null);
-// With ?publishCamera the camera must be ON before the connection is made: a track is added once, at connect time, and a show that
-// started without it would go out as audio only (measured 21 Nov: "1 track (Opus)" in MediaMTX while Zé streamed a video slot).
-// Refuses the start when the camera cannot come on: a "video" show that silently goes out as audio is worse than no show.
-const ensureCameraForShow = async (): Promise<boolean> => {
-  if (!sendCamera) return true;
-  if (camera.view.on) return true;
-  await camera.start();
-  return camera.view.on; // when it did not start, the panel's note already says why (cameraWords)
-};
-// IN SHOW: does the picture go out with the show? Off by default, remembered in this browser; a show started without it is audio only.
-const cameraSend = $("camera-send") as HTMLButtonElement;
-function renderSend(): void {
-  cameraSend.classList.toggle("on", sendCamera);
-  cameraSend.setAttribute("aria-pressed", String(sendCamera));
-  cameraSend.title = sendCamera
-    ? "The camera's picture goes out with your show (H264, the server does not re-encode). Click to keep it off the air."
-    : "Send the camera's picture with your show (H264, the server does not re-encode). Off: the show is audio only.";
-}
-cameraSend.addEventListener("click", () => {
-  sendCamera = !sendCamera;
-  try { if (sendCamera) localStorage.setItem(PUBLISH_KEY, "1"); else localStorage.removeItem(PUBLISH_KEY); } catch { /* private window */ }
-  renderSend();
-  renderStream();
-});
-renderSend();
-cameraButton.addEventListener("click", () => { void camera.toggle().catch(() => {}); });
-cameraPick.addEventListener("change", () => { void camera.choose(cameraPick.value || null).catch(() => {}); });
-// Another camera plugged in (or taken out) is offered at once.
-mediaDevices?.addEventListener?.("devicechange", () => { void camera.refreshDevices().catch(() => {}); });
-void camera.refreshDevices().catch(() => {});
-const streamFailed = (e: unknown): void => { note.textContent = e instanceof Error ? e.message : String(e); };
-const startWithCamera = async (start: () => Promise<void>): Promise<void> => {
-  if (!(await ensureCameraForShow())) return; // nothing was sent; the note says why
-  await start();
-};
-// Only a click that STARTS something waits for the camera. STOP CHECK / END SHOW / CANCEL must always work at once, whatever the camera
-// does (22 Nov review: with IN SHOW on and the camera off or failing, the stop click asked for the camera first and could not end the show).
-const checkStarts = (): boolean => !soundCheck.view.stops && soundCheck.state !== "signed-out";
-const goStarts = (): boolean => goLive.state === "on";
-checkButton.addEventListener("click", () => { void (checkStarts() ? startWithCamera(() => soundCheck.toggle()) : soundCheck.toggle()).catch(streamFailed); });
-goButton.addEventListener("click", () => { void (goStarts() ? startWithCamera(() => goLive.toggle()) : goLive.toggle()).catch(streamFailed); });
-// Signed in on another tab (the site's /broadcast), or coming back to this one: look again. Closing the page ends a test or a show at the server.
-const streamRefresh = (): void => { soundCheck.refresh(); void goLive.refresh(); };
-window.addEventListener("storage", (e) => { if (e.key === "gl_token") streamRefresh(); });
-document.addEventListener("visibilitychange", () => { if (!document.hidden) streamRefresh(); });
-window.addEventListener("pagehide", () => { void soundCheck.stop(); void goLive.stop(); void camera.stop(); });
-// While the panel is on screen: the slot's countdown and the timer every second, the slot read again every half minute, and the radio asked every 5 s whether it lists this booking.
-let streamShown = false, streamAwaySince = 0;
-// What the booth is playing goes to the Worker while the show is sending, so the site's player can show it (stream/nowplaying.ts).
-const nowPlaying = new NowPlaying({
-  session: readStreamSession, fetchFn: streamFetch, bookingId: () => goLive.sendingBookingId,
-  decks: () => [0, 1].map((d) => { const t = userOnDeck[d]; return { playing: deckPlaying(d), level: engine.decks[d].volume, artist: t?.artist ?? "", title: t ? (t.title || t.name.replace(/\.[^.]+$/, "")) : "" }; }),
-});
-setInterval(() => { if (streamShown) { goLive.tick(); renderOnAirTimer(); void nowPlaying.tick(); } }, 1000);
-setInterval(() => { if (streamShown) void goLive.refresh(); }, 30_000);
-setInterval(() => { if (streamShown) void goLive.pollLive(); }, 5_000);
-/** Called every frame with "the booth is in LIVE and on screen". Leaving it (another mode, a title, a card over the booth) ends a test or a show, but not for a blink: it must be gone for a second. */
-function streamVisibility(live: boolean, nowMs: number): void {
-  if (live) {
-    streamAwaySince = 0;
-    if (!streamShown) { streamShown = true; streamRefresh(); }
-    return;
-  }
-  if (!streamShown) return;
-  if (!streamAwaySince) streamAwaySince = nowMs;
-  if (nowMs - streamAwaySince < 1000) return;
-  streamShown = false; streamAwaySince = 0;
-  if (soundCheck.view.stops) void soundCheck.stop();
-  if (goLive.busy || goLive.state === "confirming") void goLive.stop();
-  // The camera goes out with them: a picture left running keeps the device (and its light) away from every other program.
-  if (camView?.on || camView?.asking) void camera.stop();
-}
-// The master meter in the stream panel (audio/meter.ts): what the radio gets, read every frame while LIVE is on screen.
-const meter = new Meter();
-const meterEl = $("meter"), meterCovers = [...meterEl.querySelectorAll<HTMLElement>(".m-cover")], meterHolds = [...meterEl.querySelectorAll<HTMLElement>(".m-hold")], meterDb = meterEl.querySelector<HTMLElement>(".m-db")!;
-let meterAt = 0, meterText = "";
-function renderMeter(live: boolean, nowMs: number): void {
-  const peaks = live ? engine.streamPeaks() : null;
-  if (!peaks) { if (meterAt) { meter.reset(); meterAt = 0; paintMeter(); } return; }
-  meter.update(peaks[0], peaks[1], meterAt ? nowMs - meterAt : 16);
-  meterAt = nowMs;
-  paintMeter();
-}
-function paintMeter(): void {
-  const v = meter.view;
-  for (let i = 0; i < 2; i++) {
-    meterCovers[i].style.transform = `scaleY(${(1 - v.fill[i]).toFixed(3)})`;
-    meterHolds[i].style.bottom = `calc(${(v.hold[i] * 100).toFixed(1)}% - 1px)`;
-    meterHolds[i].style.opacity = v.hold[i] > 0.01 ? "1" : "0";
-  }
-  const text = v.holdDb === null ? "\u2014" : (v.holdDb <= -59.9 ? "-\u221e" : v.holdDb.toFixed(1));
-  if (text !== meterText) { meterText = text; meterDb.textContent = text; }
-  meterEl.classList.toggle("clipping", v.clipping);
-}
-Object.assign((window as unknown as { headliner: object }).headliner, { soundCheck, goLive, streamTest, meter, camera });
-
 // Keys and controllers work only while the booth is on screen (not a menu, a scene, the bag, the
 // credits or a result card).
 const boothActive = () => title.hidden && chapterScreen.hidden && $("story").hidden && $("bag").hidden && $("credits").hidden && result.hidden;
 midi.active = boothActive;
+attachKeys(booth, boothActive, () => { fillControls(); toggle($("controls")); });
 
-// LIVE's own parts (the wall under the gear row, the stream panel, the top bar's title) show while the booth is in LIVE and on screen.
-// A record counts as played once it has run for half a minute on a deck (the wall's "most played").
-const playedFor = [0, 0], counted = [false, false];
-const PLAY_COUNT_SECONDS = Number(params.get("playcount")) || 30; // ?playcount=2 for the tests
-let lastTick = performance.now();
-// The wall is up in free play when the booth is on screen; then nobody sees the crowd, so its clips rest.
-let wallMode = booth.mode;
-(function frontLoop() {
-  if (booth.mode !== wallMode) { wallMode = booth.mode; wall.refresh(); } // the game's records are in free play's crates, not in LIVE's
-  const free = booth.freePlayExtras && booth.mode === "game" && !booth.lesson && !booth.night && boothActive();
-  wall.setVisible((free && front === "wall") || (booth.mode === "live" && boothActive()));
-  booth.setRoomHidden(free && front === "wall");
-  $("wall-open").hidden = !(free && front === "room");
-  requestAnimationFrame(frontLoop);
-})();
-$("wall-open").addEventListener("click", () => setFront("wall"));
-// The wall's own controls keep clear of the top bar, whatever its width is (its buttons come and go, the font follows the window).
-if (typeof ResizeObserver !== "undefined") {
-  new ResizeObserver(() => document.documentElement.style.setProperty("--top-w", `${$("top").getBoundingClientRect().width}px`)).observe($("top"));
-}
-(function liveLoop() {
-  const now = performance.now(), dt = Math.min(1, (now - lastTick) / 1000);
-  lastTick = now;
-  for (const d of [0, 1]) {
-    const t = userOnDeck[d], deck = engine.decks[d];
-    if (!t || counted[d] || booth.mode !== "live") continue;
-    if (deck.motorOn && deck.rate > 0.3) playedFor[d] += dt;
-    if (playedFor[d] >= PLAY_COUNT_SECONDS) { counted[d] = true; t.plays = (t.plays ?? 0) + 1; library.update(t).catch(() => {}); wall.refresh(); }
-  }
-  const live = booth.mode === "live" && boothActive();
-  $("stream").hidden = !live;
-  streamVisibility(live, now);
-  renderMeter(live, now);
-  $("livebar").hidden = !live;
-  requestAnimationFrame(liveLoop);
-})();
-attachKeys(booth, boothActive, () => {
-  if (booth.mode === "live") { if (!settingsSheet.hidden && settingsTab === "keys") settingsSheet.hidden = true; else openSettings("keys"); return; }
-  fillControls(); toggle($("controls"));
-});
-
-if (boothApp) {
-  document.title = "Grooveline Booth";
-  $("back").hidden = true; // the Booth has no game behind it
-}
 if (params.has("autostart")) autostart().catch(failed); // screenshots (the browser allows sound without a click)
-else if (params.has("live") || boothApp) openLiveLink();
 else showTitle();

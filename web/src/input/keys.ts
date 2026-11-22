@@ -52,11 +52,6 @@ export const KEYS: { code: string; label: string; does: string; action: Action }
   { code: "KeyM", label: "M", does: "Right fader up", action: B.faderUp },
   { code: "KeyO", label: "O", does: "Right LOW down", action: B.lowDown },
   { code: "KeyP", label: "P", does: "Right LOW up", action: B.lowUp },
-  { code: "KeyG", label: "G", does: "Effect on / off", action: { press: { t: "fxOn" } } },
-  { code: "KeyT", label: "T", does: "Next effect", action: { press: { t: "fxType", d: -1 } } },
-  { code: "KeyY", label: "Y", does: "Next note value of the effect (1/4, 1/8, 1/16, 1/32)", action: { press: { t: "fxDiv", d: -1 } } },
-  { code: "KeyV", label: "V", does: "Effect amount down", action: { step: { t: "fxAmount" }, by: -0.05, fine: -0.01 } },
-  { code: "KeyB", label: "B", does: "Effect amount up", action: { step: { t: "fxAmount" }, by: 0.05, fine: 0.01 } },
   { code: "ArrowLeft", label: "←", does: "Crossfader left", action: { step: { t: "cross" }, by: -0.03, fine: -0.01 } },
   { code: "ArrowRight", label: "→", does: "Crossfader right", action: { step: { t: "cross" }, by: 0.03, fine: 0.01 } },
 ];
