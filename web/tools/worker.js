@@ -24,26 +24,38 @@ export default {
       url.pathname = "/headliner/";
       return Response.redirect(url.toString(), 308);
     }
-    if (url.pathname === "/headliner/live" || url.pathname === "/headliner/live/") {
-      // The link for the website: grooveline.org/headliner/live opens the page straight in the DJ's LIVE booth (no game title).
-      url.pathname = "/headliner/";
-      url.search = "?live";
+    // Grooveline Booth (22 Nov 2026): the DJ software at its own address, grooveline.org/booth/. For now it is the same build as the
+    // Headliner (the files are served from /headliner/), and the page opens straight in the booth when its address starts with /booth.
+    if (url.pathname === "/booth") {
+      url.pathname = "/booth/";
+      return Response.redirect(url.toString(), 308);
+    }
+    // The old LIVE links go to the Booth: /headliner/live and /headliner/?live (other parameters, e.g. ?publishCamera, are kept).
+    if (url.pathname === "/headliner/live" || url.pathname === "/headliner/live/" || (url.pathname === "/headliner/" && url.searchParams.has("live"))) {
+      url.pathname = "/booth/";
+      const kept = url.search.slice(1).split("&").filter((p) => p && p.split("=")[0] !== "live"); // the rest exactly as written (?publishCamera stays bare)
+      url.search = kept.length ? `?${kept.join("&")}` : "";
       return Response.redirect(url.toString(), 302);
     }
-    if (!url.pathname.startsWith("/headliner/")) return fetch(request); // a neighbouring path stays with the site
+    const booth = url.pathname.startsWith("/booth/");
+    if (!booth && !url.pathname.startsWith("/headliner/")) return fetch(request); // a neighbouring path stays with the site
     if (request.method !== "GET" && request.method !== "HEAD") {
       return new Response("Method not allowed", { status: 405, headers: { Allow: "GET, HEAD" } });
     }
     // Static assets always answer a Range request with the whole file (Cloudflare's docs); the
     // media players need byte ranges (Safari probes bytes=0-1 and plays video only with them).
-    const plain = new Request(request.url, { method: request.method, headers: withoutRange(request.headers) });
+    // The Booth's files are the Headliner's: /booth/<file> is read from /headliner/<file>.
+    const assetPath = booth ? `/headliner/${url.pathname.slice("/booth/".length)}` : url.pathname;
+    const assetUrl = new URL(url);
+    assetUrl.pathname = assetPath;
+    const plain = new Request(assetUrl.toString(), { method: request.method, headers: withoutRange(request.headers) });
     const response = await env.ASSETS.fetch(plain);
     const headers = new Headers(response.headers);
     for (const [k, v] of Object.entries(HEADERS)) headers.set(k, v);
-    if (response.status === 200 && /\.(m4a|mp4|mp3)$/.test(url.pathname)) {
+    if (response.status === 200 && /\.(m4a|mp4|mp3)$/.test(assetPath)) {
       headers.set("Accept-Ranges", "bytes");
       const range = request.headers.get("Range");
-      if (range) return ranged(range, response, headers, request.method, SIZES[url.pathname]);
+      if (range) return ranged(range, response, headers, request.method, SIZES[assetPath]);
     }
     return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
   },

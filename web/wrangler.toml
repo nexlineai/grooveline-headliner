@@ -1,7 +1,8 @@
 # grooveline.org/headliner/ (Zé, 19 Nov 2026: published, linked from the site later).
 # Build: node tools/build.ts (web/dist, media hard-linked from ../App). Deploy: Zé runs
 # `npm run deploy` in web/ (production deploys are his). The radio site's Pages project, DNS and
-# API are untouched: this Worker only answers grooveline.org/headliner*.
+# API are untouched: this Worker only answers grooveline.org/headliner* and, since 22 Nov, grooveline.org/booth*
+# (Grooveline Booth, the DJ software: the same build opened straight in the booth, see tools/worker.js).
 name = "grooveline-headliner"
 main = "tools/worker.js"
 compatibility_date = "2026-08-27"
@@ -20,4 +21,9 @@ run_worker_first = true
 
 [[routes]]
 pattern = "grooveline.org/headliner*"
+zone_name = "grooveline.org"
+
+# Grooveline Booth (22 Nov 2026): the DJ software's own address, served by this Worker from the same build (see tools/worker.js).
+[[routes]]
+pattern = "grooveline.org/booth*"
 zone_name = "grooveline.org"

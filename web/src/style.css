@@ -228,6 +228,7 @@ button.quiet[hidden] { display: none; }
 #studio .cell.gap { margin-left: 5px; }
 #studio .cell.now { border: 2px solid #fff; }
 
+#back[hidden] { display: none; } /* the Booth (grooveline.org/booth) has no back arrow */
 #back { position: fixed; z-index: 6; top: 2vh; left: 2vw; width: 36px; height: 36px; border-radius: 50%; border: 0; cursor: pointer;
   background: rgba(0, 0, 0, 0.45); color: rgba(255, 255, 255, 0.85); font: 700 24px/1 system-ui, sans-serif; padding-bottom: 3px; }
 

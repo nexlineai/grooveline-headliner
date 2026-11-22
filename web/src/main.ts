@@ -63,6 +63,9 @@ const booth = new Booth($<HTMLCanvasElement>("booth"), $("room"), engine);
 const title = $("start"), chapterScreen = $("chapter"), crate = $("crate"), crateList = $("crate-list"), phonesPanel = $("phones"), settingsSheet = $("settings"), note = $("note");
 const lessonOverlay = $("lesson"), nightOverlay = $("night"), result = $("result");
 const params = new URLSearchParams(location.search);
+/** Grooveline Booth (22 Nov 2026): the DJ software at grooveline.org/booth/ (the same build, served by the Worker from /headliner/). It opens
+ * straight in the LIVE booth, with its own name, and never shows the game: no title, no back arrow. `?booth` does the same on the dev server. */
+const boothApp = location.pathname.startsWith("/booth") || params.has("booth");
 
 let content: Content | null = null;
 let tracks: TrackInfo[] = [];
@@ -344,7 +347,7 @@ async function autostart(): Promise<void> {
   title.hidden = true;
   if (lesson) await startLesson(lesson, Number(params.get("step") ?? 0));
   else if (night) await startNight(night, Number(params.get("length") ?? 0) || null);
-  else if (params.has("live")) await openLive();
+  else if (params.has("live") || boothApp) await openLive();
   else {
     await openFreePlay();
     if (params.has("demo")) booth.demo();
@@ -448,7 +451,6 @@ $("title-play").addEventListener("click", () => {
   ensureStarted().then(() => openChapter(Progress.current(progress, content!.career.chapters))).catch(failed);
 });
 $("title-free").addEventListener("click", () => { ensureStarted().then(() => openFreePlay()).catch(failed); });
-$("title-live").addEventListener("click", () => { ensureStarted().then(() => openLive()).catch(failed); });
 
 // Zé's hidden unlock, as on the iPhone: hold the Grooveline logo three seconds.
 {
@@ -785,8 +787,9 @@ $("result-continue").addEventListener("click", () => {
   leave();
 });
 
-/** Back: leaves the lesson, night or story (and whatever was lined up after it). */
+/** Back: leaves the lesson, night or story (and whatever was lined up after it). The Booth has nothing to go back to. */
 function leave(): void {
+  if (boothApp) return;
   bag?.close();
   bag = null;
   credits?.stop();
@@ -1439,6 +1442,10 @@ attachKeys(booth, boothActive, () => {
   fillControls(); toggle($("controls"));
 });
 
+if (boothApp) {
+  document.title = "Grooveline Booth";
+  $("back").hidden = true; // the Booth has no game behind it
+}
 if (params.has("autostart")) autostart().catch(failed); // screenshots (the browser allows sound without a click)
-else if (params.has("live")) openLiveLink();
+else if (params.has("live") || boothApp) openLiveLink();
 else showTitle();
