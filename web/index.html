@@ -43,53 +43,16 @@
 
   <div id="top">
     <button id="jingle-button" class="pill" hidden>JINGLE</button>
-    <button id="settings-button" class="pill" title="Settings: tempo range, keys &amp; MIDI, phones" aria-label="Settings"><svg class="ico" viewBox="0 0 24 24" width="1.4em" height="1.4em" aria-hidden="true"><path d="M3 7h10M19 7h2M3 17h2M11 17h10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><circle cx="16" cy="7" r="2.6" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="8" cy="17" r="2.6" fill="none" stroke="currentColor" stroke-width="2.2"/></svg><span>SETTINGS</span></button>
     <button id="controls-button" class="pill">KEYS &amp; MIDI</button>
     <button id="phones-button" class="pill"><svg class="icon" viewBox="0 0 24 24" width="1.2em" height="1.2em" aria-hidden="true"><path d="M4 15v-3a8 8 0 0 1 16 0v3" fill="none" stroke="currentColor" stroke-width="2.4"/><rect x="2.5" y="13.5" width="5" height="8" rx="2" fill="currentColor"/><rect x="16.5" y="13.5" width="5" height="8" rx="2" fill="currentColor"/></svg>PHONES</button>
-    <button id="share-button" class="pill" aria-haspopup="dialog">SHARE</button>
     <button id="crate-button" class="pill">CRATE</button>
     <button id="fullscreen-button" class="pill" hidden title="Fullscreen" aria-label="Fullscreen"><svg class="ico" viewBox="0 0 24 24" width="1.4em" height="1.4em" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>FULLSCREEN</span></button>
   </div>
-  <button id="wall-open" class="pill" hidden>RECORDS</button>
-  <div id="wall" hidden></div>
-  <div id="livebar" hidden>
-    <span class="brand">GROOVELINE<b>BOOTH</b></span>
-    <span class="clock" title="The time of day">--:--</span>
-    <span class="onair" id="bar-onair"><i></i><span>OFF AIR</span></span>
-    <span class="time" id="bar-time" title="How long you have been on air">00:00:00</span>
-  </div>
-  <aside id="stream" hidden>
-    <div class="s-head"><span>STREAM</span><span class="s-state">OFF AIR</span></div>
-    <div class="s-body">
-      <div id="camera" hidden><video id="camera-video" muted playsinline></video></div>
-      <dl>
-        <dt>SLOT</dt><dd id="stream-slot">&mdash;</dd>
-        <dt>ON AIR</dt><dd id="stream-onair">00:00:00</dd>
-        <dt>LISTENERS</dt><dd>&mdash;</dd>
-        <dt>BITRATE</dt><dd>&mdash;</dd>
-      </dl>
-      <div id="meter" title="MASTER: the level the radio gets (the room, not the headphones). Aim for the top of the green; red is clipping." aria-label="Master level">
-        <div class="m-bars"><div class="m-bar"><i class="m-cover"></i><b class="m-hold"></b></div><div class="m-bar"><i class="m-cover"></i><b class="m-hold"></b></div></div>
-        <span class="m-db">&mdash;</span><span class="m-clip">CLIP</span>
-      </div>
-    </div>
-    <div id="camera-bar"><span class="cam-label">PREVIEW</span><span class="cam-tight">no room for the picture in this window</span><select id="camera-pick" hidden aria-label="Camera"></select><button id="camera-send" type="button" class="send" title="Send the camera picture with your show">IN SHOW</button><button id="camera-toggle" type="button" title="The camera stays in this page: nothing is sent anywhere">ON</button></div>
-    <p id="stream-note" class="s-note" hidden></p>
-    <div class="s-buttons">
-      <button id="sound-check" class="check" type="button" title="Send your master to a private test stream: nobody hears it">SOUND CHECK</button>
-      <button id="go-live" class="go" type="button" disabled title="Go on Grooveline Radio in your booked slot">GO LIVE</button>
-    </div>
-  </aside>
   <div id="note"></div>
 
   <div id="crate" class="sheet" hidden>
     <div class="head"><h2>CRATE</h2><button id="crate-close" class="pill">CLOSE</button></div>
-    <div id="crate-tabs" class="tabs" hidden>
-      <button id="tab-records" class="pill on">RECORDS</button>
-      <button id="tab-mine" class="pill">MY MUSIC</button>
-    </div>
     <div id="crate-list"></div>
-    <div id="mymusic" hidden></div>
   </div>
 
   <div id="phones" class="sheet small" hidden>
@@ -102,16 +65,6 @@
     <div id="controls-body"></div>
   </div>
 
-  <!-- SETTINGS (LIVE): tempo range, KEYS & MIDI and PHONES under one button of the bar; the game's booth keeps its own buttons for the last two. -->
-  <div id="settings" class="sheet" hidden>
-    <div class="head"><h2>SETTINGS</h2><button id="settings-close" class="pill">CLOSE</button></div>
-    <div id="settings-tabs" class="tabs">
-      <button class="pill on" data-tab="tempo">TEMPO</button>
-      <button class="pill" data-tab="keys">KEYS &amp; MIDI</button>
-      <button class="pill" data-tab="phones">PHONES</button>
-    </div>
-    <div id="settings-body"></div>
-  </div>
 
   <div id="learn" hidden><span id="learn-text"></span><span id="learn-choice"></span><button id="learn-done" class="pill">DONE</button></div>
 
@@ -128,10 +81,6 @@
     <div class="row"><button id="title-free" class="quiet">FREE PLAY</button></div>
     <p class="hint">Web preview</p>
   </div>
-
-  <div id="sound-gate" hidden><span>CLICK ANYWHERE TO START THE SOUND</span></div>
-
-  <div id="deck-tip" hidden></div>
 
   <script type="module" src="src/main.ts"></script>
 </body>

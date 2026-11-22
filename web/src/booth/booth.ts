@@ -11,11 +11,6 @@ import {
   rgba, roundRect, sheenPicture, tonearm, wavePicture,
 } from "./gear.ts";
 import type { Point, RGB, Rect } from "./gear.ts";
-import { liveGeometry, liveTouch } from "./live-geometry.ts";
-import type { BarRoom } from "./live-geometry.ts";
-import type { LiveGeometry } from "./live-geometry.ts";
-import { LiveRenderer } from "./live-draw.ts";
-import type { LiveView } from "./live-draw.ts";
 import type { LessonDesk, LessonTarget } from "../game/content.ts";
 import type { TrackInfo } from "../core/beatgrid.ts";
 import { clash, compatible } from "../core/harmony.ts";
@@ -23,20 +18,14 @@ import type { NightRunner } from "../game/night.ts";
 import type { NightInfo } from "../game/content.ts";
 import type { LessonRunner } from "../game/lesson.ts";
 import { PHRASE } from "../game/lesson.ts";
-import { FX_DEFAULTS, FX_DIVISIONS, FX_KNOBS, FX_TYPES, PHONES_UNITY, ROOM_UNITY, beatDelaySeconds, fxTempoKnob, stepIndex, stepValue, trimDecibels } from "../audio/fx.ts";
+import { PHONES_UNITY } from "../audio/fx.ts";
 
 export type Kind =
   | { t: "jog"; d: number }
   | { t: "platter"; d: number } | { t: "rim"; d: number } | { t: "pitch"; d: number } | { t: "channel"; d: number }
   | { t: "cross" } | { t: "eq"; d: number; band: number } | { t: "play"; d: number } | { t: "cue"; d: number }
   | { t: "sync"; d: number } | { t: "needle"; d: number } | { t: "wave"; d: number } | { t: "phones"; d: number }
-  | { t: "cueMix" } | { t: "phonesLevel" } | { t: "filter"; d: number }
-  // LIVE only: the channel's gain (TRIM) and the master volume.
-  | { t: "trim"; d: number } | { t: "master" }
-  // LIVE only: a pad under the deck (`band` = which one), a loop control (`band` = LOOP_ACTIONS), the zoom buttons (band +1 in, -1 out), and the zoomable waveform.
-  | { t: "pad"; d: number; band: number } | { t: "loop"; d: number; band: number } | { t: "zoom"; d: number; band: number } | { t: "zwave"; d: number }
-  // The effect unit (free play): `d` is the effect or the note value, -1 = the next one.
-  | { t: "fxOn" } | { t: "fxAmount" } | { t: "fxType"; d: number } | { t: "fxDiv"; d: number } | { t: "fxParam"; d: number } | { t: "fxSend"; d: number };
+  | { t: "cueMix" } | { t: "phonesLevel" } | { t: "filter"; d: number };
 
 export const keyOf = (k: Kind): string => `${k.t}:${"d" in k ? k.d : ""}:${"band" in k ? k.band : ""}`;
 
@@ -62,15 +51,8 @@ type PartnerMove =
 const TURN = 2 * Math.PI * (100 / 3) / 60;
 /** The pitch fader covers ±8 %, like a classic turntable. */
 const PITCH_RANGE = 0.08;
-/** What LIVE's tempo fader can be set to cover (SETTINGS): for very fast records, more than a turntable's 8 %. The game's booth always keeps 8 %. */
-export const PITCH_RANGES: readonly number[] = [0.08, 0.12, 0.16, 0.25, 0.35, 0.5];
-const PITCH_RANGE_STORE = "headliner.pitchRange";
 /** The cue mix and headphones level knobs sit this far (in units) either side of the mixer's middle. */
 const KNOB_GAP = 11;
-/** What the loop buttons do (`Kind.band` of a "loop"). */
-export const LOOP_ACTIONS = ["cues", "loops", "in", "out", "half", "double", "toggle", "auto4", "auto8", "auto16", "auto32"] as const;
-/** How many seconds the big waveform shows at each zoom level (0 = the whole record). */
-export const ZOOM_SECONDS = [0, 60, 30, 15, 8, 4, 2];
 const MOODS = ["waiting", "nodding", "dancing", "nuts"];
 /** Extra lift of a room's picture, as a part of its height, for rooms whose people stand low. */
 const ROOM_LIFT: Record<string, number> = { field: 0.28, forest: 0.32, festival: 0.2, tent: 0.2, meridian: 0.15 };
@@ -90,12 +72,6 @@ interface Layout {
   knobX: number[]; knobY: number[]; knobTravel: number;
   channelX: number[]; channelY: number; channelTravel: number;
   phonesY: number; meterX: number[]; meterY: number; meterH: number;
-  /** The gain knobs above the faders (free play only): their height, else null. */
-  trimY: number | null;
-  /** The effect bar under the gear (free play only). */
-  fx: { panel: Rect; cy: number; typeX: number[]; divX: number[]; knobX: number; onX: number } | null;
-  /** The LIVE booth's geometry (null in the game's booth), and how far a horizontal headphone fader runs. */
-  live: LiveGeometry | null; sliderTravel: number; fxTravel: number;
   crossY: number; crossTravel: number; filterY: number;
 }
 
@@ -116,11 +92,6 @@ export class Booth {
   private phones = [false, false];
   /** The one-knob filter per channel (0.5 = off). */
   private filterSetting = [0.5, 0.5];
-  /** Web free play's extras (the effect bar under the gear and a GAIN knob above each fader, 19 Nov). OFF since 22 Nov (Zé: free play is the
-   * iPhone game; your own music and the DJ tools are LIVE's). true brings them back, nothing else changes. */
-  freePlayExtras = false;
-  /** The gain knob per channel (0.5 = 0 dB); it only works in free play (a lesson or a night is the iPhone's desk). */
-  private trimSetting = [0.5, 0.5];
   private syncAllowed = true;
   private hideNumbers = false;
   private hasFilter = true;
@@ -163,14 +134,6 @@ export class Booth {
   // to the mark when CUE is let go).
   private cueDown = [false, false];
   private previewing = [false, false];
-  /** The effect unit: which effect, which note value, how much, on or off. Off at every start. */
-  /** `on`: the whole room (free play's bar); `send`: the channels the effect works on (LIVE's FX buttons). */
-  fx = { type: 0, div: 1, amount: 0.5, on: false, params: FX_DEFAULTS[0].slice(), send: [false, false] as boolean[] };
-  /** The channels the G key switches back on. */
-  private lastSend = [true, true];
-  /** The four knobs of every effect, kept as you left them (null: the effect's defaults). */
-  private fxSaved: (number[] | null)[] = FX_TYPES.map(() => null);
-  private fxSent = 0;
 
   /** Puts a record (by id) on a deck; the page knows where records live. */
   loadRecord: (d: number, id: string) => Promise<void> = async () => {};
@@ -207,23 +170,8 @@ export class Booth {
   private roomMood = -1;
   /** The record room is up over the room (free play): its clips are not played (nobody sees them). */
   private roomHidden = false;
-  /** "game": the iPhone's desk (lessons, nights, free play). "live": the DJ's booth with its own layout. */
-  mode: "game" | "live" = "game";
-  /** How far LIVE's tempo fader goes either side (a fraction: 0.08 = ±8 %); kept in this browser. */
-  private liveRange = ((): number => { try { const r = Number(localStorage.getItem(PITCH_RANGE_STORE)); return PITCH_RANGES.includes(r) ? r : PITCH_RANGE; } catch { return PITCH_RANGE; } })();
-  /** What the tempo fader covers now: the setting in LIVE, a turntable's 8 % everywhere else (lessons and nights are tuned to it). */
-  get pitchRange(): number { return this.mode === "live" ? this.liveRange : PITCH_RANGE; }
-  private live: LiveGeometry | null = null;
-  private readonly liveRenderer = new LiveRenderer();
-  /** LIVE's master knob while the game's booth is showing. */
-  private liveMaster = ROOM_UNITY;
-  /** What the pads under each deck are: the hot cues, or the saved loops. */
-  private padMode: ("cues" | "loops")[] = ["cues", "cues"];
-  /** The zoom of each deck's big waveform (an index into ZOOM_SECONDS), kept between visits. */
-  private zoomLevel: number[] = (() => { try { const z = JSON.parse(localStorage.getItem("headliner.zoom") ?? "[]"); return [0, 1].map((d) => (Number.isInteger(z[d]) && z[d] >= 0 && z[d] < ZOOM_SECONDS.length ? z[d] : 3)); } catch { return [3, 3]; } })();
-  private lastWheelZoom = 0;
-  /** A message over a deck (a record cannot be changed while it plays), and until when. */
-  private alerts: ({ text: string; until: number } | null)[] = [null, null];
+  /** What the tempo fader covers: a turntable's 8 % (lessons and nights are tuned to it). */
+  get pitchRange(): number { return PITCH_RANGE; }
   private lastTime = 0;
   /** What the room heard this frame. */
   lastReading: MixReading | null = null;
@@ -234,27 +182,9 @@ export class Booth {
     this.roomLayer = roomLayer;
     this.engine = engine;
     for (const d of [0, 1]) this.decks[d].volume = faderGain(this.channel[d]) * (d === 0 ? crossfade(this.cross).a : crossfade(this.cross).b);
-    try {
-      const saved = JSON.parse(localStorage.getItem("headliner.fx") ?? "{}") as { type?: number; div?: number; amount?: number; knobs?: unknown };
-      if (saved.type !== undefined && saved.type >= 0 && saved.type < FX_TYPES.length) this.fx.type = Math.trunc(saved.type);
-      if (saved.amount !== undefined && saved.amount >= 0 && saved.amount <= 1) this.fx.amount = saved.amount;
-      if (Array.isArray(saved.knobs)) {
-        FX_TYPES.forEach((_, t) => {
-          const k = (saved.knobs as unknown[])[t];
-          if (Array.isArray(k) && k.length === 4 && k.every((x) => typeof x === "number" && x >= 0 && x <= 1)) this.fxSaved[t] = k as number[];
-        });
-      } else if (saved.div !== undefined && saved.div >= 0 && saved.div < FX_DIVISIONS.length) {
-        this.fxSaved[0] = [stepValue(Math.trunc(saved.div), FX_DIVISIONS.length), ...FX_DEFAULTS[0].slice(1)]; // an older save: only the note value
-      }
-    } catch { /* nothing saved */ }
-    this.fx.params = (this.fxSaved[this.fx.type] ?? FX_DEFAULTS[this.fx.type]).slice();
-    engine.fxType = this.fx.type;
-    engine.fxAmount = this.fx.amount;
-    engine.fxOn = false;
-    this.pushFxKnobs();
+    engine.fxOn = false; // the effect unit is the Booth's (grooveline.org/booth/); the game has none
     canvas.addEventListener("pointerdown", (e) => this.down(e));
-    canvas.addEventListener("pointermove", (e) => { this.move(e); this.hoverTitle(e); });
-    canvas.addEventListener("pointerleave", () => this.tip(null));
+    canvas.addEventListener("pointermove", (e) => this.move(e));
     canvas.addEventListener("pointerup", (e) => this.up(e));
     canvas.addEventListener("pointercancel", (e) => this.up(e));
     canvas.addEventListener("wheel", (e) => this.wheel(e), { passive: false });
@@ -322,8 +252,6 @@ export class Booth {
     this.phones = [false, false];
     this.cueDown = [false, false];
     this.previewing = [false, false];
-    this.fx.on = false; // a lesson or a night is the iPhone's desk: no effect unit
-    this.engine.fxOn = false;
     for (const d of [0, 1]) {
       const deck = this.decks[d];
       deck.motorOn = false;
@@ -403,20 +331,15 @@ export class Booth {
     this.canvas.width = Math.round(W * this.dpr);
     this.canvas.height = Math.round(H * this.dpr);
     if (W <= 200 || H <= 200) { this.L = null; return; }
-    if (this.mode === "live") { this.buildLive(W, H); return; }
-    this.live = null;
     const left = 10, right = 10, bottom = 8;
     const gx0 = left;
     const gw = W - left - right;
-    // Free play has the effect bar as a third row under the decks and the mixer (36 units and a gap).
-    const fxBar = this.freePlayExtras && this.lesson === null && this.night === null;
-    const BAR = 36, BAR_GAP = 6;
     // The gear is drawn in units `u` (the iPhone's: 210 high, 816 wide with a mixer 224 wide): as big
     // as the height (at most the lower 58 %) and the width both allow. On a tall screen (fullscreen
     // 16:9) the width is the limit; the gear then sits at the bottom and the room takes the rest.
-    const u = Math.min((H * 0.58 - 6 - bottom) / (210 + (fxBar ? BAR + BAR_GAP : 0)), gw / 816);
+    const u = Math.min((H * 0.58 - 6 - bottom) / 210, gw / 816);
     const gh = 210 * u;
-    const gy0 = bottom + (fxBar ? (BAR + BAR_GAP) * u : 0);
+    const gy0 = bottom;
     const gearTop = gy0 + gh + 6;
     // The overlays (lesson, night, studio grid, record room) are as high as the room above the gear: 100vh minus this.
     document.documentElement.style.setProperty("--gear-h", `${gearTop}px`);
@@ -476,8 +399,7 @@ export class Booth {
     const knobY = [0, 1, 2].map((band) => my + 74 * u + band * 41 * u);
     const channelX = [mx + 72 * u, mx + mw - 72 * u];
     // Free play has a gain knob above each fader: the faders are a little shorter to make room.
-    const trimY = fxBar ? my + 163 * u : null;
-    const channelTravel = (fxBar ? 72 : 88) * u, channelY = my + (fxBar ? 102 : 110) * u;
+    const channelTravel = 88 * u, channelY = my + 110 * u;
     const phonesY = my + 49 * u;
     const crossTravel = Math.min(112 * u, mw * 0.55);
     const crossY = my + 24 * u, filterY = my + 27 * u;
@@ -485,7 +407,6 @@ export class Booth {
       for (const band of [0, 1, 2]) first({ t: "eq", d, band }, centred(knobX[d], knobY[band], 42 * u, 40 * u));
       first({ t: "channel", d }, centred(channelX[d], channelY, 40 * u, channelTravel + 28 * u));
       first({ t: "phones", d }, centred(channelX[d], phonesY, 44 * u, 24 * u));
-      if (trimY !== null) first({ t: "trim", d }, centred(channelX[d], trimY, 30 * u, 30 * u));
     }
     // The cue mix and the headphones level knobs side by side between the PHONES buttons.
     first({ t: "cueMix" }, centred(mid - KNOB_GAP * u, phonesY, 22 * u, 26 * u));
@@ -494,26 +415,13 @@ export class Booth {
     // Filter knobs last, so they win the little overlap with the crossfader's touch area.
     if (this.hasFilter) for (const d of [0, 1]) first({ t: "filter", d }, centred(knobX[d], filterY, 30 * u, 30 * u));
 
-    let fx: Layout["fx"] = null;
-    if (fxBar) {
-      // Centred under the mixer: effects, note values, amount, ON.
-      const px = mid - 212 * u, cy = bottom + (BAR / 2) * u;
-      fx = { panel: { x: px, y: bottom, w: 424 * u, h: BAR * u }, cy,
-             typeX: [0, 1, 2].map((i) => px + (37 + i * 54) * u), divX: [0, 1, 2, 3].map((i) => px + (200 + i * 36) * u),
-             knobX: px + 348 * u, onX: px + 392 * u };
-      fx.typeX.forEach((x, i) => first({ t: "fxType", d: i }, centred(x, cy, 54 * u, 30 * u)));
-      fx.divX.forEach((x, i) => first({ t: "fxDiv", d: i }, centred(x, cy, 36 * u, 30 * u)));
-      first({ t: "fxAmount" }, centred(fx.knobX, cy, 26 * u, 30 * u));
-      first({ t: "fxOn" }, centred(fx.onX, cy, 44 * u, 30 * u));
-    }
-
     this.hits = hits;
     this.L = {
       W, H, u, gearTop, left, deck, mixer, outer, r, centre, pivot, armLength, armPivotAngle,
       needleReach: Math.max(20, 20 * u), rowY, titleX, timeX, dotX, wave, buttonW, buttonH, buttonX, buttonY,
       pitchX, pitchY, pitchTravel, bpmX: [mx + 32 * u, mx + mw - 32 * u], topY: my + mh - 15 * u, phaseY: my + mh - 30 * u,
       phaseWidth: Math.min(104 * u, mw * 0.5), knobX, knobY, knobTravel: 90 * u, channelX, channelY, channelTravel,
-      phonesY, meterX: [mid - 9 * u, mid + 9 * u], meterY: channelY, meterH: channelTravel + 8 * u, trimY, fx, live: null, sliderTravel: 0, fxTravel: 0, crossY, crossTravel, filterY,
+      phonesY, meterX: [mid - 9 * u, mid + 9 * u], meterY: channelY, meterH: channelTravel + 8 * u, crossY, crossTravel, filterY,
     };
     this.platterImg = TINTS.map((t) => platterPicture(r, t, this.dpr));
     this.labelShown = [null, null]; // the next frame draws the covers again
@@ -522,165 +430,8 @@ export class Booth {
     this.placeRoom();
   }
 
-  /** Where the top bar has room for the effects: from the end of the stream bar's text (GROOVELINE LIVE, OFF AIR, the time) to the left edge of the page's buttons.
-   * Measured, so a longer label (EXIT FULLSCREEN) or a font that loads late counts; none if the bar is not there (the unit tests give the geometry no room). */
-  private barRoom(): BarRoom | undefined {
-    this.fitBar(); // the page sheds what the bar can spare (the clock, the brand's name) before it is measured
-    const bar = document.getElementById("livebar"), buttons = document.getElementById("top");
-    if (!bar || !buttons || bar.hidden) return undefined;
-    const left = bar.getBoundingClientRect().right, right = buttons.getBoundingClientRect().left;
-    return left > 0 && right > left ? { left, right } : undefined;
-  }
-
-  /** Set by the page: makes the top bar's text as short as the room needs, so the effects fit between it and the buttons. Called before every measure. */
-  fitBar: () => void = () => {};
-
-  /** Lay the booth out again at the next frame (the top bar's text or buttons changed size; main.ts watches them). */
+  /** Lay the booth out again at the next frame (the window changed size). */
   relayout(): void { this.L = null; }
-
-  /** The LIVE booth: free play's own layout. Everything is registered with the same pointer code as the game's gear. */
-  private buildLive(W: number, H: number): void {
-    const g = liveGeometry(W, H, this.barRoom()), u = g.u, T = liveTouch(g), M = g.mixer;
-    this.live = g;
-    this.liveRenderer.reset();
-    const hits: { kind: Kind; rect: Rect }[] = [];
-    const first = (kind: Kind, rect: Rect) => hits.unshift({ kind, rect });
-    const outer = g.deck[0].platter.outer, r = outer / 1.07;
-    const centre: Point[] = [], pivot: Point[] = [], rowY: number[] = [], titleX: number[] = [], timeX: number[] = [];
-    const dotX: number[][] = [], wave: Rect[] = [], buttonX: number[][] = [], buttonY: number[] = [], pitchX: number[] = [], pitchY: number[] = [];
-    let armLength = 100, armPivotAngle = 0;
-    for (const d of [0, 1]) {
-      const G = g.deck[d], c = G.platter.c, B = G.buttons;
-      centre.push(c);
-      hits.push({ kind: { t: "platter", d }, rect: centred(c.x, c.y, outer * 2.16, outer * 2.16) });
-      const p = { x: c.x + r * 0.98, y: c.y + r * 0.86 };
-      pivot.push(p);
-      armLength = Math.hypot(p.x - c.x, p.y - c.y);
-      armPivotAngle = Math.atan2(c.y - p.y, c.x - p.x);
-      rowY.push(G.title.y); titleX.push(G.title.x); timeX.push(G.time.x); dotX.push(G.lamps.map((l) => l.x));
-      wave.push(G.wave);
-      // The strip of the whole record drops the needle; the big waveform scrolls with a drag; the zoom buttons sit over its corner.
-      first({ t: "wave", d }, { x: G.wave.x - 4, y: G.wave.y - 4, w: G.wave.w + 8, h: G.wave.h + 8 });
-      first({ t: "zwave", d }, G.zoom);
-      first({ t: "zoom", d, band: -1 }, G.zoomOut);
-      first({ t: "zoom", d, band: 1 }, G.zoomIn);
-      const LU = G.loopUi;
-      [...G.modeTabs, ...LU.io, ...LU.scale, LU.toggle, ...LU.auto].forEach((r, i) => first({ t: "loop", d, band: i }, r)); // the eleven controls come in the order of LOOP_ACTIONS
-      G.pads.forEach((r, i) => first({ t: "pad", d, band: i }, r));
-      buttonY.push(B.cue.y); buttonX.push([B.cue.x, B.play.x, B.sync.x]);
-      ([{ t: "cue", d }, { t: "play", d }, { t: "sync", d }] as Kind[]).forEach((k, i) => first(k, centred([B.cue, B.play, B.sync][i].x, B.cue.y, B.w + 6, B.h + 8)));
-      pitchX.push(G.pitch.x); pitchY.push(G.pitch.y);
-      first({ t: "pitch", d }, centred(G.pitch.x, G.pitch.y, 46 * u, G.pitch.travel + 28 * u));
-    }
-    for (const d of [0, 1]) {
-      // The strip, top to bottom: TRIM, HI, MID, LOW, FILTER.
-      first({ t: "trim", d }, T.eq[d][0]);
-      first({ t: "eq", d, band: 2 }, T.eq[d][1]);
-      first({ t: "eq", d, band: 1 }, T.eq[d][2]);
-      first({ t: "eq", d, band: 0 }, T.eq[d][3]);
-      first({ t: "filter", d }, T.eq[d][4]);
-      first({ t: "channel", d }, T.channel[d]);
-      first({ t: "phones", d }, T.cue[d]);
-    }
-    first({ t: "cross" }, T.cross);
-    first({ t: "master" }, T.master);
-    first({ t: "cueMix" }, T.mix);
-    first({ t: "phonesLevel" }, T.level);
-    // The effects strip: the name (the left third goes to the effect before, the rest to the next), the four knobs, the LEVEL fader. The effect is
-    // switched on for a channel by the FX button beside its FILTER.
-    const F = g.fx, lvl = F.level;
-    document.body.classList.toggle("fxbar", g.fxInBar); // the page's orange message makes room for them
-    first({ t: "fxType", d: -1 }, F.name);
-    first({ t: "fxType", d: -2 }, { x: F.name.x, y: F.name.y, w: F.name.w * 0.3, h: F.name.h });
-    first({ t: "fxAmount" }, lvl.touch);
-    F.knobs.forEach((k, i) => first({ t: "fxParam", d: i }, k.touch));
-    F.send.forEach((r, d) => first({ t: "fxSend", d }, { x: r.x - 3, y: r.y - 3, w: r.w + 6, h: r.h + 6 }));
-
-    this.hits = hits;
-    const B0 = g.deck[0].buttons;
-    this.L = {
-      W, H, u, gearTop: g.gear.y + g.gear.h, left: g.gear.x, deck: g.deck.map((d) => d.rect), mixer: M.rect, outer, r, centre, pivot, armLength, armPivotAngle,
-      needleReach: Math.max(20, 20 * u), rowY, titleX, timeX, dotX, wave, buttonW: B0.w, buttonH: B0.h, buttonX, buttonY,
-      pitchX, pitchY, pitchTravel: g.deck[0].pitch.travel, bpmX: [0, 0], topY: 0, phaseY: 0, phaseWidth: 0,
-      knobX: M.strip.map((s) => s.x), knobY: M.strip[0].knobY, knobTravel: 90 * u, channelX: M.strip.map((s) => s.fader.x), channelY: M.strip[0].fader.y,
-      channelTravel: M.strip[0].fader.travel, phonesY: M.mid.mix.y, meterX: M.mid.meterX, meterY: M.mid.meter.y, meterH: M.mid.meter.h,
-      trimY: null, fx: null, live: g, sliderTravel: M.mid.mix.w - 12 * u, fxTravel: g.fx.level.travel, crossY: M.mid.cross.y, crossTravel: M.mid.cross.travel, filterY: 0,
-    };
-    this.labelShown = [null, null];
-    // Where the page's own parts sit (the library and the stream panel are HTML over the canvas), published as CSS variables.
-    const css = document.documentElement.style, top = (r: Rect) => H - (r.y + r.h);
-    css.setProperty("--bar-h", `${g.topBar.h}px`);
-    for (const [name, rect] of [["lib", g.library], ["stream", g.streamPanel]] as const) {
-      css.setProperty(`--${name}-left`, `${rect.x}px`); css.setProperty(`--${name}-top`, `${top(rect)}px`);
-      css.setProperty(`--${name}-w`, `${rect.w}px`); css.setProperty(`--${name}-h`, `${rect.h}px`);
-    }
-  }
-
-  /** The booth for the game (lessons, nights: the iPhone's desk) or for LIVE (free play). */
-  setMode(mode: "game" | "live"): void {
-    if (mode === this.mode) return;
-    this.endCueHolds();
-    const rangeBefore = this.pitchRange;
-    this.mode = mode;
-    this.rescalePitch(rangeBefore); // LIVE's travel may differ from the game's 8 %
-    document.body.classList.toggle("live", mode === "live");
-    // LIVE has no room: a crowd clip a night left playing would go on decoding behind `display: none`. The game's own `showRoom` plays it again.
-    if (mode === "live") for (const v of this.roomVideos) if (v && !v.paused) v.pause();
-    for (const d of this.decks) d.smoothSeek = mode === "live"; // a needle drop while the record turns fades across (no click); the game's booth keeps the hard jump
-    // Free play's effect bar offers the first three effects: LIVE's other four are left behind; its channel sends go off.
-    if (mode === "game") { [0, 1].forEach((d) => this.setFxSend(d, false)); if (this.fx.type > 2) this.setFxType(0); }
-    // LIVE's master knob (the room only) comes back where it was left; the game's booth runs at the mixer's own level.
-    if (mode === "live") this.engine.roomVolume = this.liveMaster;
-    else { this.liveMaster = this.engine.roomVolume; this.engine.roomVolume = ROOM_UNITY; }
-    this.padMode = ["cues", "cues"];
-    this.L = null;
-  }
-
-  /** A new travel for LIVE's tempo fader. The tempo each deck plays at stays (the fader moves to where that tempo now is); if the new travel is shorter than that tempo, the fader stops at its end. */
-  setPitchRange(range: number): void {
-    if (!PITCH_RANGES.includes(range)) return;
-    try { localStorage.setItem(PITCH_RANGE_STORE, String(range)); } catch { /* private window */ }
-    const before = this.pitchRange;
-    this.liveRange = range;
-    this.rescalePitch(before);
-  }
-
-  /** The travel changed from `before` to `pitchRange`: keep each deck's tempo where it can. */
-  private rescalePitch(before: number): void {
-    const now = this.pitchRange;
-    if (now === before) return;
-    for (const d of [0, 1]) {
-      const tempo = (0.5 - this.pitchFader[d]) * 2 * before;
-      this.pitchFader[d] = clamp01(0.5 - tempo / (2 * now));
-      if (!this.sync[d]) this.decks[d].pitch = (0.5 - this.pitchFader[d]) * 2 * now; // (a deck in sync follows the other one: runSync clamps it to the new travel)
-    }
-  }
-
-  /** A message over a deck, for a few seconds (for example: a record cannot be changed while it plays). */
-  alertDeck(d: number, text: string, ms = 3200): void { this.alerts[d] = { text, until: performance.now() + ms }; }
-
-  private liveView(): LiveView {
-    const L = this.L!;
-    const both = Math.abs(this.decks[0].rate) > 0.3 && Math.abs(this.decks[1].rate) > 0.3;
-    return {
-      decks: this.decks, pitchFader: this.pitchFader, channel: this.channel, cross: this.cross, eq: this.eq, filter: this.filterSetting, trim: this.trimSetting,
-      phones: this.phones, sync: this.sync, cueDown: this.cueDown, previewing: this.previewing, meter: this.meterLevel, dropAt: this.dropAt,
-      cueMix: this.engine.cueMix, phonesLevel: this.engine.phonesLevel, master: this.engine.roomVolume, fx: this.fx,
-      armAngle: (d) => this.armAngle(d), pivot: L.pivot, armLength: L.armLength, labelArt: this.labelArt, alerts: this.alerts,
-      trimDb: (d) => trimDecibels(this.trimSetting[d]), now: performance.now(), dpr: this.dpr,
-      phase: both ? phaseOffset(this.decks[0].beat, this.decks[1].beat) : null, syncAllowed: this.syncAllowed,
-      padMode: this.padMode, zoom: this.zoomLevel.map((_, d) => ({ level: this.zoomLevel[d], seconds: this.windowSeconds(d) })),
-    };
-  }
-
-  private drawLive(dt: number): void {
-    const L = this.L!, ctx = this.ctx;
-    ctx.setTransform(this.dpr, 0, 0, -this.dpr, 0, L.H * this.dpr); // y up, as everywhere in the booth
-    ctx.clearRect(0, 0, L.W, L.H);
-    for (const d of [0, 1]) this.meterLevel[d] = Math.max(this.decks[d].takePeak(), this.meterLevel[d] - dt * 1.6);
-    this.liveRenderer.draw(ctx, L.live!, this.liveView());
-    if (!this.engine.running) label(ctx, `AUDIO OFF  ${this.engine.lastError ?? ""}`, L.W / 2, L.H - 20, { size: 10, color: rgba(Palette.red) });
-  }
 
   // MARK: - The room
 
@@ -810,12 +561,8 @@ export class Booth {
       case "cross": return this.cross;
       case "eq": return this.eq[k.d][k.band];
       case "filter": return this.filterSetting[k.d];
-      case "trim": return this.trimSetting[k.d];
-      case "master": return this.engine.roomVolume;
       case "cueMix": return this.engine.cueMix;
       case "phonesLevel": return this.engine.phonesLevel;
-      case "fxAmount": return this.fx.amount;
-      case "fxParam": return this.fx.params[k.d] ?? 0;
       default: return 0;
     }
   }
@@ -880,43 +627,11 @@ export class Booth {
         decks[kind.d].lifted = true;
         this.dropAt[kind.d] = this.waveProgress(p, kind.d);
         break;
-      case "zwave":
-        // The big waveform is dragged like a record: the needle is lifted and carried, and drops where the picture is let go.
-        decks[kind.d].lifted = true;
-        grab.startValue = decks[kind.d].seconds;
-        this.dropAt[kind.d] = decks[kind.d].progress;
-        break;
-      case "pad":
-        this.padDown(kind.d, kind.band, e.shiftKey || e.altKey || e.button === 2);
-        break;
-      case "loop":
-      case "zoom":
-      case "fxSend":
-        this.press(kind);
-        break;
       case "play":
       case "cue":
       case "sync":
       case "phones":
-      case "fxOn":
-      case "fxType":
-      case "fxDiv":
         this.press(kind);
-        break;
-      case "fxAmount": {
-        const lv = this.L?.live?.fx.level;
-        if (doubleTap) { this.setFxAmount(0.5); grab.startValue = 0.5; }
-        else if (lv) {
-          // LIVE's LEVEL is a short horizontal fader: a press on the slot (not on the cap) puts the cap where the finger is, and the drag goes on from there, 1:1.
-          const along = clamp01((p.x - (lv.x - lv.travel / 2)) / lv.travel);
-          const capX = lv.x + (this.fx.amount - 0.5) * lv.travel;
-          if (Math.abs(p.x - capX) > lv.capW * 0.6) { this.setFxAmount(along); grab.startValue = along; grab.start = p; }
-        }
-        break;
-      }
-      case "fxParam":
-        // A double tap puts the knob back where the effect rests.
-        if (doubleTap) { const v = FX_DEFAULTS[this.fx.type][kind.d]; this.setFxParam(kind.d, v); grab.startValue = v; }
         break;
       case "eq":
         // A double tap puts a knob back at its default: EQ flat, in the middle.
@@ -924,12 +639,6 @@ export class Booth {
         break;
       case "filter":
         if (doubleTap) { this.setFilter(kind.d, 0.5); grab.startValue = 0.5; }
-        break;
-      case "trim":
-        if (doubleTap) { this.setTrim(kind.d, 0.5); grab.startValue = 0.5; }
-        break;
-      case "master":
-        if (doubleTap) { this.engine.roomVolume = ROOM_UNITY; grab.startValue = ROOM_UNITY; }
         break;
       case "phonesLevel":
         // The headphones level's default is unity: as loud as before the knob.
@@ -945,29 +654,6 @@ export class Booth {
     this.grabs.set(e.pointerId, grab);
   }
 
-  /** LIVE: the pointer over a deck's title shows the whole title (a long one is cut short in the deck). */
-  private hoverTitle(e: PointerEvent): void {
-    const L = this.L;
-    if (!L?.live || this.grabs.size > 0) { this.tip(null); return; }
-    const p = this.at(e), u = L.live.u;
-    for (let d = 0; d < 2; d++) {
-      const G = L.live.deck[d], info = this.decks[d].info;
-      if (info && p.x >= G.title.x && p.x <= G.title.x + G.titleMax && Math.abs(p.y - G.title.y) <= 9 * u) { this.tip(`${info.artist} \u00b7 ${info.title}`, e); return; }
-    }
-    this.tip(null);
-  }
-
-  private tipEl: HTMLElement | null = null;
-  private tip(text: string | null, e?: PointerEvent): void {
-    const el = (this.tipEl ??= document.getElementById("deck-tip"));
-    if (!el) return;
-    if (text === null || !e) { el.hidden = true; return; }
-    el.textContent = text;
-    el.hidden = false;
-    const w = el.offsetWidth;
-    el.style.left = `${Math.max(6, Math.min(window.innerWidth - w - 6, e.clientX + 12))}px`;
-    el.style.top = `${e.clientY + 18}px`;
-  }
 
   private move(e: PointerEvent): void {
     const grab = this.grabs.get(e.pointerId);
@@ -1000,13 +686,6 @@ export class Booth {
       case "wave":
         this.dropAt[k.d] = this.waveProgress(p, k.d);
         break;
-      case "zwave": {
-        const deck = this.decks[k.d], r = L.live!.deck[k.d].zoom;
-        // Dragging the picture to the right shows what came before: the needle goes back by as many seconds as the picture moved.
-        const t = grab.startValue - (p.x - grab.start.x) * (this.windowSeconds(k.d) / r.w);
-        this.dropAt[k.d] = deck.duration > 0 ? clamp01(t / deck.duration) : 0;
-        break;
-      }
       case "pitch": {
         // Fine mode: with the finger well to the side of the fader it moves four times slower,
         // step by step from the last position, so switching modes mid-drag does not jump.
@@ -1027,29 +706,16 @@ export class Booth {
         this.applyMix();
         break;
       case "cueMix":
-        this.engine.cueMix = clamp01(grab.startValue + (L.live ? (p.x - grab.start.x) / L.sliderTravel : (p.y - grab.start.y) / L.knobTravel));
+        this.engine.cueMix = clamp01(grab.startValue + (p.y - grab.start.y) / L.knobTravel);
         break;
       case "phonesLevel":
-        this.engine.phonesLevel = clamp01(grab.startValue + (L.live ? (p.x - grab.start.x) / L.sliderTravel : (p.y - grab.start.y) / L.knobTravel));
-        break;
-      case "master":
-        this.engine.roomVolume = clamp01(grab.startValue + (p.y - grab.start.y) / L.knobTravel);
-        break;
-      case "fxAmount":
-        // LIVE's LEVEL is a horizontal fader (left to right); free play's AMOUNT is a knob (up and down).
-        this.setFxAmount(grab.startValue + (L.live ? (p.x - grab.start.x) / L.fxTravel : (p.y - grab.start.y) / L.knobTravel));
-        break;
-      case "fxParam":
-        this.setFxParam(k.d, grab.startValue + (p.y - grab.start.y) / L.knobTravel);
+        this.engine.phonesLevel = clamp01(grab.startValue + (p.y - grab.start.y) / L.knobTravel);
         break;
       case "eq":
         this.setEQ(k.d, k.band, clamp01(grab.startValue + (p.y - grab.start.y) / L.knobTravel));
         break;
       case "filter":
         this.setFilter(k.d, clamp01(grab.startValue + (p.y - grab.start.y) / L.knobTravel));
-        break;
-      case "trim":
-        this.setTrim(k.d, clamp01(grab.startValue + (p.y - grab.start.y) / L.knobTravel));
         break;
       default:
         break;
@@ -1070,8 +736,7 @@ export class Booth {
         break;
       case "needle":
       case "wave":
-      case "zwave":
-        if (!this.holds("needle", k.d) && !this.holds("wave", k.d) && !this.holds("zwave", k.d)) this.dropNeedle(k.d);
+        if (!this.holds("needle", k.d) && !this.holds("wave", k.d)) this.dropNeedle(k.d);
         break;
       case "cue":
         if (!this.holds("cue", k.d)) this.release(k);
@@ -1081,44 +746,7 @@ export class Booth {
     }
   }
 
-  // MARK: - Pads, loops and zoom (LIVE)
-
-  /** How many seconds the big waveform shows across now (the whole record at level 0, or when it is shorter than the level). */
-  windowSeconds(d: number): number {
-    const deck = this.decks[d], level = this.zoomLevel[d], dur = Math.max(1, deck.duration);
-    return level === 0 || ZOOM_SECONDS[level] >= dur ? dur : ZOOM_SECONDS[level];
-  }
-
-  private zoomBy(d: number, by: number): void {
-    this.zoomLevel[d] = Math.max(0, Math.min(ZOOM_SECONDS.length - 1, this.zoomLevel[d] + (by > 0 ? 1 : -1)));
-    try { localStorage.setItem("headliner.zoom", JSON.stringify(this.zoomLevel)); } catch { /* private window */ }
-  }
-
-  /** A pad: with the cues showing, an empty one is set and a set one jumps; with the loops showing, an empty one keeps the loop and a full one starts it. */
-  private padPress(d: number, i: number): void {
-    const deck = this.decks[d];
-    if (this.mode !== "live" || !deck.isLoaded) return;
-    if (this.padMode[d] === "cues") deck.hotCuePress(i); else deck.loopSlotPress(i);
-  }
-
-  /** The pointer on a pad: shift, alt or the right button clears it. */
-  private padDown(d: number, i: number, clear: boolean): void {
-    if (!clear) { this.padPress(d, i); return; }
-    if (this.padMode[d] === "cues") this.decks[d].clearHotCue(i); else this.decks[d].clearLoopSlot(i);
-  }
-
-  private loopAction(d: number, action: number): void {
-    const deck = this.decks[d], a = LOOP_ACTIONS[action];
-    if (this.mode !== "live" || !a) return;
-    if (a === "cues" || a === "loops") { this.padMode[d] = a; return; }
-    if (!deck.isLoaded) return;
-    if (a === "in") deck.loopIn();
-    else if (a === "out") deck.loopOut();
-    else if (a === "half") deck.loopScale(0.5);
-    else if (a === "double") deck.loopScale(2);
-    else if (a === "toggle") deck.toggleLoop();
-    else deck.autoLoop(Number(a.slice(4)));
-  }
+  // MARK: - The mouse wheel
 
   /** The mouse wheel turns knobs and moves faders (laptops): one notch is a small step. */
   private wheel(e: WheelEvent): void {
@@ -1133,23 +761,8 @@ export class Booth {
       case "cross": this.cross = clamp01(this.cross - step); this.applyMix(); break;
       case "eq": this.setEQ(kind.d, kind.band, clamp01(this.eq[kind.d][kind.band] + step)); break;
       case "filter": this.setFilter(kind.d, clamp01(this.filterSetting[kind.d] + step)); break;
-      case "trim": this.setTrim(kind.d, clamp01(this.trimSetting[kind.d] + step)); break;
-      case "zwave": case "wave": case "zoom": {
-        // The wheel over a waveform zooms it (one level for each little burst of the wheel).
-        const now = performance.now();
-        if (now - this.lastWheelZoom > 90) { this.lastWheelZoom = now; this.zoomBy(kind.d, e.deltaY < 0 ? 1 : -1); }
-        break;
-      }
-      case "master": this.engine.roomVolume = clamp01(this.engine.roomVolume + step); break;
       case "cueMix": this.engine.cueMix = clamp01(this.engine.cueMix + step); break;
       case "phonesLevel": this.engine.phonesLevel = clamp01(this.engine.phonesLevel + step); break;
-      case "fxAmount": this.setFxAmount(this.fx.amount + step); break;
-      case "fxParam": {
-        // A stepped knob moves one step for a notch of the wheel; the others by the usual small step.
-        const knob = FX_KNOBS[this.fx.type][kind.d], n = knob.steps?.length ?? 0;
-        this.setFxParam(kind.d, n ? this.fx.params[kind.d] + Math.sign(step) / (n - 1) : this.fx.params[kind.d] + step);
-        break;
-      }
       default: break;
     }
   }
@@ -1161,9 +774,6 @@ export class Booth {
     if (this.partnerHolds(k)) { this.stepOn(); return; }
     const decks = this.decks;
     switch (k.t) {
-      case "pad": this.padPress(k.d, k.band); break;
-      case "loop": this.loopAction(k.d, k.band); break;
-      case "zoom": this.zoomBy(k.d, k.band); break;
       case "play": {
         const deck = decks[k.d];
         deck.finishPark();
@@ -1189,76 +799,9 @@ export class Booth {
         this.phones[k.d] = !this.phones[k.d];
         decks[k.d].cue = this.phones[k.d];
         break;
-      case "fxOn": if (this.mode === "live") this.setFxOn(!(this.fx.send[0] || this.fx.send[1])); else if (this.L?.fx) this.setFxOn(!this.fx.on); break;
-      case "fxType": if (this.mode === "live" || this.L?.fx) this.setFxType(k.d === -2 ? (this.fx.type + FX_TYPES.length - 1) % FX_TYPES.length : k.d < 0 ? (this.fx.type + 1) % FX_TYPES.length : k.d); break;
-      case "fxDiv": if (this.mode === "live" || this.L?.fx) this.setFxDiv(k.d < 0 ? (this.fx.div + 1) % FX_DIVISIONS.length : k.d); break;
-      case "fxParam": break; // a knob has no press
-      case "fxSend": if (this.mode === "live") this.setFxSend(k.d, !this.fx.send[k.d]); break;
       default:
         break;
     }
-  }
-
-  // MARK: - The effect unit
-
-  /** G, MIDI: in LIVE all the channels the effect was on for (or both), or none; in free play the whole room. */
-  private setFxOn(on: boolean): void {
-    if (this.mode === "live") {
-      if (on) [0, 1].forEach((d) => this.setFxSend(d, this.lastSend[d] || !(this.lastSend[0] || this.lastSend[1])));
-      else { if (this.fx.send[0] || this.fx.send[1]) this.lastSend = this.fx.send.slice(); [0, 1].forEach((d) => this.setFxSend(d, false)); }
-      return;
-    }
-    this.fx.on = on; this.engine.fxOn = on;
-  }
-  private setFxSend(d: number, on: boolean): void { this.fx.send[d] = on; this.engine.setFxSend(d, on); }
-  /** Another effect: its four knobs come back as you left them. */
-  private setFxType(i: number): void {
-    this.fxSaved[this.fx.type] = this.fx.params.slice();
-    this.fx.type = i;
-    this.fx.params = (this.fxSaved[i] ?? FX_DEFAULTS[i]).slice();
-    this.engine.fxType = i;
-    this.pushFxKnobs();
-    this.saveFx();
-  }
-  /** The note value (Y key, MIDI): the effect's tempo knob steps to it; a reverb has none. */
-  private setFxDiv(i: number): void {
-    const t = fxTempoKnob(this.fx.type);
-    if (t >= 0) this.setFxParam(t, stepValue(i, FX_DIVISIONS.length));
-  }
-  /** One knob of the effect, 0...1 (a stepped knob snaps to a step). */
-  private setFxParam(i: number, v: number): void {
-    const knob = FX_KNOBS[this.fx.type][i];
-    if (!knob) return;
-    const value = knob.steps ? stepValue(stepIndex(v, knob.steps.length), knob.steps.length) : clamp01(v);
-    this.fx.params[i] = value;
-    this.engine.setFxKnob(i, value);
-    if (knob.tempo) this.fx.div = stepIndex(value, FX_DIVISIONS.length);
-    this.saveFx();
-  }
-  /** The effect's four knobs (and its note value) to the sound. */
-  private pushFxKnobs(): void {
-    this.fx.params.forEach((v, i) => this.engine.setFxKnob(i, v));
-    const t = fxTempoKnob(this.fx.type);
-    if (t >= 0) this.fx.div = stepIndex(this.fx.params[t], FX_DIVISIONS.length);
-  }
-  private setFxAmount(x: number): void { this.fx.amount = clamp01(x); this.engine.fxAmount = this.fx.amount; this.saveFx(); }
-  private saveFx(): void {
-    this.fxSaved[this.fx.type] = this.fx.params.slice();
-    try { localStorage.setItem("headliner.fx", JSON.stringify({ type: this.fx.type, amount: this.fx.amount, knobs: this.fxSaved })); } catch { /* private window */ }
-  }
-
-  /** The delay's time follows the tempo of the record the room hears: the louder of the playing
-   * ones, or the left one when nothing plays. Sent only when it moved a little (SYNC nudges the tempo
-   * all the time). */
-  private updateFxTime(): void {
-    if (this.mode !== "live" && !this.L?.fx) return;
-    // The tempo of the record the effect works on: of the channels it is switched on for (LIVE), the louder playing one; with none, or in free play, of both.
-    const assigned = this.mode === "live" ? [0, 1].filter((d) => this.fx.send[d]) : [];
-    const pool = assigned.length ? assigned : [0, 1];
-    let best = -1, loudest = 0;
-    for (const d of pool) { const deck = this.decks[d]; if (deck.isLoaded && deck.motorOn && deck.rate > 0.3 && deck.volume > loudest) { best = d; loudest = deck.volume; } }
-    const seconds = beatDelaySeconds(this.decks[best >= 0 ? best : pool[0]].bpm, this.fx.div);
-    if (Math.abs(seconds - this.fxSent) > 0.0002) { this.fxSent = seconds; this.engine.fxDelaySeconds = seconds; }
   }
 
   /** A button let go. Only CUE cares: it was playing the record while held. */
@@ -1278,12 +821,8 @@ export class Booth {
       case "cross": this.cross = x; this.applyMix(); break;
       case "eq": this.setEQ(k.d, k.band, x); break;
       case "filter": this.setFilter(k.d, x); break;
-      case "trim": this.setTrim(k.d, x); break;
-      case "master": this.engine.roomVolume = x; break;
       case "cueMix": this.engine.cueMix = x; break;
       case "phonesLevel": this.engine.phonesLevel = x; break;
-      case "fxAmount": this.setFxAmount(x); break;
-      case "fxParam": this.setFxParam(k.d, x); break;
       default: break;
     }
   }
@@ -1334,17 +873,6 @@ export class Booth {
     const v = Math.abs(raw - 0.5) < 0.03 ? 0.5 : raw;
     this.filterSetting[d] = v;
     this.decks[d].setFilter(v);
-  }
-
-  private setTrim(d: number, raw: number): void {
-    this.trimSetting[d] = Math.abs(raw - 0.5) < 0.03 ? 0.5 : raw;
-    this.applyTrim();
-  }
-
-  /** The gain knobs act in LIVE and in free play; in a lesson or a night every channel is at 0 dB (the knob keeps its place). */
-  private applyTrim(): void {
-    const on = this.mode === "live" || (this.freePlayExtras && this.lesson === null && this.night === null);
-    for (const d of [0, 1]) this.decks[d].trim = on ? this.trimSetting[d] : 0.5;
   }
 
   private waveProgress(p: Point, d: number): number {
@@ -1426,14 +954,8 @@ export class Booth {
   private frame(time: number): void {
     const dt = this.lastTime > 0 ? Math.min(0.05, Math.max(0.001, (time - this.lastTime) / 1000)) : 1 / 60;
     this.lastTime = time;
-    // The layout changes with the mode (the game's booth is the iPhone's desk; LIVE has its own).
-    if (this.L && (this.L.live !== null) !== (this.mode === "live")) this.L = null;
-    // The effect bar and the gain knobs come and go with free play (a lesson or a night is the iPhone's desk).
-    if (this.L && this.L.live === null && (this.L.fx !== null) !== (this.freePlayExtras && this.lesson === null && this.night === null)) this.L = null;
     if (!this.L) this.build();
-    this.applyTrim();
     if (this.L) {
-      this.updateFxTime();
       this.moveHands(dt);
       this.runSync();
       this.drivePartner(time / 1000);
@@ -1512,7 +1034,7 @@ export class Booth {
     if (h === null) return false;
     switch (k.t) {
       case "cross": return this.channel[h] > 0.04;
-      case "phones": case "cueMix": case "phonesLevel": case "master": case "fxOn": case "fxAmount": case "fxType": case "fxDiv": case "fxParam": case "fxSend": return false;
+      case "phones": case "cueMix": case "phonesLevel": return false;
       default: return "d" in k && k.d === h;
     }
   }
@@ -1811,7 +1333,6 @@ export class Booth {
   }
 
   private draw(dt: number): void {
-    if (this.L!.live) { this.drawLive(dt); return; }
     const L = this.L!, ctx = this.ctx, u = L.u;
     for (const d of [0, 1]) {
       const art = this.labelArt[d];
@@ -1960,19 +1481,6 @@ export class Booth {
   }
 
   /** The effect bar: the effect, the note value, the amount, ON. */
-  private drawFxBar(): void {
-    const L = this.L!, F = L.fx;
-    if (!F) return;
-    const ctx = this.ctx, u = L.u;
-    roundRect(ctx, F.panel, 10 * u, rgba(Palette.panel), EDGE);
-    // The bar offers the first three effects (the DJ booth, LIVE, has all seven with their own knobs).
-    F.typeX.forEach((x, i) => button(ctx, x, F.cy, 50 * u, 20 * u, FX_TYPES[i], Palette.orange, this.fx.type === i));
-    // The reverb has no note value.
-    F.divX.forEach((x, i) => button(ctx, x, F.cy, 32 * u, 20 * u, FX_DIVISIONS[i].label, Palette.ink, this.fx.div === i, this.fx.type === 1 ? 0.3 : 1));
-    knob(ctx, F.knobX, F.cy + 3 * u, 8 * u, Palette.orange, "AMOUNT", this.fx.amount);
-    button(ctx, F.onX, F.cy, 40 * u, 20 * u, "ON", Palette.red, this.fx.on);
-  }
-
   private drawMixer(reading: MixReading, snapshots: DeckSnapshot[]): void {
     const L = this.L!, ctx = this.ctx, u = L.u, rect = L.mixer, mid = rect.x + rect.w / 2;
     roundRect(ctx, rect, 10 * u, rgba(Palette.panel), EDGE);
@@ -2004,13 +1512,7 @@ export class Booth {
       button(ctx, L.channelX[d], L.phonesY, 36 * u, 15 * u, "PHONES", Palette.orange, this.phones[d]);
       meter(ctx, L.meterX[d], L.meterY, 7 * u, L.meterH, Math.min(1, this.meterLevel[d] * 1.15));
       if (this.hasFilter) knob(ctx, L.knobX[d], L.filterY, 10 * u, TINTS[d], "FILTER", this.filterSetting[d]);
-      if (L.trimY !== null) {
-        // Free play: the gain knob above the fader; turned, it shows how many dB.
-        const dB = trimDecibels(this.trimSetting[d]);
-        knob(ctx, L.channelX[d], L.trimY, 9 * u, TINTS[d], dB === 0 ? "GAIN" : `${dB > 0 ? "+" : "\u2212"}${Math.abs(Math.round(dB))} dB`, this.trimSetting[d]);
-      }
     }
-    this.drawFxBar();
     // Cue mix, between the PHONES buttons: left = only the cued record, right = only the room.
     knob(ctx, mid - KNOB_GAP * u, L.phonesY, 7.5 * u, Palette.orange, "", this.engine.cueMix);
     label(ctx, "MIX", mid - KNOB_GAP * u, L.phonesY - 12.5 * u, { size: 4.6 * u, color: DIM });

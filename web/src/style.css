@@ -67,7 +67,7 @@ html, body {
 
 #top { position: fixed; top: 2vh; right: 2vw; z-index: 3; display: flex; gap: 0.5em; }
 /* The bar's buttons are small (about two thirds of the sheets' buttons): the booth is the thing to look at. */
-#top .pill, #wall-open { font-size: clamp(9px, 0.95vw, 11.5px); letter-spacing: 0.13em; padding: 0.55em 1.1em; }
+#top .pill { font-size: clamp(9px, 0.95vw, 11.5px); letter-spacing: 0.13em; padding: 0.55em 1.1em; }
 #note { position: fixed; top: 2.5vh; left: 2vw; z-index: 3; color: var(--orange); font-size: 14px; }
 
 .sheet {
@@ -199,13 +199,7 @@ button.quiet[hidden] { display: none; }
 #night-words b { color: var(--teal); font: 800 11px system-ui, sans-serif; letter-spacing: 0.3em; }
 #night-words span { font: 600 clamp(14px, 1.6vw, 20px) system-ui, sans-serif; }
 
-
-
 .pill[hidden] { display: none; }
-/* The link straight to LIVE (?live): browsers start sound after a click, so a prompt sits on the booth until then (only if the sound is not allowed yet). */
-#sound-gate { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: rgba(5, 7, 10, 0.55); cursor: pointer; }
-#sound-gate[hidden] { display: none; }
-#sound-gate span { padding: 16px 26px; border-radius: 10px; border: 1.5px solid rgba(38, 198, 240, 0.6); background: rgba(8, 11, 16, 0.94); color: var(--ink); font: 800 13px system-ui, sans-serif; letter-spacing: 0.18em; }
 .pill.pointed { border: 2.5px solid var(--orange); animation: pulse 1.2s ease-in-out infinite alternate; }
 @keyframes pulse { from { box-shadow: 0 0 2px rgba(255, 153, 61, 0.2); } to { box-shadow: 0 0 14px rgba(255, 153, 61, 0.9); } }
 
@@ -244,7 +238,6 @@ button.quiet[hidden] { display: none; }
 #story .caption p { margin: 0; font: 600 clamp(16px, 2vw, 22px)/1.3 system-ui, sans-serif; }
 #story .card { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 6vw;
   font: 900 clamp(22px, 3.6vw, 44px)/1.3 system-ui, sans-serif; letter-spacing: 0.2em; }
-
 
 /* THE BAG: six parts on the left, your records on the right. */
 #bag { background: var(--night); }
@@ -307,21 +300,24 @@ button.quiet[hidden] { display: none; }
   font: 800 13px system-ui, sans-serif; letter-spacing: 0.15em; }
 
 /* PHONES: the modes and the devices. */
-#phones-body .mode, #settings-body.phones-tab .mode { display: flex; gap: 12px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--edge); }
-#phones-body .mode .pill, #settings-body.phones-tab .mode .pill { flex: none; min-width: 130px; }
-#phones-body .mode .pill:disabled, #settings-body.phones-tab .mode .pill:disabled { opacity: 0.35; cursor: default; }
-#phones-body .mode p, #settings-body.phones-tab .mode p { margin: 0; font-size: 14px; }
-#phones-body .device, #settings-body.phones-tab .device { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; color: var(--dim); font: 800 11px system-ui, sans-serif; letter-spacing: 0.15em; }
-#phones-body select, #settings-body.phones-tab select { padding: 8px; border-radius: 8px; background: var(--slot); color: var(--ink); border: 1px solid var(--edge); font: 500 14px system-ui, sans-serif; }
-#phones-body .quiet, #controls-body .pill, #settings-body.phones-tab .quiet, #settings-body.keys-tab .pill { margin-top: 10px; }
-.sheet p.small, #controls-body p.small, #settings-body p.small { color: var(--dim); font-size: 13px; margin: 6px 0; }
+#phones-body .mode { display: flex; gap: 12px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--edge); }
+#phones-body .mode .pill { flex: none; min-width: 130px; }
+#phones-body .mode .pill:disabled { opacity: 0.35; cursor: default; }
+#phones-body .mode p { margin: 0; font-size: 14px; }
+#phones-body .device { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; color: var(--dim); font: 800 11px system-ui, sans-serif; letter-spacing: 0.15em; }
+#phones-body select { padding: 8px; border-radius: 8px; background: var(--slot); color: var(--ink); border: 1px solid var(--edge); font: 500 14px system-ui, sans-serif; }
+#phones-body .quiet,
+#controls-body .pill { margin-top: 10px; }
+.sheet p.small,
+#controls-body p.small { color: var(--dim); font-size: 13px; margin: 6px 0; }
 .sheet.small { max-height: 90vh; overflow-y: auto; }
 
 /* KEYS & MIDI */
-#controls-body, #settings-body.keys-tab { overflow-y: auto; display: flex; gap: 22px; flex-wrap: wrap; }
-#controls-body h3, #settings-body.keys-tab h3 { margin: 4px 0; color: var(--teal); font: 700 13px "Orbitron", sans-serif; letter-spacing: 0.2em; }
-#controls-body h4, #settings-body.keys-tab h4 { margin: 12px 0 4px; font: 700 14px system-ui, sans-serif; }
-#controls-body .keys, #controls-body .midi, #settings-body.keys-tab .keys, #settings-body.keys-tab .midi { flex: 1 1 240px; }
+#controls-body { overflow-y: auto; display: flex; gap: 22px; flex-wrap: wrap; }
+#controls-body h3 { margin: 4px 0; color: var(--teal); font: 700 13px "Orbitron", sans-serif; letter-spacing: 0.2em; }
+#controls-body h4 { margin: 12px 0 4px; font: 700 14px system-ui, sans-serif; }
+#controls-body .keys,
+#controls-body .midi { flex: 1 1 240px; }
 .keytable { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; align-items: center; }
 .keytable kbd { min-width: 26px; text-align: center; padding: 3px 6px; border-radius: 6px; background: var(--slot); border: 1px solid rgba(255, 255, 255, 0.25);
   font: 700 13px system-ui, sans-serif; }
@@ -349,455 +345,27 @@ button.quiet[hidden] { display: none; }
 #learn-choice:empty { display: none; }
 #learn-choice .pill { font-size: 11px; padding: 0.6em 1em; }
 
-#phones-body .timing, #settings-body.phones-tab .timing { margin-top: 10px; padding: 10px 0; border-bottom: 1px solid var(--edge); }
-#phones-body .timing .head, #settings-body.phones-tab .timing .head { color: var(--teal); font: 800 11px system-ui, sans-serif; letter-spacing: 0.15em; }
-#phones-body .trim, #settings-body.phones-tab .trim { display: flex; align-items: center; gap: 8px; }
-#phones-body .trim input, #settings-body.phones-tab .trim input { flex: 1; accent-color: var(--teal); }
-#phones-body .trim .end, #settings-body.phones-tab .trim .end { color: var(--dim); font: 800 9px system-ui, sans-serif; letter-spacing: 0.08em; white-space: nowrap; }
-#phones-body .trim .ms, #settings-body.phones-tab .trim .ms { min-width: 58px; text-align: right; font: 700 13px system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+#phones-body .timing { margin-top: 10px; padding: 10px 0; border-bottom: 1px solid var(--edge); }
+#phones-body .timing .head { color: var(--teal); font: 800 11px system-ui, sans-serif; letter-spacing: 0.15em; }
+#phones-body .trim { display: flex; align-items: center; gap: 8px; }
+#phones-body .trim input { flex: 1; accent-color: var(--teal); }
+#phones-body .trim .end { color: var(--dim); font: 800 9px system-ui, sans-serif; letter-spacing: 0.08em; white-space: nowrap; }
+#phones-body .trim .ms { min-width: 58px; text-align: right; font: 700 13px system-ui, sans-serif; font-variant-numeric: tabular-nums; }
 
 /* MY MUSIC: your own files in the crate (free play). */
 .tabs { display: flex; gap: 8px; margin-bottom: 10px; }
 .tabs .pill.on { background: var(--teal); color: #000; border-color: var(--teal); }
-#mymusic { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-#mymusic[hidden], #crate-list[hidden] { display: none; }
-#mymusic .mm-top { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
-#mymusic .mm-folder { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border: 1px solid var(--edge); border-radius: 10px; font-size: 13px; }
-#mymusic .mm-folder b { max-width: 12em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#mymusic .mm-folder span { color: var(--dim); }
-#mymusic .mm-status { margin: 0 0 8px; font-size: 13px; color: var(--dim); }
-#mymusic .mm-search { width: 100%; box-sizing: border-box; padding: 9px 10px; margin-bottom: 8px; border-radius: 8px; background: var(--slot); color: var(--ink);
-  border: 1px solid var(--edge); font: 600 13px system-ui, sans-serif; letter-spacing: 0.08em; }
-#mymusic .mm-bar { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
-#mymusic .mm-bar .mm-search { flex: 1; width: auto; min-width: 0; margin-bottom: 0; }
-#mymusic .mm-bar button.mini.on { background: var(--teal); color: #000; border-color: var(--teal); }
+#crate-list[hidden] { display: none; }
 /* The sleeves: covers in a grid, like the front of a crate; a tap opens LEFT / RIGHT on the cover. */
-#mymusic .mm-list.sleeves { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 14px 10px; align-content: start; padding: 2px 2px 10px; }
-#mymusic .mm-list.sleeves p { grid-column: 1 / -1; }
-.mm-sleeve { position: relative; display: flex; flex-direction: column; gap: 2px; min-width: 0; cursor: pointer; outline: none; }
-.mm-sleeve .mm-cover { position: relative; aspect-ratio: 1; border-radius: 6px; overflow: hidden; border: 1px solid var(--edge); box-shadow: 0 5px 12px rgba(0, 0, 0, 0.5); }
-.mm-sleeve:focus-visible .mm-cover { border-color: var(--teal); }
-.mm-sleeve canvas.mm-art { display: block; width: 100%; height: 100%; }
-.mm-sleeve b { display: block; margin-top: 5px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mm-sleeve > span { color: var(--dim); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mm-sleeve .mm-pick { position: absolute; inset: auto 0 0 0; display: none; gap: 4px; padding: 14px 6px 6px; background: linear-gradient(transparent, rgba(0, 0, 0, 0.88)); }
-.mm-sleeve:hover .mm-pick, .mm-sleeve:focus-visible .mm-pick, .mm-sleeve.open .mm-pick { display: flex; }
-.mm-sleeve .mm-pick button { flex: 1; padding: 7px 0; border-radius: 7px; background: rgba(8, 10, 18, 0.85); font: 800 11px system-ui, sans-serif; letter-spacing: 0.1em; border: 1.5px solid; cursor: pointer; }
-.mm-sleeve .mm-pick button.left { color: var(--teal); border-color: var(--teal); }
-.mm-sleeve .mm-pick button.right { color: var(--magenta); border-color: var(--magenta); }
-.record canvas.mm-art { width: 44px; height: 44px; flex: none; border-radius: 5px; border: 1px solid var(--edge); }
-#mymusic .mm-list { overflow-y: auto; flex: 1; min-height: 80px; }
-#mymusic .mm-loaded { border-top: 1px solid var(--edge); margin-top: 8px; padding-top: 6px; }
-#mymusic .mm-fix { display: flex; align-items: center; gap: 6px; padding: 4px 0; font-size: 13px; }
-#mymusic .mm-fix b { font: 700 11px system-ui, sans-serif; letter-spacing: 0.12em; min-width: 3.4em; }
-#mymusic .mm-fix b.left { color: var(--teal); }
-#mymusic .mm-fix b.right { color: var(--magenta); }
-#mymusic .mm-fix .mm-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#mymusic .mm-fix .mm-bpm { color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
-#mymusic .mm-fix .mm-bpm.unsure { color: var(--orange); }
 button.mini { padding: 4px 9px; border-radius: 7px; background: var(--slot); color: var(--ink); border: 1px solid var(--edge); font: 700 11px system-ui, sans-serif; letter-spacing: 0.08em; cursor: pointer; }
 button.mini.on { border-color: var(--orange); color: var(--orange); }
 
-/* The record room (free play): a wall with a shelf of picks and crates; a crate opens to dig through it. */
-#wall { --ws: 1; position: fixed; left: 0; right: 0; top: 0; height: calc(100vh - var(--gear-h, 58vh)); height: calc(100dvh - var(--gear-h, 58dvh)); z-index: 2;
-  overflow: hidden; display: flex; flex-direction: column; border-bottom: 1px solid var(--edge);
-  background: radial-gradient(110% 80% at 50% 0%, rgba(255, 153, 61, 0.13), transparent 62%),
-    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px calc(var(--ws) * 36px)),
-    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.22) 0 2px, transparent 2px calc(var(--ws) * 96px)),
-    linear-gradient(#171b2c, #0a0c15); }
-#wall[hidden] { display: none; }
-#wall-open { position: fixed; z-index: 3; top: 9vh; left: 2vw; }
-#wall .mini { padding: 5px 10px; border-radius: 7px; background: rgba(5, 6, 10, 0.7); color: var(--ink); border: 1px solid var(--edge); font: 700 calc(var(--wz) * 11px) system-ui, sans-serif;
-  letter-spacing: 0.1em; cursor: pointer; }
-#wall .mini.on { background: var(--teal); color: #000; border-color: var(--teal); }
-#wall .w-top { flex: none; display: flex; align-items: center; gap: 8px; height: calc(var(--wz) * 48px); padding: 0 calc(var(--top-w, 460px) + 2vw + 16px) 0 max(88px, 6vw); overflow: hidden; white-space: nowrap; }
-#wall .w-group { display: flex; align-items: center; gap: 5px; margin-right: 8px; }
-#wall .w-cap { color: var(--dim); font: 700 calc(var(--ws) * 10px) system-ui, sans-serif; letter-spacing: 0.14em; margin-right: 3px; }
-@media (max-width: 1180px) { #wall .w-cap { display: none; } }
-#wall .w-status { color: var(--orange); font-size: calc(var(--ws) * 13px); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-#wall .w-empty { color: var(--dim); text-align: center; margin: 0; padding: 2em; }
-#wall .w-shelf { flex: none; padding: 0 3vw; }
-#wall.compact .w-shelf { display: none; }
-#wall.compact .w-floor { align-items: center; }
-#wall .w-row { display: flex; justify-content: center; align-items: flex-end; gap: calc(var(--ws) * 14px); height: calc(var(--ws) * 116px); }
-#wall .w-pick { position: relative; width: calc(var(--ws) * 104px); aspect-ratio: 1; flex: none; border-radius: 3px; overflow: hidden; cursor: pointer; outline: none;
-  box-shadow: 0 7px 12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08); transition: transform 0.15s; }
-#wall .w-pick:nth-child(3n+1) { transform: rotate(-1.4deg); }
-#wall .w-pick:nth-child(3n+2) { transform: rotate(0.9deg); }
-#wall .w-pick:hover, #wall .w-pick:focus-visible, #wall .w-pick.open { transform: translateY(-7px) rotate(0); }
-#wall canvas.w-art { display: block; width: 100%; height: 100%; }
-#wall .w-pop { position: absolute; inset: auto 0 0 0; display: none; flex-direction: column; gap: 4px; padding: 16px 5px 5px; background: linear-gradient(transparent, rgba(0, 0, 0, 0.9) 35%); }
-#wall .w-pick:hover .w-pop, #wall .w-pick:focus-visible .w-pop, #wall .w-pick.open .w-pop { display: flex; }
-#wall .w-pop b { font-size: calc(var(--ws) * 11px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#wall .w-decks { display: flex; gap: 4px; }
-#wall .w-decks button { flex: 1; padding: calc(var(--ws) * 6px) 0; border-radius: 7px; background: rgba(8, 10, 18, 0.88); font: 800 calc(var(--ws) * 10px) system-ui, sans-serif; letter-spacing: 0.1em; border: 1.5px solid; cursor: pointer; }
-#wall .w-decks button.left { color: var(--teal); border-color: var(--teal); }
-#wall .w-decks button.right { color: var(--magenta); border-color: var(--magenta); }
-#wall .w-board { height: calc(var(--ws) * 9px); margin: 0 1vw; border-radius: 2px; box-shadow: 0 9px 14px rgba(0, 0, 0, 0.55);
-  background: repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.0) 0 70px, rgba(0, 0, 0, 0.16) 70px 72px), linear-gradient(#8a5f36, #5b3d22); }
-#wall .w-floor { flex: 1; min-height: 0; display: flex; justify-content: center; align-items: flex-end; gap: calc(var(--ws) * 18px); padding: 0 2vw calc(var(--ws) * 10px); }
-#wall .w-crate { flex: none; width: calc(var(--ws) * 148px); padding: 0; border: 0; background: none; color: inherit; cursor: pointer; display: flex; flex-direction: column; font: inherit; }
-#wall .w-peek { position: relative; display: block; height: calc(var(--ws) * 64px); margin-bottom: calc(var(--ws) * -12px); transition: transform 0.15s; }
-#wall .w-crate:hover .w-peek, #wall .w-crate:focus-visible .w-peek { transform: translateY(calc(var(--ws) * -8px)); }
-#wall .w-rec { position: absolute; top: calc(var(--ws) * (var(--k) * -1px + 6px)); left: calc(4% + var(--k) * 23%); width: 50%; aspect-ratio: 1; overflow: hidden; border-radius: 3px;
-  transform: rotate(calc((var(--k) - 1.5) * 3.2deg)); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), 0 -2px 6px rgba(0, 0, 0, 0.4); }
-#wall .w-box { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; height: calc(var(--ws) * 66px); border-radius: 4px 4px 7px 7px;
-  background: repeating-linear-gradient(180deg, #7b5532 0 16px, #4f361e 16px 18px), #6b4829; border: 1px solid rgba(0, 0, 0, 0.55);
-  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.14), inset 0 -3px 6px rgba(0, 0, 0, 0.35), 0 9px 14px rgba(0, 0, 0, 0.55); }
-#wall .w-box b { font: 800 calc(var(--ws) * 15px) "Orbitron", sans-serif; letter-spacing: 0.06em; color: #f6e6c9; padding: 2px 9px; border-radius: 3px; background: rgba(0, 0, 0, 0.42); max-width: 92%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#wall .w-box i { font-style: normal; color: rgba(255, 235, 200, 0.7); font-size: calc(var(--ws) * 11px); }
-#wall .w-ask { align-self: flex-end; }
-#wall .w-ask .w-box { background: rgba(255, 255, 255, 0.04); border: 2px dashed rgba(255, 255, 255, 0.3); box-shadow: none; position: absolute; inset: auto 0 0 0; }
-#wall .w-ask b, #wall .w-ask i { position: relative; z-index: 3; }
-#wall .w-ask b { align-self: center; margin-top: calc(var(--ws) * 14px); font: 800 calc(var(--ws) * 14px) "Orbitron", sans-serif; }
-#wall .w-ask i { align-self: center; font-style: normal; color: var(--teal); font-size: calc(var(--ws) * 11px); letter-spacing: 0.1em; margin-top: 3px; }
-#wall .w-ask { position: relative; height: calc(var(--ws) * 78px); }
-
-/* Digging through a crate: the front record stands up, the ones behind show their tops. */
-#wall .w-dig { position: absolute; inset: 0; display: grid; grid-template-columns: 22% 40% 1fr; background: inherit; z-index: 2; }
-#wall .w-dig[hidden] { display: none; }
-#wall .d-left { padding: calc(var(--ws) * 16px) calc(var(--ws) * 10px) 0 max(88px, 6vw); }
-#wall .d-left h3 { margin: calc(var(--ws) * 14px) 0 2px; font: 800 calc(var(--ws) * 22px) "Orbitron", sans-serif; color: #f6e6c9; letter-spacing: 0.05em; overflow-wrap: anywhere; }
-#wall .d-left p { margin: 2px 0; color: var(--dim); font-size: calc(var(--ws) * 13px); }
-#wall .d-left .d-pos { color: var(--teal); font-variant-numeric: tabular-nums; }
-#wall .d-stage { position: relative; perspective: calc(var(--ws) * 760px); perspective-origin: 50% 8%; touch-action: none; cursor: ns-resize; --S: 160px; }
-#wall .d-rec { position: absolute; left: 50%; bottom: calc(var(--ws) * 12px); width: var(--S); height: var(--S); margin-left: calc(var(--S) / -2); transform-origin: 50% 100%;
-  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.25s; border-radius: 3px; overflow: hidden; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 10px 22px rgba(0, 0, 0, 0.6); cursor: pointer; }
-#wall .d-rec.front { cursor: default; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18), 0 14px 28px rgba(0, 0, 0, 0.7); }
-#wall .d-rec canvas.w-art { width: 100%; height: 100%; }
-#wall .d-shade { position: absolute; inset: 0; background: #000; opacity: var(--dark, 0); pointer-events: none; transition: opacity 0.3s; }
-#wall .d-info { padding: calc(var(--ws) * 64px) 3vw 0 1vw; min-width: 0; }
-#wall .d-info h3 { margin: 0; font: 800 calc(var(--ws) * 22px)/1.15 system-ui, sans-serif; overflow-wrap: anywhere; }
-#wall .d-info p { margin: calc(var(--ws) * 4px) 0; }
-#wall .d-artist { font-size: calc(var(--ws) * 16px); color: var(--ink); }
-#wall .d-sub { color: var(--dim); font-size: calc(var(--ws) * 13px); }
-#wall .d-on { color: var(--orange); font: 700 calc(var(--ws) * 11px) system-ui, sans-serif; letter-spacing: 0.12em; }
-#wall .d-info .w-decks { margin: calc(var(--ws) * 12px) 0; max-width: calc(var(--ws) * 300px); }
-#wall .d-info .w-decks button { padding: calc(var(--ws) * 11px) 0; font-size: calc(var(--ws) * 13px); }
-#wall .d-cap { color: var(--dim); font: 700 calc(var(--ws) * 10px) system-ui, sans-serif; letter-spacing: 0.14em; margin-top: calc(var(--ws) * 10px); }
-#wall .d-next { margin: 2px 0 0; padding: 0; list-style: none; color: var(--dim); font-size: calc(var(--ws) * 12px); }
-#wall .d-next li { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 1px 0; }
-#wall .d-scrub { display: block; width: 100%; max-width: calc(var(--ws) * 260px); margin: calc(var(--ws) * 14px) 0 0; accent-color: var(--teal); }
-
-/* LIVE: the DJ's booth (free play). The canvas draws the gear row; the library and the stream panel are HTML under it. */
-body.live #room { display: none; }
-body.live #back { top: 3px; left: 8px; width: 30px; height: 30px; font-size: 20px; }
-body.live #top { top: 6px; right: 10px; gap: 6px; }
-/* In LIVE the bar's buttons match the small caps of the rest of the booth: still glass, a tiny smaller. */
-body.live #top .pill { font-size: 9px; letter-spacing: 0.14em; padding: 0.5em 1.05em; line-height: 1.15; background: rgba(12, 16, 22, 0.55); border-color: rgba(255, 255, 255, 0.2); backdrop-filter: blur(6px); }
-body.live #top .pill:hover { border-color: rgba(255, 255, 255, 0.4); }
-body.live #top .pill .icon { width: 1.1em; height: 1.1em; margin-right: 0.5em; }
-/* The page's messages sit between the stream bar (its ON AIR time) and the buttons, and never over either. */
-/* The orange messages: small, under GROOVELINE LIVE, up to two lines, the whole text (and in the tooltip). */
-body.live #livebar { align-items: flex-start; padding-top: 9px; box-sizing: border-box; }
-body.live #note { top: 22px; left: 48px; font-size: 10px; line-height: 11px; max-width: max(180px, calc(100vw - 48px - 540px)); max-height: 22px; overflow: hidden;
-  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; z-index: 4; }
-/* The effects controls are in the bar (a wide window): the message is one line under them (they use the top 32 px), from the left edge to the buttons. */
-body.live.fxbar #note { top: 32px; line-height: 12px; max-height: 12px; max-width: calc(100vw - 48px - 410px); -webkit-line-clamp: 1; }
-#deck-tip { position: fixed; z-index: 50; max-width: 70vw; padding: 6px 10px; border-radius: 7px; background: rgba(8, 11, 16, 0.96); border: 1px solid rgba(255, 255, 255, 0.25);
-  font: 600 13px system-ui, sans-serif; color: var(--ink); pointer-events: none; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6); }
-#deck-tip[hidden] { display: none; }
-#livebar { position: fixed; z-index: 3; top: 0; left: 48px; height: var(--bar-h, 44px); display: flex; align-items: center; gap: 14px; pointer-events: none; }
-#livebar[hidden] { display: none; }
-#livebar .brand { font: 700 12.5px "Orbitron", sans-serif; letter-spacing: 0.26em; color: var(--ink); }
-#livebar .brand b { color: #26c6f0; margin-left: 0.5em; }
-#livebar .onair { display: flex; align-items: center; gap: 7px; font: 700 11px system-ui, sans-serif; letter-spacing: 0.16em; color: var(--dim); }
-#livebar .onair i { width: 9px; height: 9px; border-radius: 50%; background: rgba(255, 255, 255, 0.16); }
-#livebar .time { font: 600 12.5px ui-monospace, Menlo, monospace; color: var(--dim); }
-#livebar .clock { font: 600 12.5px ui-monospace, Menlo, monospace; letter-spacing: 0.06em; color: var(--ink); }
-body.live #wall { left: var(--lib-left); top: var(--lib-top); right: auto; width: var(--lib-w); height: var(--lib-h); border: 1px solid var(--edge); border-radius: 8px;
-  background: radial-gradient(120% 90% at 50% 0%, rgba(38, 198, 240, 0.05), transparent 60%), linear-gradient(#10141b, #090c11); }
-body.live #wall { --teal: #26c6f0; --magenta: #ffac28; }
-body.live #wall .w-top { padding: 0 14px; justify-content: space-between; gap: 12px; }
-body.live #wall .d-left { padding-left: 18px; }
-#stream { position: fixed; z-index: 2; left: var(--stream-left); top: var(--stream-top); width: var(--stream-w); height: var(--stream-h); box-sizing: border-box; padding: 14px 16px;
-  display: flex; flex-direction: column; border: 1px solid var(--edge); border-radius: 8px; background: linear-gradient(#10141b, #090c11); overflow: hidden; }
-#stream[hidden] { display: none; }
-#stream .s-head { display: flex; justify-content: space-between; font: 700 11px "Orbitron", sans-serif; letter-spacing: 0.22em; color: var(--ink); }
-#stream .s-state { font: 700 11px system-ui, sans-serif; letter-spacing: 0.16em; color: var(--dim); }
-#stream .s-body { display: flex; gap: 12px; margin: 16px 0 0; min-height: 0; }
-#stream dl { flex: 1; min-width: 0; display: grid; grid-template-columns: auto 1fr; gap: 9px 14px; margin: 0; font-size: 12px; }
-/* The master meter: the level the radio gets, two vertical bars (left, right) beside the rows. The colour is the level (green, amber, red); a dark cover hides the part above it. */
-#meter { position: relative; flex: none; width: 30px; display: flex; flex-direction: column; gap: 4px; }
-#meter .m-bars { flex: 1; min-height: 52px; display: flex; gap: 4px; }
-#meter .m-bar { position: relative; flex: 1; border-radius: 2px; overflow: hidden;
-  background: linear-gradient(to top, #2fd27a 0 66%, #c9d23a 72%, #ffc233 80%, #ff9a3d 90%, #ff4e40 96%); }
-#meter .m-bar::after { content: ""; position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(to top, transparent 11%, rgba(255, 255, 255, 0.16) 11% calc(11% + 1px), transparent calc(11% + 1px) 50%, rgba(255, 255, 255, 0.16) 50% calc(50% + 1px), transparent calc(50% + 1px) 74%, rgba(255, 255, 255, 0.16) 74% calc(74% + 1px), transparent calc(74% + 1px) 86.7%, rgba(255, 255, 255, 0.16) 86.7% calc(86.7% + 1px), transparent calc(86.7% + 1px)); }
-#meter .m-cover { position: absolute; left: 0; right: 0; top: 0; height: 100%; background: #0b0e13; transform-origin: top; transform: scaleY(1); }
-#meter .m-hold { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: #eef2f7; opacity: 0; }
-#meter .m-db { font: 600 9px ui-monospace, Menlo, monospace; letter-spacing: 0.02em; color: var(--dim); text-align: center; white-space: nowrap; }
-#meter .m-clip { position: absolute; top: -2px; left: -1px; right: -1px; padding: 1px 0; border-radius: 2px; background: #ff4e40; color: #fff; font: 800 7.5px system-ui, sans-serif; letter-spacing: 0.08em; text-align: center; display: none; }
-#meter.clipping .m-clip { display: block; }
-#meter.clipping .m-db { color: #ff7d70; }
-#stream dt { color: var(--dim); font: 700 9.5px system-ui, sans-serif; letter-spacing: 0.14em; align-self: center; }
-#stream dd { margin: 0; min-width: 0; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#stream dd#stream-slot { white-space: normal; line-height: 1.25; } /* a day-away slot ("Sat 13:10-14:10 . in 18 h 30 min") wraps to a second line instead of being cut */
-#stream .s-state.checking { color: var(--teal); }
-#stream .s-state.onair { color: #ff7d70; }
-/* PREVIEW: the DJ's own camera, in this page only. The row sits under the facts (and replaces them while the picture is on: five rows and a 16:9
-   picture do not fit in 276 x 248 px). The video is a MediaStream of this browser: no CSP change (nothing is fetched). */
-#camera { display: none; }
-#stream.camera-on .s-body { flex: 1 1 auto; margin-top: 10px; }
-#stream.camera-on #camera { display: flex; flex: 1 1 auto; min-width: 0; min-height: 0; align-items: center; justify-content: center; overflow: hidden; }
-/* A 16:9 box that fits whatever is left: both sizes auto, the ratio sets it, the two max constraints shrink it without ever cropping the picture. */
-#camera video { width: auto; height: auto; max-width: 100%; max-height: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: #000; display: block; border: 1px solid var(--edge); border-radius: 6px; }
-#stream.camera-on dl { display: none; }
-/* The picture needs the room the rows had, and a squeezed panel must not push the meter over the note and the buttons. */
-#stream.camera-on #meter .m-bars { min-height: 0; }
-#camera-bar { display: flex; align-items: center; gap: 8px; margin: 9px 0 0; }
-#stream.camera-on #camera-bar { margin-top: 8px; }
-#camera-bar .cam-label { flex: 1; color: var(--dim); font: 700 9.5px system-ui, sans-serif; letter-spacing: 0.14em; }
-#camera-bar .cam-tight { display: none; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dim); font: 600 9px system-ui, sans-serif; }
-#camera-bar select { flex: none; max-width: 118px; padding: 2px 3px; border-radius: 5px; background: var(--slot); color: var(--ink); border: 1px solid var(--edge); font: 600 10px system-ui, sans-serif; }
-#camera-bar button { flex: none; padding: 4px 11px; border-radius: 6px; border: 1.5px solid rgba(255, 255, 255, 0.4); background: rgba(255, 255, 255, 0.06); color: var(--ink);
-  font: 800 9.5px system-ui, sans-serif; letter-spacing: 0.16em; cursor: pointer; }
-#camera-bar button:hover { border-color: rgba(255, 255, 255, 0.65); }
-#camera-bar button[disabled] { opacity: 0.5; cursor: default; }
-/* IN SHOW: lit = the picture goes out with the show (the stream panel's PREVIEW row). */
-#camera-bar button.send { letter-spacing: 0.12em; color: var(--dim); }
-#camera-bar button.send.on { border-color: rgba(38, 198, 240, 0.7); color: #26c6f0; background: rgba(38, 198, 240, 0.16); }
-#stream .s-note { flex: none; margin: 8px 0 0; font: 600 10.5px/1.3 system-ui, sans-serif; color: var(--orange); max-height: 28px; overflow: hidden; }
-#stream .s-note.good { color: var(--dim); }
-#stream .s-buttons { margin-top: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding-top: 8px; }
-#stream .check { padding: 11px 0; border-radius: 8px; border: 1.5px solid rgba(38, 198, 240, 0.5); background: rgba(38, 198, 240, 0.07); color: #26c6f0;
-  font: 800 11px system-ui, sans-serif; letter-spacing: 0.14em; cursor: pointer; }
-#stream .check:hover { background: rgba(38, 198, 240, 0.16); }
-#stream .check.stops { border-color: rgba(255, 255, 255, 0.4); color: var(--ink); background: rgba(255, 255, 255, 0.06); }
-#stream .go { margin-top: 0; padding: 11px 0; border-radius: 8px; border: 1.5px solid rgba(255, 78, 64, 0.55); background: rgba(255, 78, 64, 0.07); color: #ff7d70;
-  font: 800 12px system-ui, sans-serif; letter-spacing: 0.18em; }
-#stream .go:disabled { opacity: 0.45; cursor: default; }
-#stream .go:not(:disabled) { cursor: pointer; }
-#stream .go:not(:disabled):hover { background: rgba(255, 78, 64, 0.16); }
-#stream .go.stops { border-color: rgba(255, 255, 255, 0.4); color: var(--ink); background: rgba(255, 255, 255, 0.06); }
-#stream .go.confirm { border-color: #ff4e40; background: rgba(255, 78, 64, 0.28); color: #fff; }
-#stream .check:disabled { opacity: 0.45; cursor: default; }
-#livebar .onair.live { color: #ff7d70; }
-#livebar .onair.live i { background: #ff4e40; box-shadow: 0 0 8px rgba(255, 78, 64, 0.8); }
-#livebar .onair.warm { color: var(--ink); }
-#livebar .onair.warm i { background: var(--orange); }
-#livebar .onair.live ~ .time { color: var(--ink); }
-
-/* The library's search and its two views. */
-#wall .w-topl { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; }
-#wall .w-topr { display: flex; align-items: center; gap: 6px; flex: none; }
-#wall .w-search { width: calc(var(--ws) * 230px); box-sizing: border-box; padding: calc(var(--ws) * 6px) calc(var(--ws) * 10px); border-radius: 7px; background: rgba(5, 6, 10, 0.75);
-  color: var(--ink); border: 1px solid var(--edge); font: 600 calc(var(--ws) * 11px) system-ui, sans-serif; letter-spacing: 0.08em; }
-#wall .w-search:focus { outline: none; border-color: #26c6f0; }
-#wall.listing .w-shelf, #wall.listing .w-floor { display: none; }
-#wall .w-list { display: none; flex: 1; min-height: 0; flex-direction: column; padding: 0 14px 8px; --l-cols: minmax(0, 2fr) minmax(0, 3fr) calc(var(--wz) * 46px) calc(var(--wz) * 42px) calc(var(--wz) * 36px) calc(var(--wz) * 44px) calc(var(--wz) * 78px) minmax(0, 1fr) calc(var(--wz) * 86px); }
-#wall.listing .w-list { display: flex; }
-#wall .l-head { flex: none; display: grid; grid-template-columns: var(--l-cols); gap: 10px; padding: 0 8px 4px; border-bottom: 1px solid var(--edge); }
-#wall .l-col { background: none; border: 0; padding: 4px 0; text-align: left; color: var(--dim); font: 700 calc(var(--wz) * 10px) system-ui, sans-serif; letter-spacing: 0.14em; cursor: pointer; }
-#wall .l-col:disabled { cursor: default; }
-#wall .l-col.on { color: #26c6f0; }
-#wall .l-col.end { text-align: right; padding: 4px 0; }
-#wall .l-scroll { position: relative; flex: 1; min-height: 0; overflow-y: auto; }
-#wall .l-spacer { width: 1px; }
-#wall .l-row { position: absolute; left: 0; right: 0; display: grid; grid-template-columns: var(--l-cols); gap: 10px; align-items: center; padding: 0 8px; box-sizing: border-box;
-  font-size: calc(var(--wz) * 13px); border-bottom: 1px solid rgba(255, 255, 255, 0.035); }
-#wall .l-row:hover { background: rgba(255, 255, 255, 0.04); }
-/* On a deck now: the row is lit in that deck's colour, with a bar at its left, so it can be found in a long list. */
-#wall .l-row.on { background: rgba(38, 198, 240, 0.14); box-shadow: inset 3px 0 0 #26c6f0; font-weight: 700; }
-#wall .l-row.on.onb { background: rgba(255, 172, 40, 0.14); box-shadow: inset 3px 0 0 #ffac28; }
-#wall .l-row.on.onb.ona { background: linear-gradient(90deg, rgba(38, 198, 240, 0.16), rgba(255, 172, 40, 0.16)); box-shadow: inset 3px 0 0 #26c6f0, inset -3px 0 0 #ffac28; }
-#wall .l-row.on .l-title, #wall .l-row.on .l-artist { color: #fff; }
-#wall .l-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#wall .l-artist { color: var(--ink); }
-#wall .l-title { color: rgba(236, 240, 245, 0.8); }
-#wall .l-num, #wall .l-key, #wall .l-time, #wall .l-type, #wall .l-date { color: var(--dim); font-variant-numeric: tabular-nums; }
-#wall .l-time, #wall .l-date { white-space: nowrap; }
-#wall .l-genre { color: var(--dim); font-size: 0.9em; }
-#wall .mark { display: inline-block; margin-right: 6px; padding: 0 4px; border-radius: 3px; font: 800 0.72em system-ui, sans-serif; font-style: normal; color: #04070a; }
-#wall .mark.a { background: #26c6f0; }
-#wall .mark.b { background: #ffac28; }
-#wall .l-load { display: flex; gap: 4px; justify-content: flex-end; overflow: visible !important; }
-#wall .l-load button { width: calc(var(--wz) * 26px); padding: calc(var(--wz) * 3px) 0; border-radius: 5px; background: rgba(8, 10, 18, 0.9); font: 800 calc(var(--wz) * 10px) system-ui, sans-serif; border: 1.5px solid; cursor: pointer; }
-#wall .l-load button.left { color: #26c6f0; border-color: #26c6f0; }
-#wall .l-load button.right { color: #ffac28; border-color: #ffac28; }
-#wall .l-count { flex: none; padding: 6px 8px 0; color: var(--dim); font-size: calc(var(--wz) * 11px); }
-#wall .w-floor { justify-content: safe center; }
-#wall.listing .w-group, #wall.listing .w-shuffle { display: none; }
-
-/* The question a click on a record asks: on which deck? (library/loadpop.ts) Left is cyan, right is amber, as in the booth. */
-.load-pop { position: fixed; z-index: 40; width: 244px; padding: 13px 13px 14px; border-radius: 12px; color: var(--ink);
-  background: linear-gradient(#1b212b, #0e1217); border: 1px solid rgba(255, 255, 255, 0.22); box-shadow: 0 16px 44px rgba(0, 0, 0, 0.75); }
-.load-pop[hidden] { display: none; }
-.load-pop .lp-title b { display: block; font: 700 13px system-ui, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.load-pop .lp-title i { display: block; font: 500 11px system-ui, sans-serif; font-style: normal; color: rgba(236, 240, 245, 0.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
-.load-pop .lp-ask { margin: 11px 0 7px; font: 700 9px "Orbitron", sans-serif; letter-spacing: 0.2em; color: rgba(236, 240, 245, 0.46); }
-.load-pop .lp-decks { display: flex; gap: 8px; }
-.load-pop .lp-decks button { flex: 1; padding: 9px 0 8px; border-radius: 9px; background: #0a0d11; border: 1.5px solid; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px; }
-.load-pop .lp-decks button b { font: 800 13px "Orbitron", sans-serif; letter-spacing: 0.14em; }
-.load-pop .lp-decks button i { font: 600 9px system-ui, sans-serif; font-style: normal; letter-spacing: 0.14em; opacity: 0.7; }
-.load-pop .lp-decks .left { color: #26c6f0; border-color: #26c6f0; }
-.load-pop .lp-decks .right { color: #ffac28; border-color: #ffac28; }
-.load-pop .lp-decks .left:hover, .load-pop .lp-decks .left:focus-visible { background: rgba(38, 198, 240, 0.16); outline: none; }
-.load-pop .lp-decks .right:hover, .load-pop .lp-decks .right:focus-visible { background: rgba(255, 172, 40, 0.16); outline: none; }
-.load-pop .lp-decks button.busy { border-color: rgba(255, 255, 255, 0.25); color: rgba(236, 240, 245, 0.5); }
-.load-pop .lp-decks button.busy i { color: #ffb02a; opacity: 1; }
-#wall .l-row, #wall .w-pick { cursor: pointer; }
-
-/* The crates are a DJ's flight cases and record bags. They rise into place one after the other, the records bob, and a hovered one lifts (the case's
-   latches flash, the bag's flap opens). */
-@keyframes crate-in { from { transform: translateY(18px) scale(0.94); opacity: 0; } to { transform: none; opacity: 1; } }
-@keyframes rec-bob { 0%, 100% { transform: translateY(0) rotate(var(--tilt)); } 50% { transform: translateY(calc(var(--ws) * -2.2px)) rotate(var(--tilt)); } }
-@keyframes latch-glint { 0%, 100% { filter: none; } 50% { filter: brightness(1.7); } }
-#wall .w-crate { animation: crate-in 0.5s cubic-bezier(0.2, 0.9, 0.3, 1) both; animation-delay: calc(var(--i, 0) * 70ms); transition: transform 0.18s; }
-#wall .w-crate:hover, #wall .w-crate:focus-visible { transform: translateY(calc(var(--ws) * -4px)) rotate(-0.6deg); outline: none; }
-#wall .w-crate.bag:hover, #wall .w-crate.bag:focus-visible { transform: translateY(calc(var(--ws) * -4px)) rotate(0.8deg); }
-#wall .w-crate .w-rec { --tilt: calc((var(--k) - 1.5) * 3.2deg); transform: rotate(var(--tilt)); animation: rec-bob 3.4s ease-in-out infinite; animation-delay: calc(var(--k) * -0.8s); }
-#wall .w-crate .w-box { overflow: visible; }
-#wall .w-crate .w-deco { position: absolute; inset: 0; pointer-events: none; }
-#wall .w-crate .w-box b, #wall .w-crate .w-box i { position: relative; z-index: 3; }
-/* The flight case: ribbed black ATA shell, steel corners, butterfly latches, a handle, a strip of gaffer tape for the name. */
-#wall .w-crate.case .w-box { border-radius: 6px; border: 2px solid #2d323b;
-  background: repeating-linear-gradient(90deg, #171a20 0 9px, #0c0e12 9px 11px), #111318;
-  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.1), inset 0 -4px 8px rgba(0, 0, 0, 0.65), 0 9px 14px rgba(0, 0, 0, 0.6); }
-#wall .w-crate.case .w-box b { color: #15110a; background: #e6dcc0; border-radius: 2px; transform: rotate(-1.4deg); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); font-family: "Orbitron", sans-serif; }
-#wall .w-crate.case .w-box i { color: rgba(236, 240, 245, 0.62); }
-#wall .w-crate.case .w-handle { position: absolute; top: calc(var(--ws) * -9px); left: 34%; width: 32%; height: calc(var(--ws) * 9px); border: 2.5px solid #9aa1ad; border-bottom: 0; border-radius: 8px 8px 0 0; }
-#wall .w-crate.case .w-latch { position: absolute; top: calc(var(--ws) * 9px); width: calc(var(--ws) * 16px); height: calc(var(--ws) * 10px); border-radius: 2px; background: linear-gradient(#d9dde3, #8b919b); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.7); }
-#wall .w-crate.case .w-latch.l { left: 12%; } #wall .w-crate.case .w-latch.r { right: 12%; }
-#wall .w-crate.case:hover .w-latch { animation: latch-glint 0.7s ease-in-out infinite; }
-#wall .w-crate.case .w-corner { position: absolute; width: calc(var(--ws) * 11px); height: calc(var(--ws) * 11px); background: linear-gradient(135deg, #c8cdd5, #6c727d); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.45); }
-#wall .w-crate.case .w-corner.tl { top: -2px; left: -2px; border-radius: 6px 0 4px 0; } #wall .w-crate.case .w-corner.tr { top: -2px; right: -2px; border-radius: 0 6px 0 4px; }
-#wall .w-crate.case .w-corner.bl { bottom: -2px; left: -2px; border-radius: 0 4px 0 6px; } #wall .w-crate.case .w-corner.br { bottom: -2px; right: -2px; border-radius: 4px 0 6px 0; }
-/* The record bag: dark green canvas, a flap with a buckle, tan straps, a sewn patch for the name. */
-#wall .w-crate.bag .w-box { border-radius: 9px 9px 12px 12px; border: 1px solid #0b1511;
-  background: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.035) 0 2px, transparent 2px 5px), linear-gradient(#2d4d40, #1a2f26);
-  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.1), inset 0 -4px 8px rgba(0, 0, 0, 0.5), 0 9px 14px rgba(0, 0, 0, 0.6); }
-#wall .w-crate.bag .w-box b { color: #f3ead4; background: rgba(8, 20, 15, 0.7); border: 1.5px dashed rgba(243, 234, 212, 0.6); border-radius: 5px; }
-#wall .w-crate.bag .w-strap { position: absolute; top: 0; bottom: 0; width: calc(var(--ws) * 9px); background: linear-gradient(90deg, #a47a42, #c99b5c 50%, #a47a42); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35); }
-#wall .w-crate.bag .w-strap.l { left: 14%; } #wall .w-crate.bag .w-strap.r { right: 14%; }
-#wall .w-crate.bag .w-flap { position: absolute; left: -1px; right: -1px; top: -1px; height: 42%; border-radius: 9px 9px 60% 60% / 9px 9px 40% 40%; transform-origin: 50% 0;
-  background: linear-gradient(#264238, #1d362d); box-shadow: 0 3px 6px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.12); transition: transform 0.22s; }
-#wall .w-crate.bag .w-buckle { position: absolute; left: 50%; top: 34%; width: calc(var(--ws) * 13px); height: calc(var(--ws) * 9px); margin-left: calc(var(--ws) * -6.5px); border: 2px solid #d2b17a; border-radius: 2px; z-index: 2; }
-#wall .w-crate.bag:hover .w-flap, #wall .w-crate.bag:focus-visible .w-flap { transform: perspective(160px) rotateX(38deg); }
-@media (prefers-reduced-motion: reduce) { #wall .w-crate, #wall .w-crate .w-rec { animation: none; } }
-.load-pop .lp-title { display: flex; align-items: flex-start; gap: 8px; }
-.load-pop .lp-names { flex: 1; min-width: 0; }
-.load-pop .lp-heart { flex: none; width: 30px; height: 30px; border-radius: 50%; border: 1.5px solid rgba(255, 255, 255, 0.25); background: #0a0d11; color: rgba(236, 240, 245, 0.6); font-size: 16px; line-height: 1; cursor: pointer; }
-.load-pop .lp-heart.on { color: #ff6a5a; border-color: #ff6a5a; background: rgba(255, 106, 90, 0.12); }
-.load-pop .lp-heart:hover { border-color: rgba(255, 255, 255, 0.55); }
-#wall .l-load button.heart { width: calc(var(--wz) * 22px); border-color: rgba(255, 255, 255, 0.2); color: rgba(236, 240, 245, 0.5); font-size: calc(var(--wz) * 12px); }
-#wall .l-load button.heart.on { color: #ff6a5a; border-color: #ff6a5a; }
-#wall .w-fav { position: absolute; top: 3px; right: 5px; font-size: calc(var(--ws) * 13px); color: #ff6a5a; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8); pointer-events: none; }
-
-/* SHARE: only in LIVE (the game has nothing to share), one small popup under the button. */
-#share-button { display: none; }
-body.live #share-button { display: inline-block; }
-body.live #top .pill.on { background: rgba(38, 198, 240, 0.2); color: #fff; border-color: #26c6f0; }
-.share-pop { position: fixed; z-index: 45; width: 300px; padding: 14px; border-radius: 12px; color: var(--ink); background: linear-gradient(#1b212b, #0e1217);
-  border: 1px solid rgba(255, 255, 255, 0.22); box-shadow: 0 16px 44px rgba(0, 0, 0, 0.75); }
-.share-pop[hidden] { display: none; }
-.share-pop .sp-head { margin: 0 0 4px; font: 700 10px "Orbitron", sans-serif; letter-spacing: 0.2em; color: rgba(236, 240, 245, 0.55); }
-.share-pop .sp-text { margin: 0 0 10px; font: 600 13px system-ui, sans-serif; }
-.share-pop .sp-row { display: flex; gap: 6px; }
-.share-pop .sp-link { flex: 1; min-width: 0; padding: 8px 9px; border-radius: 7px; border: 1px solid rgba(255, 255, 255, 0.2); background: #080a0e; color: var(--ink); font: 500 12px system-ui, sans-serif; }
-.share-pop button { cursor: pointer; border-radius: 7px; font: 800 10px "Orbitron", sans-serif; letter-spacing: 0.12em; }
-.share-pop .sp-copy { padding: 0 12px; border: 1.5px solid #26c6f0; background: rgba(38, 198, 240, 0.12); color: #26c6f0; }
-.share-pop .sp-more { width: 100%; margin-top: 8px; padding: 9px 0; border: 1.5px solid rgba(255, 255, 255, 0.3); background: #0a0d11; color: var(--ink); }
-.share-pop .sp-nets { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-.share-pop .sp-nets a { padding: 7px 10px; border-radius: 7px; border: 1px solid rgba(255, 255, 255, 0.22); background: #0a0d11; color: var(--ink); text-decoration: none; font: 800 9.5px "Orbitron", sans-serif; letter-spacing: 0.12em; }
-.share-pop .sp-nets a:hover { border-color: rgba(255, 255, 255, 0.55); }
-/* ROOM / RECORDS: free play's wall can give way to the crowd; in LIVE the wall is the library, there is no room. */
-body.live #wall .w-room { display: none; }
-
-/* The PLAYLISTS view of the library: the playlists on the left, the records of the one picked on the right. */
-#wall .w-plays { display: none; flex: 1; min-height: 0; padding: 0 14px 8px; gap: 14px; font-size: calc(var(--wz) * 13px); }
-#wall.playlisting .w-shelf, #wall.playlisting .w-floor { display: none; }
-#wall.playlisting .w-plays { display: flex; }
-#wall.listing .w-plays { display: none; }
-#wall .pl-side { flex: none; width: calc(var(--wz) * 230px); display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--edge); padding-right: 12px; }
-#wall .pl-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 0 8px; }
-#wall .pl-cap { font: 700 calc(var(--wz) * 10px) system-ui, sans-serif; letter-spacing: 0.16em; color: var(--dim); }
-#wall .pl-bar, #wall .pl-actions { display: flex; gap: 6px; }
-#wall .pl-lists { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; }
-#wall .pl-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: calc(var(--wz) * 7px) calc(var(--wz) * 10px); border-radius: 7px; border: 1px solid transparent; background: rgba(255, 255, 255, 0.03); color: var(--ink); cursor: pointer; text-align: left; font: inherit; }
-#wall .pl-item:hover { background: rgba(255, 255, 255, 0.07); }
-#wall .pl-item.on { background: rgba(38, 198, 240, 0.14); border-color: #26c6f0; }
-#wall .pl-item .pl-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#wall .pl-item i { font-style: normal; color: var(--dim); font-variant-numeric: tabular-nums; font-size: 0.9em; }
-#wall .pl-none, #wall .pl-empty { color: var(--dim); font-size: 0.95em; padding: 10px 4px; margin: 0; }
-#wall .pl-main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
-#wall .pl-title { flex: none; display: flex; align-items: center; gap: 12px; padding: 0 0 8px; border-bottom: 1px solid var(--edge); }
-#wall .pl-title h3 { margin: 0; font: 700 calc(var(--wz) * 16px) system-ui, sans-serif; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#wall .pl-count { color: var(--dim); font-size: 0.9em; white-space: nowrap; }
-#wall .pl-actions { margin-left: auto; }
-#wall .pl-rename { flex: 1; min-width: 0; padding: 5px 9px; border-radius: 6px; border: 1px solid #26c6f0; background: #080a0e; color: var(--ink); font: 700 calc(var(--wz) * 15px) system-ui, sans-serif; }
-#wall .pl-rows { flex: 1; min-height: 0; overflow-y: auto; }
-#wall .pl-row { display: grid; grid-template-columns: calc(var(--wz) * 28px) minmax(0, 2fr) minmax(0, 3fr) calc(var(--wz) * 46px) calc(var(--wz) * 64px) calc(var(--wz) * 78px); gap: 10px; align-items: center; padding: calc(var(--wz) * 6px) 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.035); cursor: pointer; }
-#wall .pl-row:hover { background: rgba(255, 255, 255, 0.04); }
-#wall .pl-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#wall .pl-row .pl-n, #wall .pl-row .pl-time { color: var(--dim); font-variant-numeric: tabular-nums; }
-#wall .pl-row.gone { opacity: 0.5; cursor: default; }
-#wall .pl-row.on { background: rgba(38, 198, 240, 0.14); box-shadow: inset 3px 0 0 #26c6f0; }
-#wall .pl-row.on.onb { background: rgba(255, 172, 40, 0.14); box-shadow: inset 3px 0 0 #ffac28; }
-#wall .pl-row.on.onb.ona { background: linear-gradient(90deg, rgba(38, 198, 240, 0.16), rgba(255, 172, 40, 0.16)); box-shadow: inset 3px 0 0 #26c6f0, inset -3px 0 0 #ffac28; }
-#wall .pl-load, #wall .pl-move { display: flex; gap: 4px; justify-content: flex-end; overflow: visible !important; }
-#wall .pl-load button { width: calc(var(--wz) * 26px); padding: calc(var(--wz) * 3px) 0; border-radius: 5px; background: rgba(8, 10, 18, 0.9); font: 800 calc(var(--wz) * 10px) system-ui, sans-serif; border: 1.5px solid; cursor: pointer; }
-#wall .pl-load button.left { color: #26c6f0; border-color: #26c6f0; }
-#wall .pl-load button.right { color: #ffac28; border-color: #ffac28; }
-#wall .pl-move button.arrow { width: calc(var(--wz) * 22px); padding: calc(var(--wz) * 3px) 0; border-radius: 5px; border: 1px solid rgba(255, 255, 255, 0.2); background: transparent; color: var(--dim); font-size: calc(var(--wz) * 10px); cursor: pointer; }
-#wall .pl-move button.arrow:hover { color: var(--ink); border-color: rgba(255, 255, 255, 0.5); }
-#wall .pl-move button.arrow.x:hover { color: #ff6a5a; border-color: #ff6a5a; }
-#wall .w-status.flash { color: #7be3a1; }
-#wall .mini.warn { border-color: #ff6a5a; color: #ff6a5a; }
-.load-pop .lp-add { width: 100%; margin-top: 9px; padding: 8px 8px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.25); background: #0a0d11; color: var(--ink); font: 700 10px "Orbitron", sans-serif; letter-spacing: 0.1em; }
-.load-pop .lp-add[hidden] { display: none; }
-.load-pop .lp-say { margin: 7px 0 0; min-height: 13px; font: 600 11px system-ui, sans-serif; color: #7be3a1; }
-
-/* SETTINGS: in LIVE it holds the tempo range, KEYS & MIDI and PHONES, so the bar spares two buttons; the game's booth keeps its own buttons. */
-#settings-button { display: none; }
-body.live #settings-button { display: inline-block; }
-body.live #controls-button, body.live #phones-button { display: none; }
-#settings-tabs { flex-wrap: wrap; }
-#settings-body { overflow-y: auto; }
-#settings-body.tempo-tab h3 { margin: 4px 0; color: var(--teal); font: 700 13px "Orbitron", sans-serif; letter-spacing: 0.2em; }
-#settings-tabs .pill, .tempo-options .pill, .midi-file .pill { font-size: 11px; padding: 0.55em 1.1em; }
-.tempo-options { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
-.tempo-options .pill { min-width: 72px; }
-.tempo-example { color: var(--ink); font-size: 14px; }
+/* KEYS & MIDI: the MIDI config file buttons and the learned controls. */
+.midi-file .pill { font-size: 11px; padding: 0.55em 1.1em; }
 .midi-file { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .midi-status { margin: 8px 0 0; font-size: 13px; color: var(--teal); }
 .midi-status.bad { color: var(--orange); }
 .binding-device { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
-
-/* The bar sheds what it can spare when the effects need the room (see fitBar in main.ts): the brand's name, the words on SETTINGS and FULLSCREEN, the clock, the words OFF AIR (the dot stays). */
-body.live.bar-nobrand #livebar .brand, body.live.bar-noclock #livebar .clock, body.live.bar-nostate #livebar .onair span { display: none; }
 /* SETTINGS and FULLSCREEN carry a small picture that shows only when the bar is tight: then the words go. */
 #top .pill .ico { display: none; }
-body.live.bar-icons #settings-button span, body.live.bar-icons #fullscreen-button span { display: none; }
-body.live.bar-icons #settings-button .ico, body.live.bar-icons #fullscreen-button .ico { display: block; width: 1.5em; height: 1.5em; margin: 0; }
-body.live.bar-icons #settings-button, body.live.bar-icons #fullscreen-button { padding: 0.4em 0.7em; }
-
-/* A short window: the stream panel is small, so its least useful facts give way to the preview row, the note and the buttons. LISTENERS and BITRATE
-   (a dash today) go at 660, nothing else; at 540 the panel also sheds its own padding and the meter shrinks instead of spilling. */
-@media (max-height: 660px) {
-  body.live #stream { padding: 8px 12px; }
-  body.live #stream dl dt:nth-of-type(n+3), body.live #stream dl dd:nth-of-type(n+3) { display: none; }
-  body.live #stream .s-body { margin-top: 10px; }
-  body.live #meter .m-bars { min-height: 0; }
-  body.live #camera-bar { margin-top: 6px; }
-}
-@media (max-height: 540px) {
-  body.live #stream dl dt:nth-of-type(n+3), body.live #stream dl dd:nth-of-type(n+3) { display: none; }
-  /* 163 px tall here: the panel's own padding is the cheapest room there is (it used to spill the rows and the meter over the note at 1152 x 540). */
-  body.live #stream { padding: 8px 12px; }
-  body.live #stream .s-body { margin-top: 8px; }
-  body.live #stream dd#stream-slot { white-space: nowrap; }
-  body.live #stream dl { row-gap: 6px; }
-  body.live #stream .check, body.live #stream .go { padding: 7px 0; }
-  body.live #stream .s-note { margin-top: 4px; }
-  /* In a window this short there is no room for a picture (a 16:9 box would be a 39 px strip), so the facts stay and the row says why. */
-  body.live #stream.camera-on #camera { display: none; }
-  body.live #stream.camera-on dl { display: grid; }
-  body.live #stream.camera-on #camera-bar .cam-tight { display: block; flex: 1 1 auto; }
-  body.live #stream.camera-on #camera-bar .cam-label { flex: 0 0 auto; }
-  /* The meter shrinks with the panel here instead of spilling over the note and the buttons (it did at 1152 x 540). */
-  body.live #meter .m-bars { min-height: 0; }
-  body.live #camera-bar { margin-top: 4px; }
-  body.live #camera-bar button { padding: 2px 9px; }
-}
 
