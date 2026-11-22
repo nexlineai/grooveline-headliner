@@ -25,8 +25,28 @@ public final class Deck {
     /// Output sample rate of the engine; set by `DeckEngine` before it starts.
     var outputRate: Double = 48_000 { didSet { apply() } }
 
+    private var _motorOn = false
+    /// CUE's own transport: the record starts and stops within a few milliseconds, like the cue
+    /// of a club deck, instead of the motor's run-up and run-down. PLAY (`motorOn`) ends it.
+    private var quick = false
+    /// A CUE return waiting for the record to stop: where the needle will drop, and its timer.
+    private var parkSpot: Double?
+    private var parkWork: DispatchWorkItem?
+    /// A CUE preview starts with the quick glide only: this ends it a moment later, so pitch,
+    /// nudges and SYNC move the playing record as smoothly as with PLAY.
+    private var settleWork: DispatchWorkItem?
+
     /// The platter motor (the START/STOP button).
-    public var motorOn = false { didSet { apply() } }
+    public var motorOn: Bool {
+        get { _motorOn }
+        set {
+            cancelPark()
+            endSettle()
+            quick = false
+            _motorOn = newValue
+            apply()
+        }
+    }
     /// Pitch fader, as a fraction: 0.02 is +2 %.
     public var pitch: Double = 0 { didSet { apply() } }
     /// A short push or drag on top of the pitch (rim nudge, or sync pulling the beats together).
@@ -55,6 +75,8 @@ public final class Deck {
     }
 
     deinit {
+        cancelPark()
+        endSettle()
         shared.deinitialize(count: 1)
         shared.deallocate()
         strip.deinitialize(count: 1)
@@ -66,10 +88,10 @@ public final class Deck {
         let seconds: Double // time for the platter to cover most of the gap
         if held {
             target = handRate; seconds = 0.006
-        } else if motorOn {
-            target = 1 + pitch + bend; seconds = 0.05
+        } else if _motorOn {
+            target = 1 + pitch + bend; seconds = quick ? 0.004 : 0.05
         } else {
-            target = 0; seconds = 0.12
+            target = 0; seconds = quick ? 0.005 : 0.12
         }
         shared.pointee.targetRate = target
         shared.pointee.glide = 1 - exp(-1 / (seconds * outputRate))
@@ -172,7 +194,71 @@ public final class Deck {
 
     /// Lifts the needle and drops it at `seconds`.
     public func seek(to seconds: Double) {
+        cancelPark()
         shared.pointee.seekTo = max(1, min(duration, seconds) * fileRate)
+    }
+
+    /// CUE held on a stopped record: it plays from where the needle is, at once (no motor run-up).
+    public func preview() {
+        cancelPark()
+        endSettle()
+        quick = true
+        _motorOn = true
+        apply()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.settleWork = nil
+            self.quick = false
+            self.apply()
+        }
+        settleWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.04, execute: work)
+    }
+
+    /// PLAY pressed while CUE is held: the record goes on playing when CUE is let go.
+    public func latch() {
+        endSettle()
+        quick = false
+        apply()
+    }
+
+    /// CUE going back to its mark: the record stops almost at once (a few milliseconds, not the
+    /// motor's slow run-down), then the needle drops on the mark with nothing playing, so neither
+    /// a tape-stop tail nor a click is heard.
+    public func park(at seconds: Double) {
+        cancelPark()
+        endSettle()
+        quick = true
+        _motorOn = false
+        apply()
+        parkSpot = seconds
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.parkWork = nil
+            _ = self.finishPark()
+        }
+        parkWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.03, execute: work)
+    }
+
+    /// Drops the needle on a pending CUE return now. Returns whether there was one.
+    @discardableResult
+    public func finishPark() -> Bool {
+        guard let at = parkSpot else { return false }
+        cancelPark()
+        seek(to: at)
+        return true
+    }
+
+    private func endSettle() {
+        settleWork?.cancel()
+        settleWork = nil
+    }
+
+    private func cancelPark() {
+        parkWork?.cancel()
+        parkWork = nil
+        parkSpot = nil
     }
 
     /// Loudest sample off the record since the last call, before EQ and fader (for the channel meters).

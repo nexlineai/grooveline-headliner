@@ -52,7 +52,7 @@ final class Game: ObservableObject {
 
     /// The screenshot run starts the app with `-demo 1`: the decks start by themselves.
     let demo: Bool
-    /// The studio's drum pattern (chapter 8). Not saved yet.
+    /// The studio's drum pattern (chapter 8), kept with the progress as you edit it.
     @Published var pattern = DrumPattern()
     /// Which page of the step grid shows: 0 drums, 1 synth.
     @Published var studioPage = 0
@@ -60,12 +60,24 @@ final class Game: ObservableObject {
     @Published private(set) var cuts = 0
     /// Bumped when a night is played again straight away, so its booth is built fresh.
     @Published private(set) var attempt = 0
+    /// Set after a strong night so the chapter screen can offer the native App Store review prompt once per version.
+    @Published private(set) var pendingReview = false
 
     /// The studio cut a dubplate: its pattern is kept with the progress.
     func cut(_ pattern: DrumPattern) {
         progress.track = pattern
+        progress.studioPattern = pattern
         progress.save()
         cuts += 1
+    }
+
+    /// Saves the studio's working drum pattern between launches.
+    func saveStudioPattern() {
+        guard !demo, UserDefaults.standard.string(forKey: "screen") == nil else { return }
+        if progress.studioPattern != pattern {
+            progress.studioPattern = pattern
+            progress.save()
+        }
     }
     /// Headphones: 0 off (the room on both sides), 1 split (room left, headphones right),
     /// 2 a four-output sound card (room on 1-2, headphones on 3-4).
@@ -87,7 +99,11 @@ final class Game: ObservableObject {
     init() {
         let defaults = UserDefaults.standard
         demo = defaults.bool(forKey: "demo")
-        if defaults.bool(forKey: "demoPattern") { pattern = .house }
+        if defaults.bool(forKey: "demoPattern") {
+            pattern = .house
+        } else if let saved = progress.studioPattern {
+            pattern = saved
+        }
         studioPage = defaults.integer(forKey: "studioPage")
         phonesMode = defaults.integer(forKey: "phonesMode")
         cueMix = defaults.double(forKey: "cueMix")
@@ -141,6 +157,18 @@ final class Game: ObservableObject {
 
     var build: String {
         (Bundle.main.infoDictionary?["CFBundleVersion"] as? String) ?? "?"
+    }
+
+    var shortVersion: String {
+        (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "1.0"
+    }
+
+    /// Consumes a queued App Store review request and marks this version as asked.
+    func consumeReviewRequest() -> Bool {
+        guard pendingReview else { return false }
+        pendingReview = false
+        UserDefaults.standard.set(shortVersion, forKey: "lastReviewedVersion")
+        return true
     }
 
     /// Opens the booth: free play, or a lesson when one is named.
@@ -200,6 +228,13 @@ final class Game: ObservableObject {
         if stars > (progress.stars[id] ?? 0) {
             progress.stars[id] = stars
             progress.save()
+        }
+        // Offer the native App Store rating sheet once per version after a 2+ star night
+        // (never in screenshot runs, demo mode, or dev-unlocked test runs).
+        if stars >= 2, Nights.find(id) != nil,
+           !demo, !unlockAll, UserDefaults.standard.string(forKey: "screen") == nil,
+           UserDefaults.standard.string(forKey: "lastReviewedVersion") != shortVersion {
+            pendingReview = true
         }
     }
 

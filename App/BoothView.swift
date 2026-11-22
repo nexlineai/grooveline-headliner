@@ -113,7 +113,7 @@ struct BoothView: View {
                 if studio, let id = lessonID, let lesson = Lessons.find(id) {
                     if lesson.desk.cutter {
                         // The dubplate lesson cuts what you made (or the groove from the lessons).
-                        game.pattern = game.progress.track ?? (game.pattern != DrumPattern() ? game.pattern : (lesson.desk.pattern ?? DrumPattern()))
+                        game.pattern = game.progress.track ?? game.progress.studioPattern ?? (game.pattern != DrumPattern() ? game.pattern : (lesson.desk.pattern ?? DrumPattern()))
                     } else if !UserDefaults.standard.bool(forKey: "demoPattern") {
                         game.pattern = lesson.desk.pattern ?? DrumPattern()
                     }
@@ -147,6 +147,7 @@ struct BoothView: View {
             }
             .onChange(of: game.pattern) { _, _ in
                 scene?.patternChanged()
+                if studio { game.saveStudioPattern() }
             }
         }
     }

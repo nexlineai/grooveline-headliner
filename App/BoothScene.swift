@@ -106,6 +106,9 @@ final class BoothScene: SKScene {
     private var rimSpeed = [0.0, 0.0]
     /// While a needle is in the air: where on the record it will come down, 0...1.
     private var dropAt: [Double?] = [nil, nil]
+    /// CUE held down, and whether that hold is previewing the record (stops & returns on release).
+    private var cueDown = [false, false]
+    private var previewing = [false, false]
 
     // Gear on screen.
     private var needsBuild = true
@@ -152,6 +155,9 @@ final class BoothScene: SKScene {
     private var phaseDot: SKShapeNode?
     private var roomGlow: SKSpriteNode?
     private var roomShade: SKSpriteNode?
+    private var roomWash: [SKSpriteNode] = []
+    private var roomLip: SKSpriteNode?
+    private var platterSheen: [SKSpriteNode] = []
     /// The room in four moods, each a loop of the same picture: waiting, nodding, dancing, going nuts.
     private static let moodNames = ["waiting", "nodding", "dancing", "nuts"]
     /// Which room is above the gear (`room-<room>.jpg`); a lesson can name another.
@@ -266,6 +272,8 @@ final class BoothScene: SKScene {
         if desk.studio { Studio.load(game.pattern, on: decks[0], keepPlace: false) }
         if let mix = desk.cueMix { game.cueMix = mix }
         phones = [false, false]
+        cueDown = [false, false]
+        previewing = [false, false]
         for d in 0..<2 {
             let deck = decks[d]
             deck.motorOn = false
@@ -309,6 +317,7 @@ final class BoothScene: SKScene {
         playButton = []; cueButton = []; syncButton = []; phonesButton = []; meter = []
         bpmLabel = []; pitchLabel = []; beatDots = []
         wavePlayed = []; wavePlayhead = []; waveCue = []; waveDrop = []; timeLabel = []
+        roomWash = []; roomLip = nil; platterSheen = []
 
         let W = size.width, H = size.height
         guard W > 200, H > 200 else { return }
@@ -370,6 +379,19 @@ final class BoothScene: SKScene {
         shade.zPosition = -9
         addChild(shade)
         roomShade = shade
+        // Two additive stage-light washes (left teal for deck A, right magenta for deck B)
+        // pulsing at 120 Hz on each deck's beat weighted by how loud it is in the room.
+        let washTints = [Palette.teal, Palette.magenta]
+        for d in 0..<2 {
+            let wash = SKSpriteNode(texture: Draw.stageWash(size: rect.size, tint: washTints[d], fromLeft: d == 0))
+            wash.size = rect.size
+            wash.position = CGPoint(x: rect.midX, y: rect.midY)
+            wash.blendMode = .add
+            wash.alpha = 0
+            wash.zPosition = -8.5
+            addChild(wash)
+            roomWash.append(wash)
+        }
         let glow = SKSpriteNode(color: Palette.orange, size: rect.size)
         glow.position = CGPoint(x: rect.midX, y: rect.midY)
         glow.blendMode = .add
@@ -386,6 +408,7 @@ final class BoothScene: SKScene {
         lip.position = CGPoint(x: W / 2, y: gearTop)
         lip.zPosition = -6
         addChild(lip)
+        roomLip = lip
     }
 
     /// The video node of one mood, made (with its looping player) the first time it is wanted.
@@ -456,6 +479,7 @@ final class BoothScene: SKScene {
         sheen.zPosition = 2
         sheen.blendMode = .add
         addChild(sheen)
+        platterSheen.append(sheen)
         let reach = outer * 2.16
         hits.append((Kind.platter(d), centred(centre.x, centre.y, reach, reach)))
 
@@ -815,6 +839,13 @@ final class BoothScene: SKScene {
                 dropAt[d] = waveProgress(p, on: d)
             case .play(let d):
                 tap.impactOccurred()
+                decks[d].finishPark()
+                if previewing[d] {
+                    // PLAY while CUE is held: the record goes on playing when CUE is let go.
+                    previewing[d] = false
+                    decks[d].latch()
+                    break
+                }
                 if !decks[d].motorOn && decks[d].progress > 0.995 { decks[d].seek(to: decks[d].cuePoint) }
                 decks[d].motorOn.toggle()
             case .cue(let d):
@@ -948,6 +979,8 @@ final class BoothScene: SKScene {
                 if !holds(.rim(d)) && !sync[d] { decks[d].bend = 0 }
             case .needle(let d), .wave(let d):
                 if !holds(.needle(d)) && !holds(.wave(d)) { dropNeedle(d) }
+            case .cue(let d):
+                if !holds(.cue(d)) { releaseCue(d) }
             default:
                 break
             }
@@ -975,6 +1008,7 @@ final class BoothScene: SKScene {
 
     private func releaseAllHands() {
         grabs = [:]
+        endCueHolds()
         for d in 0..<2 {
             decks[d].held = false
             if !sync[d] { decks[d].bend = 0 }
@@ -984,14 +1018,45 @@ final class BoothScene: SKScene {
         }
     }
 
-    /// CUE as on a club deck: stopped, it marks this spot; playing, it goes back to the mark and stops.
+    /// CUE as on a club deck. Playing: back to the mark, stopped. Stopped: the needle's spot
+    /// becomes the mark (unless it is already on it) and the record plays from there for as long
+    /// as CUE is held; let go, and it stops and goes back to the mark. PLAY pressed during the
+    /// hold keeps it playing.
     private func pressCue(_ d: Int) {
         let deck = decks[d]
+        guard !cueDown[d], deck.isLoaded, !deck.lifted else { return }
+        // A return still settling (a quick double tap): the needle is about to be on the mark.
+        let parked = deck.finishPark()
+        cueDown[d] = true
         if deck.motorOn {
-            deck.motorOn = false
-            deck.seek(to: deck.cuePoint)
-        } else {
-            deck.cuePoint = deck.seconds
+            deck.park(at: deck.cuePoint)
+            return
+        }
+        if !parked {
+            if deck.progress > 0.995 {
+                deck.seek(to: deck.cuePoint)
+            } else if abs(deck.seconds - deck.cuePoint) > 0.02 {
+                deck.cuePoint = deck.seconds
+            }
+        }
+        previewing[d] = true
+        deck.preview()
+    }
+
+    private func releaseCue(_ d: Int) {
+        guard cueDown[d] else { return }
+        cueDown[d] = false
+        guard previewing[d] else { return }
+        previewing[d] = false
+        decks[d].park(at: decks[d].cuePoint)
+    }
+
+    private func endCueHolds() {
+        for d in 0..<2 {
+            cueDown[d] = false
+            guard previewing[d] else { continue }
+            previewing[d] = false
+            decks[d].park(at: decks[d].cuePoint)
         }
     }
 
@@ -1033,8 +1098,9 @@ final class BoothScene: SKScene {
             if d == partnerDeck && channel[1 - d] > 0.04 { continue }
             deck.seek(to: deck.cuePoint < deck.duration * 0.9 ? deck.cuePoint : deck.grid.firstBeat)
         }
-        lesson.update(BoothFacts(motorOn: decks.map { $0.motorOn },
-                                 turning: decks.map { $0.rate > 0.5 },
+        // A CUE preview is not a start: it ends when CUE is let go (PLAY pressed during it makes it one).
+        lesson.update(BoothFacts(motorOn: decks.enumerated().map { i, x in x.motorOn && !previewing[i] },
+                                 turning: decks.enumerated().map { i, x in x.rate > 0.5 && !previewing[i] },
                                  beat: decks.map { $0.beat },
                                  cross: cross,
                                  channel: channel,
@@ -1382,13 +1448,17 @@ final class BoothScene: SKScene {
 
             bpmLabel[d].text = deck.isLoaded ? String(format: "%.1f", deck.bpm) : "---.-"
             pitchLabel[d].text = String(format: "%+.1f%%", deck.pitch * 100)
-            playButton[d].lit = deck.motorOn
+            playButton[d].lit = deck.motorOn && !previewing[d]
             syncButton[d].lit = sync[d]
             syncButton[d].alpha = syncAllowed ? 1 : 0.25
             if d < phonesButton.count { phonesButton[d].lit = phones[d] }
             // The knob follows the slider in the headphone panel.
             if let knob = cueMixKnob, knob.value != game.cueMix { knob.value = game.cueMix }
-            cueButton[d].lit = !deck.motorOn && abs(seconds - deck.cuePoint) < 0.02
+            cueButton[d].lit = cueDown[d] || (!deck.motorOn && abs(seconds - deck.cuePoint) < 0.02)
+            if d < platterSheen.count {
+                let kick = exp(-deck.grid.phase(at: seconds) * 4)
+                platterSheen[d].alpha = moving ? CGFloat(0.75 + 0.25 * kick) : 0.7
+            }
 
             let heardGain = deck.lifted ? 0 : MixMath.faderGain(channel[d]) * (d == 0 ? fade.a : fade.b)
             snapshots.append(DeckSnapshot(playing: moving,
@@ -1415,16 +1485,39 @@ final class BoothScene: SKScene {
             dot.fillColor = bothTurn ? (abs(offset) < 0.03 ? Palette.teal : Palette.orange) : Palette.dim
         }
 
-        // The room: darker when nothing plays, a warm pulse on every beat of the loudest deck.
+        // The room: darker when nothing plays, beat-reactive stage washes per deck, and a warm
+        // pulse on every beat of the loudest deck (extra shimmer on locked blends & peak crowd).
         let lead = snapshots[0].gain >= snapshots[1].gain ? 0 : 1
         let heard = snapshots[lead].audible
+        let leadSeconds = decks[lead].seconds
+        let leadPhase = decks[lead].grid.phase(at: leadSeconds)
+        let leadKick = exp(-leadPhase * 5)
+        let lockedBlend = !hideNumbers && reading.state == .blend && reading.quality > 0.85
+        let clashBlend = !hideNumbers && reading.state == .blend && reading.quality < 0.3
+        let moodLift = night.map { 0.85 + 0.15 * Double($0.mood) } ?? 1.0
         if let shade = roomShade {
             let wanted: CGFloat = heard ? 0.06 : 0.45
             shade.alpha += (wanted - shade.alpha) * CGFloat(min(1, dt * 3))
         }
+        if roomWash.count == 2 {
+            let boost = lockedBlend ? 1.35 : 1.0
+            for d in 0..<2 {
+                let p = decks[d].grid.phase(at: decks[d].seconds)
+                let k = exp(-p * 4.5)
+                roomWash[d].alpha = snapshots[d].audible
+                    ? CGFloat(min(0.42, snapshots[d].gain * (0.08 + 0.22 * k) * boost * moodLift))
+                    : 0
+            }
+        }
         if let glow = roomGlow {
-            let phase = decks[lead].grid.phase(at: decks[lead].seconds)
-            glow.alpha = heard ? CGFloat(0.12 * exp(-phase * 5)) : 0
+            glow.color = clashBlend ? Palette.red : (lockedBlend ? Palette.teal : Palette.orange)
+            let peakAccent = (night?.mood == 3 && decks[lead].grid.beatInBar(at: leadSeconds) == 0)
+                ? 0.07 * exp(-leadPhase * 8) : 0
+            glow.alpha = heard ? CGFloat(min(0.22, (0.12 * leadKick + peakAccent) * moodLift)) : 0
+        }
+        if let lip = roomLip {
+            lip.color = lockedBlend ? Palette.teal : (lead == 0 ? Palette.teal : Palette.magenta)
+            lip.alpha = heard ? CGFloat(0.4 + 0.55 * leadKick) : 0.35
         }
         if let night {
             // A night: the crowd answers the mixing, and the room shows its mood.

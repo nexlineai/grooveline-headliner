@@ -1,4 +1,5 @@
 import SwiftUI
+import StoreKit
 import HeadlinerCore
 
 // The career is told in chapters. A chapter is a list of steps (story scenes, lessons, nights);
@@ -274,6 +275,8 @@ struct CareerProgress: Codable, Equatable {
     var track: DrumPattern?
     /// THE BAG (chapter 12): the closing set, six record ids in order. Optional, like `track`.
     var closingSet: [String]?
+    /// The studio's working drum pattern (chapter 8), kept across launches. Optional, like `track`.
+    var studioPattern: DrumPattern?
 
     private static let key = "progress.v1"
 
@@ -295,10 +298,13 @@ struct CareerProgress: Codable, Equatable {
 struct ChapterView: View {
     @EnvironmentObject var game: Game
     @EnvironmentObject var store: Store
+    @Environment(\.requestReview) private var requestReview
     let chapter: Chapter
 
     /// A paid chapter without the purchase: its steps are shown but locked, with the offer.
     private var paywalled: Bool { Store.isPaid(chapter: chapter.number) && !store.careerOpen }
+    /// Reached in story order (always true when Chapters.locked is off).
+    private var reached: Bool { Chapters.reached(chapter.number, game.progress) }
 
     private var nextIndex: Int? { chapter.steps.firstIndex { !game.progress.done($0) } }
     private var earned: Int { chapter.steps.reduce(0) { $0 + (game.progress.stars[$1.id] ?? 0) } }
@@ -363,6 +369,8 @@ struct ChapterView: View {
                     .padding(.top, 2)
                     if paywalled {
                         unlockCard
+                    } else if !reached {
+                        ownedAheadCard
                     } else if let next = nextChapter {
                         // Chapter finished: on to the next one (this one can still be played again).
                         Button { game.screen = .chapter(next) } label: {
@@ -420,22 +428,59 @@ struct ChapterView: View {
         // In the background, so the picture (wider than the screen) cannot make the screen wider.
         .background { backdrop }
         .task { if paywalled { await store.loadProduct() } }
+        .onAppear { maybeAskReview() }
+        .onChange(of: game.pendingReview) { _, _ in maybeAskReview() }
+    }
+
+    private func maybeAskReview() {
+        guard game.consumeReviewRequest() else { return }
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 800_000_000)
+            requestReview()
+        }
+    }
+
+    /// Shown if the player bought the full career while peeking ahead at a chapter not reached yet.
+    private var ownedAheadCard: some View {
+        let current = Chapters.current(game.progress)
+        return VStack(alignment: .leading, spacing: 8) {
+            Text("FULL CAREER UNLOCKED")
+                .font(.system(size: 11, weight: .heavy))
+                .tracking(3)
+                .foregroundStyle(GroovelineLogo.teal)
+            Text("Finish Chapter \(current) to reach this chapter.")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.white.opacity(0.8))
+                .fixedSize(horizontal: false, vertical: true)
+            Button { game.screen = .chapter(current) } label: {
+                Text("CHAPTER \(current)  →")
+                    .font(.system(size: 15, weight: .heavy))
+                    .tracking(4)
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 28)
+                    .padding(.vertical, 12)
+                    .background(Capsule().fill(GroovelineLogo.teal))
+            }
+        }
+        .padding(.top, 8)
     }
 
     /// The offer at the door of chapter 3: one purchase opens the rest of the career.
     private var unlockCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("The rest of the career: chapters 3 to 12. One purchase, no ads, no account.")
+            Text("10 more chapters · 60+ original records · vinyl by ear, drum machine, B2B & 60,000-person festival. One purchase, no ads, no account.")
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.white.opacity(0.8))
+                .foregroundStyle(.white.opacity(0.82))
                 .fixedSize(horizontal: false, vertical: true)
             if let price = store.priceText {
                 Button { Task { await store.buy() } } label: {
-                    Text("UNLOCK  ·  \(price)")
-                        .font(.system(size: 15, weight: .heavy))
-                        .tracking(3)
+                    Text("UNLOCK CAREER  ·  \(price)")
+                        .font(.system(size: 14, weight: .heavy))
+                        .tracking(2)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                         .foregroundStyle(.black)
-                        .padding(.horizontal, 28)
+                        .padding(.horizontal, 24)
                         .padding(.vertical, 12)
                         .background(Capsule().fill(GroovelineLogo.teal))
                 }
@@ -493,8 +538,8 @@ struct ChapterView: View {
 
     private func row(_ step: ChapterStep, index: Int) -> some View {
         let done = game.progress.done(step)
-        let open = !paywalled && (!Chapters.locked || index <= (nextIndex ?? chapter.steps.count))
-        let isNext = index == nextIndex
+        let open = !paywalled && reached && (!Chapters.locked || index <= (nextIndex ?? chapter.steps.count))
+        let isNext = !paywalled && reached && index == nextIndex
         let icon: String
         switch step.kind {
         case .story: icon = "film"

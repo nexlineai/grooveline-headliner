@@ -2,6 +2,7 @@ import SwiftUI
 
 struct StoryView: View {
     @StateObject private var player: StoryPlayer
+    @State private var drift = false
     private let onEnd: () -> Void
 
     init(scene: StoryScene, onEnd: @escaping () -> Void) {
@@ -13,11 +14,14 @@ struct StoryView: View {
         ZStack(alignment: .bottom) {
             backdrop.ignoresSafeArea()
             if let line = player.line {
-                if player.shot?.art == nil {
-                    card(line)
-                } else {
-                    caption(line)
+                Group {
+                    if player.shot?.art == nil {
+                        card(line)
+                    } else {
+                        caption(line)
+                    }
                 }
+                .animation(.easeOut(duration: 0.2), value: player.lineIndex)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -26,16 +30,27 @@ struct StoryView: View {
         .onAppear {
             player.onEnd = onEnd
             player.start()
+            restartDrift()
         }
+        .onChange(of: player.shotIndex) { _, _ in restartDrift() }
+        .onChange(of: player.video != nil) { _, _ in restartDrift() }
         .onDisappear { player.stop() }
     }
 
     /// The still picture, and on top of it the clip of the line being spoken.
+    /// Static shots (voice-over without a lip-synced clip) get a gentle slow push-in so the
+    /// frame breathes; clip shots stay rock-steady so the still matches the video to the pixel.
     private var backdrop: some View {
-        Color.black
+        let isStillShot = player.video == nil && player.shot?.art != nil
+        let pan: CGFloat = player.shotIndex.isMultiple(of: 2) ? 6 : -6
+        return Color.black
             .overlay {
                 if let name = player.shot?.art, let art = Art.storyImage(name) {
-                    Image(uiImage: art).resizable().scaledToFill()
+                    Image(uiImage: art)
+                        .resizable()
+                        .scaledToFill()
+                        .scaleEffect(isStillShot && drift ? 1.06 : 1.0)
+                        .offset(x: isStillShot && drift ? pan : 0)
                 }
             }
             .overlay {
@@ -44,6 +59,14 @@ struct StoryView: View {
                 }
             }
             .clipped()
+    }
+
+    private func restartDrift() {
+        drift = false
+        guard player.video == nil, player.shot?.art != nil else { return }
+        DispatchQueue.main.async {
+            withAnimation(.easeInOut(duration: 9.0)) { drift = true }
+        }
     }
 
     private func caption(_ line: StoryLine) -> some View {

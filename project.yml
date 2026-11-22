@@ -4,14 +4,19 @@ name: GroovelineHeadliner
 options:
   bundleIdPrefix: org.grooveline
   deploymentTarget:
-    iOS: "26.0"
+    iOS: "17.0"
 packages:
   HeadlinerKit:
     path: Packages/HeadlinerKit
 settings:
   base:
-    MARKETING_VERSION: "0.1.0"
+    # Must equal the App Store version string typed on the version page in App Store Connect.
+    # 1.0 went live 20 Nov 2026; 1.1.0 carries build 6's cleanup plus iOS 17+, CUE preview,
+    # beat-reactive room lighting, paywall polish, studio pattern save, and App Store review prompt.
+    # testflight.yml refuses a tag that does not match this value.
+    MARKETING_VERSION: "1.1.0"
     # CI overrides this with the workflow run number; every upload needs a higher one.
+    # Nothing here is the App Store build number: that is BUILD_NUMBER = github.run_number.
     CURRENT_PROJECT_VERSION: "1"
     # Swift 5 mode: the audio thread shares plain memory with the game on purpose.
     SWIFT_VERSION: "5.0"

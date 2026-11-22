@@ -285,6 +285,26 @@ enum Draw {
         }
         return SKTexture(image: image)
     }
+
+    /// A soft radial stage-light wash cast from the upper left or right of the room onto the floor.
+    static func stageWash(size: CGSize, tint: UIColor, fromLeft: Bool) -> SKTexture {
+        let w = max(16, size.width), h = max(16, size.height)
+        let image = UIGraphicsImageRenderer(size: CGSize(width: w, height: h)).image { context in
+            let c = context.cgContext
+            let start = CGPoint(x: fromLeft ? w * 0.14 : w * 0.86, y: 0)
+            let end = CGPoint(x: fromLeft ? w * 0.32 : w * 0.68, y: h * 0.85)
+            let colours = [
+                tint.withAlphaComponent(0.75).cgColor,
+                tint.withAlphaComponent(0.24).cgColor,
+                tint.withAlphaComponent(0).cgColor,
+            ] as CFArray
+            if let grad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colours, locations: [0, 0.45, 1]) {
+                c.drawRadialGradient(grad, startCenter: start, startRadius: 0,
+                                     endCenter: end, endRadius: max(w * 0.52, h * 1.15), options: [])
+            }
+        }
+        return SKTexture(image: image)
+    }
 }
 
 /// A tonearm lying along +x from its pivot (the node's origin); turn the node to move the needle.
