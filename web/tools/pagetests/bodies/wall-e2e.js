@@ -7,9 +7,9 @@ const key = (k) => window.dispatchEvent(new KeyboardEvent("keydown", { key: k, c
   const H = window.headliner, B = H.booth, E = H.engine;
   for (let i = 0; i < 100 && !(B.L && E.context); i++) await sleep(100);
   const wall = document.getElementById("wall");
-  // 1. free play: the wall is up, the right height, the room's clips rest
+  // 1. LIVE (this spec opens in LIVE): the wall is up, the right height, the room's clips rest
   for (let i = 0; i < 40 && wall.hidden; i++) await sleep(250);
-  ok("1 free play: the wall is shown", !wall.hidden);
+  ok("1 LIVE: the wall is shown", !wall.hidden);
   const lib = B.L.live.library, wr = wall.getBoundingClientRect();
   ok("1 the wall sits exactly where LIVE's geometry puts the library", Math.abs(wr.left - lib.x) <= 1.5 && Math.abs(wr.width - lib.w) <= 1.5 && Math.abs(wr.height - lib.h) <= 1.5 && Math.abs(wr.top - (B.L.H - lib.y - lib.h)) <= 1.5, JSON.stringify([wr.left, wr.top, wr.width, wr.height]) + " vs " + JSON.stringify(lib));
   const sp = document.getElementById("stream").getBoundingClientRect(), gs = B.L.live.streamPanel;
@@ -89,7 +89,7 @@ const key = (k) => window.dispatchEvent(new KeyboardEvent("keydown", { key: k, c
 
   // 7. the game's booth (a lesson or a night) has no wall and no stream panel; back to LIVE they return
   B.setMode("game"); await sleep(7000);
-  ok("7 free play: the wall is up in front of the room, no stream panel, the game's layout (the game's own records come with the real FREE PLAY start: free-e2e)", !wall.hidden && document.getElementById("stream").hidden && B.L.live === null);
+  ok("7 free play (the iPhone game, 22 Nov): no wall, no stream panel, the game's layout (the real FREE PLAY start is tested in free-e2e)", wall.hidden && document.getElementById("stream").hidden && B.L.live === null);
   B.setMode("live"); await sleep(3000);
   ok("7 back in LIVE: the wall and the stream panel are back", !wall.hidden && !document.getElementById("stream").hidden && !!B.L.live);
   T("DONE");

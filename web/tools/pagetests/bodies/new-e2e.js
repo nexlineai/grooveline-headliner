@@ -31,7 +31,9 @@ const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
   await put(da, "embedded.mp3", b64(SL["embedded.mp3"]));
   await put(db, "folder1.mp3", b64(SL["folder1.mp3"])); await put(db, "folder2.mp3", b64(SL["folder2.mp3"])); await put(db, "bare.mp3", b64(SL["bare.mp3"]));
   await H.library.init(); await H.library.addHandle(dir); await sleep(3500);
-  const crates = $$("#wall .w-crate");
+  // (the ADD A FOLDER crate, `.w-ask`, stays at the end since 155da1d; it is not a case or a bag)
+  const crates = $$("#wall .w-crate:not(.w-ask)");
+  ok("3 the ADD A FOLDER crate stays last after the first import", !!$("#wall .w-crate.w-ask") && $$("#wall .w-crate").pop().classList.contains("w-ask"));
   ok("3 the crates are flight cases and record bags, one after the other", crates.length >= 3 && crates.every((c, i) => c.classList.contains(i % 2 ? "bag" : "case")) && !!$("#wall .w-crate.case .w-latch") && !!$("#wall .w-crate.bag .w-flap"), crates.map((c) => c.className.replace("w-crate ", "")).join(","));
   ok("3 and no wooden box is left", $$("#wall .w-box").every((b) => getComputedStyle(b).backgroundImage.indexOf("7b5532") < 0 && getComputedStyle(b).backgroundImage.indexOf("rgb(123, 85, 50)") < 0));
 
