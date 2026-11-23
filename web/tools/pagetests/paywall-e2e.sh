@@ -2,8 +2,8 @@
 # A stranger plays chapters 1-2 against the REAL Worker (workerd + local D1) with the paywall ON:
 # not one file the game asks for may be refused, and a chapter 3 night must be (the control, so a
 # green run cannot mean the gate is off). About 10 minutes; ONE headless browser at a time.
-#   web/tools/pagetests/paywall-e2e.sh [port]        (not in run.sh: it starts its own Worker)
-HERE="$(cd "$(dirname "$0")" && pwd)"; WEB="$HERE/../.."; PORT="${1:-8788}"
+#   web/tools/pagetests/paywall-e2e.sh [port [only-specs-containing]]        (not in run.sh: it starts its own Worker)
+HERE="$(cd "$(dirname "$0")" && pwd)"; WEB="$HERE/../.."; PORT="${1:-8788}"; ONLY="${2:-}"   # ONLY: run just the specs whose query contains this (e.g. pw=data)
 STATE="$(mktemp -d)"; LOG="$STATE/dev.log"; cd "$WEB" || exit 1
 "$HERE/build.sh" >/dev/null
 [ -f dist/gated.json ] || node tools/build.ts >/dev/null 2>&1
@@ -21,10 +21,12 @@ RUNS=(
   "?autostart&night=first-party&length=45&pw=play&for=70|bot|80"
   "?autostart&night=garage-party&length=45&pw=play&for=70|bot|80"
   "?autostart&pw=stories||330"
+  "?autostart&pw=data||90"
   "?autostart&pw=tracks||60"
   "?autostart&night=saturday-shift&length=30&pw=control||40"
 )
 for spec in "${RUNS[@]}"; do
+  [ -n "$ONLY" ] && [[ "$spec" != *"$ONLY"* ]] && continue
   IFS='|' read -r query bot secs <<< "$spec"
   echo "== $query"
   DO="run $HERE/built/paywall-e2e.js; wait $secs"; [ -n "$bot" ] && DO="run $WEB/tools/bot.js; run $HERE/built/paywall-e2e.js; wait $secs"

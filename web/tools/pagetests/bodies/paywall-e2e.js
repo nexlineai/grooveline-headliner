@@ -33,6 +33,37 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         T("story", c.number, c.steps[i].id, shown ? "played" : "NOT SHOWN");
       }
     }
+  } else if (mode === "data") {
+    // Every file chapters 1-2 NAME in their data, asked of the Worker one by one (a second opinion: this reads the
+    // fields the game builds its URLs from, assets/Story/<clip>.mp4, Lessons/<voice>.m4a, Art/room-<room>.jpg, while
+    // the build's list was made by matching any string; a file that is not there at all (404) is not this test's business).
+    const career = await (await fetch("content/career.json")).json();
+    const scenes = new Map((await (await fetch("assets/Story/scenes.json")).json()).map((x) => [x.id, x]));
+    const paths = new Set();
+    const keyed = (o, test, out = []) => { if (Array.isArray(o)) o.forEach((v) => keyed(v, test, out)); else if (o && typeof o === "object") for (const [k, v] of Object.entries(o)) { if (typeof v === "string" && test(k)) out.push(v); else keyed(v, test, out); } return out; };
+    const voiceKey = (k) => /voice$/i.test(k);
+    const addVoices = (o) => keyed(o, voiceKey).forEach((v) => paths.add(`assets/Lessons/${v}.m4a`));
+    const addRoom = (room) => { paths.add(`assets/Art/room-${room}.jpg`); for (const m of ["waiting", "nodding", "dancing", "nuts"]) paths.add(`assets/Art/room-${room}-${m}.mp4`); };
+    for (const c of career.chapters.filter((x) => x.number <= 2)) for (const st of c.steps) {
+      for (const sc of st.screens) if (sc.type === "story") {
+        const scene = scenes.get(sc.id);
+        keyed(scene, (k) => k === "art").forEach((a) => paths.add(`assets/Story/${a}.jpg`));
+        keyed(scene, (k) => k === "clip").forEach((a) => paths.add(`assets/Story/${a}.mp4`));
+        keyed(scene, voiceKey).forEach((a) => paths.add(`assets/Story/${a}.m4a`));
+      }
+      const unit = st.kind === "lesson" ? career.lessons.find((l) => l.id === st.id) : st.kind === "night" ? career.nights.find((n) => n.id === st.id) : null;
+      if (unit) { addVoices(unit); keyed(unit, (k) => k === "room").forEach(addRoom); }
+      if (st.kind === "night") { addVoices(career.nightLines); addVoices(career.handsOff); }
+    }
+    for (const p of ["assets/Art/menu-loop.m4a", "assets/Art/title-floor.jpg", "assets/Lessons/jingle.m4a", "assets/Lessons/bag-01.m4a"]) paths.add(p);
+    const refusedNow = [];
+    let served = 0;
+    for (const p of paths) {
+      const res = await fetch(p, { headers: { Range: "bytes=0-0" } });
+      if (res.status === 403) refusedNow.push(p); else if (res.status === 200 || res.status === 206) served++;
+    }
+    ok("data: every file chapters 1-2 name is not refused", refusedNow.length === 0, refusedNow.slice(0, 8).join(" "));
+    ok("data: a good many of them exist and are served", served > 60, `${served} of ${paths.size} served`);
   } else if (mode === "tracks") {
     const rows = await (await fetch("assets/Tracks/tracks.json")).json();
     let free = 0, paid = 0;
