@@ -373,6 +373,9 @@ button.mini.on { border-color: var(--orange); color: var(--orange); }
 /* The paywall (web only): the offer at chapter 3, the ACCOUNT sheet, the title's SIGN IN. */
 #title-account { position: absolute; top: 14px; right: 16px; font-size: 11px; letter-spacing: 0.15em; padding: 0.6em 1.2em; max-width: 60vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #title-account[hidden] { display: none; }
+/* A plain way back to the radio site from the title screen (top left, opposite SIGN IN). */
+#title-home { position: absolute; top: 14px; left: 16px; font-size: 11px; letter-spacing: 0.15em; padding: 0.6em 1.2em; max-width: 46vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
+#title-home:hover, #title-home:focus-visible { border-color: var(--teal); color: var(--teal); }
 #account { z-index: 9; top: 8vh; width: min(460px, 92vw); }
 #account-body p { color: var(--ink); font-size: 15px; line-height: 1.4; }
 #account-body .ok { color: var(--teal); font-weight: 700; }
