@@ -45,7 +45,7 @@ const pay = async (event) => {
   return fetch(BASE + "/headliner/api/paddle", { method: "POST", headers: { "Paddle-Signature": `ts=${ts};h1=${h1}` }, body: raw });
 };
 const txn = `txn_${Date.now()}`;
-assert.equal((await pay({ event_id: `evt_${txn}`, event_type: "transaction.completed", data: { id: txn, status: "completed", custom_data: { player: me.player }, items: [{ price: { id: "pri_test" } }] } })).status, 200); ok("Paddle's notification is accepted");
+assert.equal((await pay({ event_id: `evt_${txn}`, event_type: "transaction.completed", data: { id: txn, status: "completed", currency_code: "EUR", details: { totals: { total: "499", subtotal: "412", tax: "87" } }, custom_data: { player: me.player }, items: [{ price: { id: "pri_test" } }] } })).status, 200); ok("Paddle's notification is accepted");
 me = await (await call("/headliner/api/me")).json(); assert.equal(me.owns, true); ok("the player owns the career");
 const bought = await call(track);
 assert.equal(bought.status, 200); assert.match(bought.headers.get("cache-control"), /private/); ok("the paid record is served (privately cached)");
@@ -53,6 +53,7 @@ await bought.arrayBuffer();
 const part = await call(clip, { headers: { Range: "bytes=0-99" } });
 assert.equal(part.status, 206); assert.equal((await part.arrayBuffer()).byteLength, 100); ok("a byte range of a paid clip: 206");
 assert.equal((await fetch(BASE + clip)).status, 403); ok("another browser (no cookie) is still refused");
-assert.equal((await pay({ event_id: `evt_ref_${txn}`, event_type: "adjustment.updated", data: { action: "refund", type: "full", status: "approved", transaction_id: txn } })).status, 200);
-assert.equal((await call(track)).status, 403); ok("a refund closes it again");
+// As the Paddle sandbox really sent it (23 Nov): the refund of the whole payment, labelled type "partial", the amounts equal.
+assert.equal((await pay({ event_id: `evt_ref_${txn}`, event_type: "adjustment.updated", data: { id: `adj_${txn}`, action: "refund", type: "partial", status: "approved", transaction_id: txn, totals: { total: "499", currency_code: "EUR" }, items: [{ type: "full", amount: "499" }] } })).status, 200);
+assert.equal((await call(track)).status, 403); ok("a refund of the whole payment (Paddle calls it partial, the amounts say all) closes it again, in real D1");
 console.log("DONE paywall-local");

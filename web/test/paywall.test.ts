@@ -246,6 +246,44 @@ describe("Paddle's notifications", () => {
     await paddle({ event_id: "evt_adj4", event_type: "adjustment.created", data: { action: "chargeback", status: "approved", transaction_id: "txn_b" } });
     assert.equal((await media()).status, 403);
   });
+  test("a refund of the whole payment is a refund, whatever Paddle calls it (the real sandbox notification: type partial, item full, 499 of 499)", async () => {
+    const cookie = await signIn("a@example.com");
+    const id = playerId("a@example.com");
+    await paddle(paid(id, "txn_r", { currency_code: "EUR", details: { totals: { total: "499", subtotal: "412", tax: "87" } } }));
+    const media = () => call("/headliner/assets/Tracks/Low-Tide.m4a", { headers: { Cookie: cookie } });
+    assert.equal((await media()).status, 200);
+    const refund = (adjustment: string, total: string, status: string, kind = "adjustment.updated", type = "partial") => ({
+      event_id: `evt_${adjustment}_${kind}`, event_type: kind,
+      data: { id: adjustment, action: "refund", type, status, transaction_id: "txn_r", totals: { total, subtotal: "412", tax: "87", currency_code: "EUR" }, items: [{ type: "full", amount: total }] },
+    });
+    await paddle(refund("adj_1", "499", "pending_approval", "adjustment.created"));
+    assert.equal((await media()).status, 200, "not approved yet");
+    const done = await (await paddle(refund("adj_1", "499", "approved"))).json() as { handled: string };
+    assert.match(done.handled, /revoked 1/);
+    assert.equal((await media()).status, 403, "closed at once");
+  });
+  test("part of the money back keeps the game; parts that add up to the whole take it; created and updated of one adjustment count once", async () => {
+    const cookie = await signIn("a@example.com");
+    const id = playerId("a@example.com");
+    await paddle(paid(id, "txn_s", { details: { totals: { total: "499" } } }));
+    const media = () => call("/headliner/assets/Tracks/Low-Tide.m4a", { headers: { Cookie: cookie } });
+    const refund = (adjustment: string, total: string, kind: string) => ({
+      event_id: `evt_${adjustment}_${kind}`, event_type: kind,
+      data: { id: adjustment, action: "refund", type: "partial", status: "approved", transaction_id: "txn_s", totals: { total } },
+    });
+    await paddle(refund("adj_a", "200", "adjustment.created"));
+    await paddle(refund("adj_a", "200", "adjustment.updated"));
+    assert.equal((await media()).status, 200, "200 of 499, counted once (not 400)");
+    const second = await (await paddle(refund("adj_b", "299", "adjustment.created"))).json() as { handled: string };
+    assert.match(second.handled, /revoked 1/, "200 + 299 = 499");
+    assert.equal((await media()).status, 403);
+  });
+  test("a refund whose payment is not on record counts only when Paddle calls it full", async () => {
+    const id = (await signIn("a@example.com"), playerId("a@example.com"));
+    await paddle(paid(id, "txn_u"));
+    const partial = await (await paddle({ event_id: "evt_u1", event_type: "adjustment.updated", data: { id: "adj_u", action: "refund", type: "partial", status: "approved", transaction_id: "txn_u", totals: { total: "999999" } } })).json() as { handled: string };
+    assert.match(partial.handled, /partial refund/);
+  });
   test("not set up (no secret or no database): the notification is refused with 503 so Paddle tries again later", async () => {
     delete env.PADDLE_WEBHOOK_SECRET;
     assert.equal((await paddle(paid("x"))).status, 503);
