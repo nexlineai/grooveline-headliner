@@ -45,7 +45,8 @@ export async function refreshAccount(): Promise<Account> {
   return state;
 }
 
-export type LinkResult = { ok: true } | { ok: false; message: string };
+/** `link` only comes with the local test setup (DEV_ECHO_LINK in wrangler.test.toml): the real Worker never sends it. */
+export type LinkResult = { ok: true; link?: string } | { ok: false; message: string };
 
 /** Asks for the sign-in link. `next: "unlock"` lands on the checkout page after the link. */
 export async function requestLink(email: string, next: "" | "unlock"): Promise<LinkResult> {
@@ -55,8 +56,8 @@ export async function requestLink(email: string, next: "" | "unlock"): Promise<L
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, next }),
     });
-    if (res.ok) return { ok: true };
-    const j = await res.json().catch(() => ({})) as { error?: string };
+    const j = await res.json().catch(() => ({})) as { error?: string; link?: string };
+    if (res.ok) return { ok: true, link: typeof j.link === "string" ? j.link : undefined };
     if (res.status === 503) return { ok: false, message: "Signing in is not available yet." };
     return { ok: false, message: j.error ?? "That did not work. Try again." };
   } catch {
@@ -125,6 +126,11 @@ export function fillAccount(body: HTMLElement, then: "" | "unlock", closeSheet: 
       status.textContent = r.ok
         ? "Check your email. The link works once, for 15 minutes. Open it on THIS device: it signs in the browser that opens it."
         : r.message;
+      if (r.ok && r.link) { // the local test setup shows the link instead of sending an email
+        const a = el("a", "", "Local test: no email is sent, open the sign-in link here") as HTMLAnchorElement;
+        a.href = r.link;
+        status.append(document.createElement("br"), a);
+      }
     });
   });
   body.append(form, status);

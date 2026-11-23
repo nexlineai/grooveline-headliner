@@ -27,6 +27,7 @@ function signInForm() {
       const res = await fetch("../api/login", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: input.value.trim(), next: "unlock" }) });
       const j = await res.json().catch(() => ({}));
       status.textContent = res.ok ? "Check your email. The link works once, for 15 minutes. Open it on THIS device: it signs in the browser that opens it, and brings you back here to pay." : (j.error ?? "That did not work. Try again.");
+      if (res.ok && j.link) { const a = el("a", "", "Local test: no email is sent, open the sign-in link here"); a.href = j.link; status.append(document.createElement("br"), a); } // only the local test setup sends `link`
     } catch { status.textContent = "Could not reach Grooveline. Check the connection and try again."; }
     send.disabled = false;
   });
