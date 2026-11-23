@@ -1,0 +1,28 @@
+# For local runs only (`wrangler dev --config wrangler.test.toml`, tools/paywall-local.sh): the real
+# Worker with the paywall ON, a local D1 and test secrets. No routes, never deployed.
+name = "grooveline-headliner-test"
+main = "tools/worker.js"
+compatibility_date = "2026-08-27"
+workers_dev = false
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+html_handling = "auto-trailing-slash"
+not_found_handling = "none"
+run_worker_first = true
+
+[vars]
+PAYWALL = "on"
+PADDLE_ENV = "sandbox"
+PADDLE_CLIENT_TOKEN = "test_token"
+PADDLE_PRICE_ID = "pri_test"
+PADDLE_WEBHOOK_SECRET = "whsec_test_only"
+SESSION_SECRET = "session_test_only"
+DEV_ECHO_LINK = "1"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "headliner-db"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"

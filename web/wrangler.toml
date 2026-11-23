@@ -22,3 +22,21 @@ run_worker_first = true
 [[routes]]
 pattern = "grooveline.org/headliner*"
 zone_name = "grooveline.org"
+
+# The paywall (23 Nov 2026, tools/paywall/, vault headliner-other-platforms.md item 8). DARK until
+# Zé flips PAYWALL to "on": "off" serves every file exactly as before and the game shows no lock.
+# A browser can try it first with /headliner/api/preview?on=1 (a cookie, only for that browser).
+# Setup (once, by Zé): tools/paywall-setup.sh creates headliner-db, applies migrations/ and asks for
+# the three secrets (SESSION_SECRET, RESEND_API_KEY, PADDLE_WEBHOOK_SECRET); it then uncomments the
+# [[d1_databases]] block below with the real id.
+[vars]
+PAYWALL = "off"
+PADDLE_ENV = "sandbox"        # "live" with the live token and price
+PADDLE_CLIENT_TOKEN = ""      # Paddle > Developer tools > Authentication > client-side token (public by design)
+PADDLE_PRICE_ID = ""          # pri_... of the one-time "Headliner career" price
+
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "headliner-db"
+# database_id = "<set by tools/paywall-setup.sh>"
+# migrations_dir = "migrations"

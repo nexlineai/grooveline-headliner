@@ -10,6 +10,7 @@ import { execFileSync } from "node:child_process";
 import { cpSync, existsSync, linkSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { stripTypeScriptTypes } from "node:module";
+import { gating } from "./gating.ts";
 
 const WEB = path.resolve(import.meta.dirname, "..");
 const ROOT = path.resolve(WEB, "..");
@@ -80,6 +81,17 @@ for (const name of (existsSync(path.join(WEB, "content/story")) ? readdirSync(pa
 // Bundled into the Worker by wrangler (tools/worker.js imports it); outside headliner/, so the
 // route never serves it.
 writeFileSync(path.join(OUT, "sizes.json"), JSON.stringify(sizes));
+
+// The media only the paid chapters (3-12) use (tools/gating.ts); the Worker answers 403 for these
+// unless the visitor owns the game and the paywall is on (tools/paywall/).
+{
+  const rels = tracked.map((r) => r.slice("App/".length));
+  const read = (rel: string) => JSON.parse(readFileSync(path.join(SITE, "assets", rel), "utf8"));
+  const g = gating(JSON.parse(readFileSync(path.join(WEB, "content/career.json"), "utf8")), read("Story/scenes.json"), read("Tracks/tracks.json"), rels);
+  writeFileSync(path.join(OUT, "gated.json"), JSON.stringify(g.gated.map((f) => `/headliner/assets/${f}`)));
+  const gatedBytes = g.gated.reduce((n, f) => n + (sizes[`/headliner/assets/${f}`] ?? 0), 0);
+  console.log(`build: ${g.gated.length} media files (${(gatedBytes / 1e6).toFixed(0)} MB) are for the paid chapters, ${rels.length - g.gated.length} stay free -> gated.json`);
+}
 
 // Headers for every page of the game.
 writeFileSync(path.join(OUT, "_headers"), `/headliner/*
