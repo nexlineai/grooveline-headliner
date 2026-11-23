@@ -37,7 +37,9 @@ const LOGIN_HEADERS = {
   "X-Content-Type-Options": "nosniff",
   "X-Robots-Tag": "noindex",
   "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
-  "Referrer-Policy": "no-referrer",
+  // NOT "no-referrer": from such a page a browser sends `Origin: null` with the button's POST (Fetch spec), and the Worker
+  // refuses any Origin but its own. The page loads nothing from outside, so "same-origin" leaks nothing either.
+  "Referrer-Policy": "same-origin",
 };
 const API_HEADERS = { "X-Content-Type-Options": "nosniff", "X-Robots-Tag": "noindex", "Referrer-Policy": "no-referrer" };
 

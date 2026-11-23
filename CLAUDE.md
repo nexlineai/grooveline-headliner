@@ -448,7 +448,8 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
   layers under the canvas. Labels use Barlow Condensed (OFL, `web/fonts/`), the same on every system.
 - **Paywall (web only, 23 Nov 2026; branch `web-paywall`, DARK until Zé sets `PAYWALL = "on"`).** Chapters 1-2 free, one payment ($4.99, Paddle as
   merchant of record) opens 3-12, tied to an email address (sign-in by an emailed link, no password). The code and text stay public; the 298 MB of
-  media only the paid chapters use are withheld by the Worker: `tools/gating.ts` builds `dist/gated.json` FROM USAGE (referenced by a chapter 3-12
+  media only the paid chapters use are withheld by the Worker (**but this repo is PUBLIC and holds every file in `App/`: `raw.githubusercontent.com/nexlineai/grooveline-headliner/main/App/Tracks/<file>`
+  serves them to anyone, checked 23 Nov, so the gate stops casual copying only; making the repo private (Mac CI minutes cost more) is Zé's decision)**: `tools/gating.ts` builds `dist/gated.json` FROM USAGE (referenced by a chapter 3-12
   step and never by chapters 1-2, the menus or the code; NOT from `tracks.json`'s `chapter` field), `tools/app.js` (`createWorker(sizes, gated)`;
   `tools/worker.js` only feeds it the two build-time tables) answers 403 for those (HEAD and Range too; the path is percent-decoded, slash-collapsed
   and lower-cased before the comparison). Back end `tools/paywall/` (own D1 `headliner-db`, `migrations/`; separate from the radio's DJ `users`):
@@ -464,7 +465,8 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
   `bash tools/paywall-setup.sh` (database, tables, secrets), then `... paddle`. Tests: `test/paywall.test.ts` (real SQL on node:sqlite via
   `test/support/d1.ts`), `test/gating.test.ts`, `tools/pagetests/paywall-local.mjs` (the purchase path against a running `wrangler dev --config
   wrangler.test.toml`), `tools/pagetests/paywall-e2e.sh` (a stranger plays chapters 1-2 against it; zero files refused; a chapter 3 night is the
-  control; about 12 minutes, not in `run.sh`). A new asset that only a paid chapter uses needs no list: the build finds it; a NEW free-chapter
+  control; about 12 minutes, not in `run.sh`), `tools/pagetests/paywall-signin-e2e.sh` (the OWNER in a real browser: the emailed link, the button, a
+  chapter 3 night with nothing refused; it caught `Referrer-Policy: no-referrer` on the sign-in page making the browser send `Origin: null`). A new asset that only a paid chapter uses needs no list: the build finds it; a NEW free-chapter
   asset loaded by CODE (not named in the chapters' data) must be added to `ALWAYS_FREE` in `tools/gating.ts`.
 
 ## Assets

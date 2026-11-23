@@ -269,5 +269,7 @@ describe("what the page asks", () => {
     assert.equal(game.headers.get("Cross-Origin-Embedder-Policy"), "require-corp");
     assert.equal(game.headers.get("Cross-Origin-Opener-Policy"), "same-origin");
     assert.match((await call("/headliner/login?t=x")).headers.get("Content-Security-Policy") ?? "", /form-action 'self'/);
+    // A sign-in page that says no-referrer makes the browser send `Origin: null` with its button's POST, which would be refused.
+    assert.equal((await call("/headliner/login?t=x")).headers.get("Referrer-Policy"), "same-origin");
   });
 });
