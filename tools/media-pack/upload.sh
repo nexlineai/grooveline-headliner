@@ -31,4 +31,4 @@ done < <(node -e 'for (const f of JSON.parse(require("fs").readFileSync(process.
 echo
 wrangler r2 object put "$BUCKET/pack/manifest.json" --file $OUT/pack-manifest.json --content-type application/json --cache-control "public, max-age=300" $WR_FLAGS >/dev/null 2>&1 || { echo "FAILED the manifest"; exit 1; }
 echo "Done: ${LIMIT:-$total} of $total files and pack/manifest.json are in the bucket $BUCKET."
-echo "Next (once): make it readable by the app: Cloudflare dashboard > R2 > $BUCKET > Settings > Custom Domains > add media.grooveline.org (see tools/media-pack/README.md)."
+echo "The bucket stays PRIVATE (no custom domain, no r2.dev): the Headliner Worker serves it to buyers and testers (see tools/media-pack/README.md)."

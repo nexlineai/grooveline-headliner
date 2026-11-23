@@ -13,10 +13,12 @@ The spec for the app side (the iPhone agent): vault `04_projects/grooveline/note
 - Tests: `web/test/media-pack.test.ts` (made-up content, runs in CI), and a local round trip of the script: `BUCKET=x WR_FLAGS="--local --persist-to DIR" LIMIT=4 bash upload.sh`.
 
 ## Zé's steps
-1. `bash tools/media-pack/upload.sh` (from a clone of this branch; about 15 minutes for 437 files).
-2. Cloudflare dashboard > R2 > `headliner-media` > Settings > Custom Domains > add `media.grooveline.org` (the zone is already on Cloudflare).
-   Check: `curl -sI https://media.grooveline.org/pack/manifest.json` answers 200.
-3. Nothing else: the bucket is public by its custom domain. (Gated version: not built, see the spec's open question.)
+1. `bash tools/media-pack/upload.sh` (from a clone of this branch; about 15 minutes for 437 files). It creates the PRIVATE bucket `headliner-media`.
+2. **Do NOT add a custom domain or turn on the public `r2.dev` URL for the bucket**: since 23 Nov the download is for buyers and testers only, and the
+   Headliner Worker (branch `pack-gate`) is the only reader (`/headliner/pack/...`, with a ticket Apple's App Store Server API vouches for). A public
+   domain would let anyone download the pack.
+3. The Worker side, after the paywall branches are merged: `bash tools/paywall-setup.sh pack` (binds the bucket) and `bash tools/paywall-setup.sh apple FILE.p8 KEYID ISSUERID`
+   (the In-App Purchase key), then deploy.
 
-R2's free allowance (check Cloudflare's pricing page): 10 GB stored, no charge for downloads out of R2, 1M writes and 10M reads a month;
-one full install is 437 reads.
+R2's free allowance (check Cloudflare's pricing page): 10 GB stored, no charge for downloads out of R2, 1M writes and 10M reads a month.
+Each file is one Worker request, so a full install is 437 of them (Workers Free: 100,000 a day).
