@@ -15,3 +15,5 @@ button:disabled { opacity: .5; cursor: default; }
 a.back { display: inline-block; margin-top: 8px; color: var(--dim); font: 700 12px system-ui; letter-spacing: .15em; text-decoration: none; }
 a.back:hover { color: var(--ink); }
 .price { color: var(--dim); font-size: 14px; margin: 10px 0 0; }
+.legal a { color: var(--dim); text-decoration: underline; }
+.legal a:hover { color: var(--ink); }
