@@ -58,10 +58,21 @@ function checkout(state) {
   const pay = el("button", "", "UNLOCK CAREER");
   const status = el("p", "status");
   say(el("p", "", "10 more chapters · 60+ original records · vinyl by ear, drum machine, B2B and a 60,000-person festival. One payment, no ads, no subscription."), pay, el("p", "price", `${PRICE} · one payment`), status);
-  fine.textContent = `Signed in as ${state.email}. You pay Paddle, our reseller: the price at checkout is in your currency and includes VAT where it applies.`;
+  fine.textContent = `Signed in as ${state.email}. You pay Paddle, our reseller: the price at checkout is in your currency, and the total shows the tax before you pay (VAT is included in the euro countries; sales tax is added on top where that is the norm, for example in the US).`;
   if (!window.Paddle) { status.textContent = "The checkout could not load. Turn off a content blocker for this page and reload."; pay.disabled = true; return; }
   if (env === "sandbox") window.Paddle.Environment.set("sandbox");
-  window.Paddle.Initialize({ token, eventCallback: (ev) => { if (ev?.name === "checkout.completed") confirming(); } });
+  window.Paddle.Initialize({
+    token,
+    eventCallback: (ev) => {
+      if (ev?.name === "checkout.completed") confirming();
+      if (ev?.name === "checkout.error") {
+        // Paddle's own window only says "Something went wrong": the code is what says why (23 Nov: transaction_default_checkout_url_not_set).
+        const e = ev.error || ev.data?.error || {};
+        console.error("Paddle checkout.error", JSON.stringify(ev));
+        status.textContent = `The checkout could not open${e.code ? ` (${e.code})` : ""}. Try again, and if it keeps happening write to info@grooveline.org.`;
+      }
+    },
+  });
   pay.addEventListener("click", () => {
     window.Paddle.Checkout.open({
       items: [{ priceId: price, quantity: 1 }],
