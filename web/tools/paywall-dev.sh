@@ -15,4 +15,9 @@ esac
 node tools/build.ts 2>&1 | grep -v -i "warning\|trace-warnings" | tail -3
 wrangler d1 migrations apply headliner-db $ARGS >/dev/null 2>&1 || { echo "could not prepare the local database"; exit 1; }
 echo "Open  http://localhost:8788/headliner/?unlockAll=1   (Ctrl+C stops it)"
-exec wrangler dev --config wrangler.test.toml --port 8788 --ip 127.0.0.1
+# wrangler 4.125's dev proxy sometimes dies with "Network connection lost" when a browser drops a request: start it again.
+trap 'exit 0' INT TERM
+while true; do
+  wrangler dev --config wrangler.test.toml --port 8788 --ip 127.0.0.1
+  echo "wrangler stopped; starting it again (Ctrl+C to quit) ..."; sleep 1
+done

@@ -96,9 +96,9 @@ export function showChapter(root: HTMLElement, chapters: Chapter[], chapter: Cha
 function unlockCard(act: ChapterActions): HTMLElement {
   const card = el("div", "unlock-card");
   card.append(el("p", "", "10 more chapters · 60+ original records · vinyl by ear, drum machine, B2B and a 60,000-person festival. One purchase, no ads, no subscription."));
-  const buy = el("button", "primary", `UNLOCK CAREER  ·  ${PRICE_TEXT}`);
+  const buy = el("button", "primary", "UNLOCK CAREER");
   buy.addEventListener("click", act.unlock);
-  card.append(buy);
+  card.append(buy, el("p", "price", `${PRICE_TEXT} · one payment`));
   const who = account();
   if (who.signedIn) card.append(el("p", "who", `Signed in as ${who.email}`));
   const have = el("button", "quiet", who.signedIn ? "ACCOUNT" : "ALREADY BOUGHT IT? SIGN IN");

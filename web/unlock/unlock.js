@@ -3,7 +3,7 @@
 // Paddle-specific code is this file's checkout() and the Worker's tools/paywall/paddle.js.
 const $ = (id) => document.getElementById(id);
 const app = $("app"), title = $("title"), fine = $("fine");
-const PRICE = "$4.99";
+const PRICE = "$4.99 / €4.99";
 const el = (tag, className = "", text = "") => { const e = document.createElement(tag); if (className) e.className = className; if (text) e.textContent = text; return e; };
 const say = (...nodes) => app.replaceChildren(...nodes);
 
@@ -55,9 +55,9 @@ async function confirming() {
 function checkout(state) {
   title.textContent = "UNLOCK THE CAREER";
   const { env, token, price } = state.checkout;
-  const pay = el("button", "", `UNLOCK CAREER  ·  ${PRICE}`);
+  const pay = el("button", "", "UNLOCK CAREER");
   const status = el("p", "status");
-  say(el("p", "", "10 more chapters · 60+ original records · vinyl by ear, drum machine, B2B and a 60,000-person festival. One payment, no ads, no subscription."), pay, status);
+  say(el("p", "", "10 more chapters · 60+ original records · vinyl by ear, drum machine, B2B and a 60,000-person festival. One payment, no ads, no subscription."), pay, el("p", "price", `${PRICE} · one payment`), status);
   fine.textContent = `Signed in as ${state.email}. You pay Paddle, our reseller: the price at checkout is in your currency and includes VAT where it applies.`;
   if (!window.Paddle) { status.textContent = "The checkout could not load. Turn off a content blocker for this page and reload."; pay.disabled = true; return; }
   if (env === "sandbox") window.Paddle.Environment.set("sandbox");

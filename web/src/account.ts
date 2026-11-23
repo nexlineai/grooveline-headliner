@@ -12,8 +12,9 @@ export interface Account {
   owns: boolean;
 }
 
-/** What the unlock costs, as the buttons say it. The checkout shows the same price in the buyer's own currency, VAT included. */
-export const PRICE_TEXT = "$4.99";
+/** What the unlock costs, as the buttons say it: 4.99 in dollars and in euros (the Paddle price has a euro override for the euro countries). The
+ * checkout page shows the buyer's own currency. */
+export const PRICE_TEXT = "$4.99 / €4.99";
 export const FIRST_PAID_CHAPTER = 3;
 
 let state: Account = { paywall: false, signedIn: false, email: null, owns: true };
@@ -96,9 +97,9 @@ export function fillAccount(body: HTMLElement, then: "" | "unlock", closeSheet: 
     if (a.owns) body.append(el("p", "ok", "FULL CAREER UNLOCKED. Chapters 3 to 12 are yours on every device you sign in on."));
     else {
       body.append(el("p", "", "Chapters 3 to 12 are not unlocked on this account yet."));
-      const buy = el("button", "primary", `UNLOCK CAREER  ·  ${PRICE_TEXT}`);
+      const buy = el("button", "primary", "UNLOCK CAREER");
       buy.addEventListener("click", goToCheckout);
-      body.append(buy);
+      body.append(buy, el("p", "price", `${PRICE_TEXT} · one payment`));
     }
     const out = el("button", "quiet", "SIGN OUT");
     out.addEventListener("click", () => { signOut().then(() => { fillAccount(body, "", closeSheet); }); });
