@@ -11,7 +11,7 @@ NAME=headliner-db
 secret_exists() { wrangler secret list --config wrangler.toml 2>/dev/null | grep -q "\"name\": \"$1\""; }
 
 if [ "$1" = "paddle" ]; then
-  echo "Paste the notification destination's SECRET KEY from Paddle (Developer tools > Notifications), then Enter:"
+  echo "Paste the notification destination's SECRET KEY from Paddle (Paddle > Events > Notifications, the destination's Edit destination), then Enter:"
   wrangler secret put PADDLE_WEBHOOK_SECRET --config wrangler.toml
   exit 0
 fi
