@@ -5,6 +5,7 @@
 import { owns, playerById } from "./accounts.js";
 import { classify } from "./gate.js";
 import { consume, json, landing, requestLink, sameSitePost } from "./login.js";
+import { issueTicket, servePack } from "./pack.js";
 import { webhook } from "./paddle.js";
 import { PREVIEW_COOKIE, SESSION_COOKIE, clearCookie, cookieValue, readSession, setCookie } from "./session.js";
 
@@ -42,6 +43,9 @@ export async function handle(request, env, ctx, url) {
     return json({ ok: true }, 200, { "Set-Cookie": clearCookie(SESSION_COOKIE) });
   }
   if (pathname === "/headliner/api/paddle" && m === "POST") return webhook(request, env);
+  // The iPhone's career pack for buyers and testers (not tied to PAYWALL, which is the web's switch).
+  if (pathname === "/headliner/api/pack-ticket" && m === "POST") return issueTicket(request, env);
+  if (pathname.startsWith("/headliner/pack/") && (m === "GET" || m === "HEAD")) return servePack(request, env, pathname.slice("/headliner/pack/".length));
   if (pathname === "/headliner/api/preview" && m === "GET") {
     const on = url.searchParams.get("on") !== "0";
     return new Response(null, { status: 303, headers: { Location: "/headliner/", "Cache-Control": "no-store", "Set-Cookie": on ? setCookie(PREVIEW_COOKIE, "1", { httpOnly: false }) : clearCookie(PREVIEW_COOKIE) } });

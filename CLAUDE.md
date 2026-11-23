@@ -468,6 +468,20 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
   control; about 12 minutes, not in `run.sh`), `tools/pagetests/paywall-signin-e2e.sh` (the OWNER in a real browser: the emailed link, the button, a
   chapter 3 night with nothing refused; it caught `Referrer-Policy: no-referrer` on the sign-in page making the browser send `Origin: null`). A new asset that only a paid chapter uses needs no list: the build finds it; a NEW free-chapter
   asset loaded by CODE (not named in the chapters' data) must be added to `ALWAYS_FREE` in `tools/gating.ts`.
+- **iPhone career pack gate (23 Nov 2026, branch `pack-gate`, stacked on `web-paywall`; Zé: "only for buyers or testers").** The v1.2.0 pack (chapters 3-12,
+  tooling on branch `r2-media-pack`, spec vault `headliner-v1.2-r2-pack-spec.md`) lives in a PRIVATE R2 bucket and is served only by this Worker:
+  `POST /headliner/api/pack-ticket {transactionId, environment?}` asks Apple's App Store Server API (`tools/paywall/apple.js`: ES256 JWT, production
+  `api.storekit.apple.com` then sandbox `api.storekit-sandbox.apple.com`, hint first) whether it is a real, unrefunded purchase of
+  `APPLE_PRODUCT_ID` in `APPLE_BUNDLE_ID`, then gives a 24 h HMAC ticket; `GET|HEAD /headliner/pack/<manifest.json|sha256.ext>` with `Authorization: Bearer`
+  streams the R2 object (`tools/paywall/pack.js`: key whitelist, byte ranges, 416 past the end, `private, no-store`). TestFlight testers and App Review buy
+  in the sandbox, which the same API answers; a build that opens the career with NO transaction (hidden logo hold, failed product load) has nothing to send:
+  the app must route those people through UNLOCK (free in TestFlight). A transaction id is not a secret, so: 12 asks a day per id, 8 tickets a day per
+  purchase, at most 4 different networks per purchase per day (a known network is always let in, a refused one is not recorded: a stranger can use up the
+  room, never push the owner out). Independent of `PAYWALL`. Needs the R2 binding `PACK` (commented in wrangler.toml; `paywall-setup.sh pack`) and the
+  secrets `APPSTORE_KEY_P8/ID/ISSUER_ID` (`paywall-setup.sh apple FILE.p8 KEYID ISSUERID`: an App Store Connect In-App Purchase key, a SEPARATE key from the
+  `testflight` environment's; the .p8 downloads once). Tests: `test/pack.test.ts` (a fake Apple that verifies our JWT with the public key), `tools/pagetests/pack-local.mjs`
+  (real workerd + local R2 + a stub Apple server). Not confirmed by Apple's docs and to check on the first real answer: the field `signedTransactionInfo`,
+  that TestFlight purchases are sandbox, the .p8 format. Each file is one Worker request (437 for a full install): Workers Free allows 100k a day.
 
 ## Assets
 - `tools/music/make.mjs ID [ID ...]`: synthesizes the original tracks into `App/Tracks/` (+

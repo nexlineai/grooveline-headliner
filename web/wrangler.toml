@@ -34,9 +34,19 @@ PAYWALL = "off"
 PADDLE_ENV = "sandbox"        # "live" with the live token and price
 PADDLE_CLIENT_TOKEN = "test_1a555d0bf1d229ac062a7a63da8"   # SANDBOX client-side token (Paddle > My account > Settings > Authentication; public by design). Live: a live_ token
 PADDLE_PRICE_ID = "pri_01m83v09yyj67txw3c8j1z6s17"        # SANDBOX price of "Grooveline Headliner: full career" (EUR 4.99 base, see the vault). Live: its own pri_
+APPLE_BUNDLE_ID = "org.grooveline.headliner"           # the iPhone career pack gate (tools/paywall/pack.js): which app and
+APPLE_PRODUCT_ID = "org.grooveline.headliner.career"   # which in-app purchase Apple must confirm
 
 [[d1_databases]]
 binding = "DB"
 database_name = "headliner-db"
 database_id = "022a8992-44bf-4590-ab79-7860ea6eb3c6"
 migrations_dir = "migrations"
+
+# The iPhone's career pack (chapters 3-12, tools/media-pack/ on branch r2-media-pack) for buyers and testers: an R2 bucket behind
+# /headliner/pack/ and a ticket Apple's App Store Server API vouches for. Secrets (never in this file): APPSTORE_KEY_P8, APPSTORE_KEY_ID,
+# APPSTORE_ISSUER_ID (`bash tools/paywall-setup.sh apple FILE.p8 KEYID ISSUERID`). `bash tools/paywall-setup.sh pack` turns the block on
+# once the bucket exists (tools/media-pack/upload.sh creates it).
+# [[r2_buckets]]
+# binding = "PACK"
+# bucket_name = "headliner-media"

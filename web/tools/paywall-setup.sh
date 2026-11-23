@@ -2,6 +2,8 @@
 # The paywall's one-time setup, run by Zé from web/ with his Cloudflare login (it creates things in his account):
 #   bash tools/paywall-setup.sh            database + session secret + email key
 #   bash tools/paywall-setup.sh paddle     the Paddle notification secret (after the Paddle account exists)
+#   bash tools/paywall-setup.sh apple FILE.p8 KEYID ISSUERID   the In-App Purchase key for the iPhone pack gate
+#   bash tools/paywall-setup.sh pack       turn on the pack's R2 binding (after tools/media-pack/upload.sh)
 # Safe to run again: it never deletes anything, and an existing database or secret is kept.
 # It does NOT deploy and does NOT switch the paywall on (PAYWALL stays "off" in wrangler.toml).
 set -e
@@ -9,6 +11,30 @@ cd "$(dirname "$0")/.."
 NAME=headliner-db
 
 secret_exists() { wrangler secret list --config wrangler.toml 2>/dev/null | grep -q "\"name\": \"$1\""; }
+
+if [ "$1" = "apple" ]; then
+  # The In-App Purchase key from App Store Connect (Users and Access > Integrations > In-App Purchase): the .p8 file, its Key ID and the Issuer ID.
+  [ -f "$2" ] && [ -n "$3" ] && [ -n "$4" ] || { echo "Usage: bash tools/paywall-setup.sh apple /path/to/AuthKey_XXXX.p8 KEY_ID ISSUER_ID"; exit 1; }
+  wrangler secret put APPSTORE_KEY_P8 --config wrangler.toml < "$2"
+  printf '%s' "$3" | wrangler secret put APPSTORE_KEY_ID --config wrangler.toml
+  printf '%s' "$4" | wrangler secret put APPSTORE_ISSUER_ID --config wrangler.toml
+  echo "Done. Keep the .p8 file somewhere safe: Apple lets you download it only once. It must NOT go into the repo."
+  exit 0
+fi
+
+if [ "$1" = "pack" ]; then
+  # Turns the PACK bucket binding on once the bucket headliner-media exists (tools/media-pack/upload.sh creates it).
+  wrangler r2 bucket list 2>/dev/null | grep -q "headliner-media" || { echo "The bucket headliner-media does not exist yet: run tools/media-pack/upload.sh first."; exit 1; }
+  python3 - <<'PY'
+import re
+p = "wrangler.toml"
+s = open(p).read()
+s = s.replace('# [[r2_buckets]]\n# binding = "PACK"\n# bucket_name = "headliner-media"', '[[r2_buckets]]\nbinding = "PACK"\nbucket_name = "headliner-media"')
+open(p, "w").write(s)
+PY
+  echo "wrangler.toml now binds the bucket. Commit that change, then deploy."
+  exit 0
+fi
 
 if [ "$1" = "paddle" ]; then
   echo "Paste the notification destination's SECRET KEY from Paddle (Developer tools > Notifications), then Enter:"

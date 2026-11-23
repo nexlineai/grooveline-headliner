@@ -20,9 +20,15 @@ PADDLE_PRICE_ID = "pri_test"
 PADDLE_WEBHOOK_SECRET = "whsec_test_only"
 SESSION_SECRET = "session_test_only"
 DEV_ECHO_LINK = "1"
+APPLE_BUNDLE_ID = "org.grooveline.headliner"
+APPLE_PRODUCT_ID = "org.grooveline.headliner.career"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "headliner-db"
 database_id = "00000000-0000-0000-0000-000000000000"
 migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "PACK"
+bucket_name = "headliner-media-test"
