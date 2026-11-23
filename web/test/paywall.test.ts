@@ -12,6 +12,8 @@ import type { WorkerEnv } from "../tools/app.js";
 
 type Env = WorkerEnv;
 
+// What the real asset store adds from dist/_headers to every file (the build writes it for the game's pages).
+const ISOLATION = { "Cross-Origin-Opener-Policy": "same-origin", "Cross-Origin-Embedder-Policy": "require-corp", "Cross-Origin-Resource-Policy": "same-origin" };
 const GATED = ["/headliner/assets/Tracks/Low-Tide.m4a", "/headliner/assets/Story/white-label-01.mp4"];
 const worker = createWorker({}, GATED);
 const SECRET = "whsec_test";
@@ -29,7 +31,7 @@ beforeEach(() => {
   mailed.length = 0;
   env = {
     DB: db, PAYWALL: "on", SESSION_SECRET: "s3cret", PADDLE_WEBHOOK_SECRET: SECRET, PADDLE_PRICE_ID: "pri_game", PADDLE_CLIENT_TOKEN: "test_t", PADDLE_ENV: "sandbox", DEV_ECHO_LINK: "1",
-    ASSETS: { fetch: async (r: Request) => { asked.push(new URL(r.url).pathname); return new Response("media", { status: 200, headers: { "Content-Type": "audio/mp4" } }); } },
+    ASSETS: { fetch: async (r: Request) => { asked.push(new URL(r.url).pathname); return new Response("media", { status: 200, headers: { "Content-Type": "audio/mp4", ...ISOLATION } }); } },
   };
 });
 

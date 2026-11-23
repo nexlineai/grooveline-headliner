@@ -4,6 +4,7 @@
 import type { Chapter, ChapterStep } from "./game/content.ts";
 import type { CareerProgress } from "./game/progress.ts";
 import * as Progress from "./game/progress.ts";
+import { PRICE_TEXT, account } from "./account.ts";
 
 const el = (tag: string, className = "", text = ""): HTMLElement => {
   const e = document.createElement(tag);
@@ -17,6 +18,12 @@ export interface ChapterActions {
   play: (steps: ChapterStep[]) => void;
   open: (chapter: number) => void;
   back: () => void;
+  /** The chapter is for the full career and this player does not have it (the web's paywall). */
+  paywalled: (chapter: number) => boolean;
+  /** Go and pay (asks for the email first when nobody is signed in). */
+  unlock: () => void;
+  /** Open the sign-in sheet (someone who bought it already). */
+  signIn: () => void;
 }
 
 /** One chapter: what it is, how many stars, CONTINUE from the first step not done to the end of
@@ -28,6 +35,7 @@ export function showChapter(root: HTMLElement, chapters: Chapter[], chapter: Cha
   const earned = chapter.steps.reduce((n, s) => n + (p.stars[s.id] ?? 0), 0);
   const possible = chapter.steps.filter((s) => s.kind !== "story").length * 3;
   const nextChapter = next < 0 ? chapters.find((c) => c.number === chapter.number + 1) : undefined;
+  const gated = act.paywalled(chapter.number);
 
   const left = el("div", "chapter-left");
   left.append(el("div", "kicker", `CHAPTER ${chapter.number}`));
@@ -35,17 +43,20 @@ export function showChapter(root: HTMLElement, chapters: Chapter[], chapter: Cha
   const dots = el("div", "dots");
   for (const other of chapters) {
     if (other.number === chapter.number) continue;
-    const open = Progress.reached(p, chapters, other.number);
+    const reached = Progress.reached(p, chapters, other.number);
+    const open = reached && !act.paywalled(other.number);
     const dot = el("button", open ? "" : "locked", open ? String(other.number) : "") as HTMLButtonElement;
     if (!open) dot.innerHTML = `<svg viewBox="0 0 16 16" width="9" height="9" aria-hidden="true"><rect x="3" y="7" width="10" height="8" rx="1.5" fill="currentColor"/><path d="M5 7V5a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="2"/></svg>`;
-    dot.disabled = !open;
-    dot.title = open ? other.title : "Locked";
+    dot.disabled = !reached; // a chapter you have reached but not bought still opens, on its offer
+    dot.title = open ? other.title : reached ? "Unlock the full career" : "Locked";
     dot.addEventListener("click", () => act.open(other.number));
     dots.append(dot);
   }
   left.append(dots, el("h1", "", chapter.title), el("p", "line", chapter.line), el("div", "stars", `★ ${earned} / ${possible}`));
   const fromNext = () => act.play(chapter.steps.slice(next < 0 ? 0 : next));
-  if (nextChapter) {
+  if (gated) {
+    left.append(unlockCard(act));
+  } else if (nextChapter) {
     const go = el("button", "primary", `CHAPTER ${nextChapter.number}  →`);
     go.addEventListener("click", () => act.open(nextChapter.number));
     const again = el("button", "quiet", "PLAY IT AGAIN");
@@ -59,7 +70,7 @@ export function showChapter(root: HTMLElement, chapters: Chapter[], chapter: Cha
 
   const right = el("div", "chapter-steps");
   chapter.steps.forEach((step, i) => {
-    const open = Progress.stepOpen(p, chapter, i);
+    const open = !gated && Progress.stepOpen(p, chapter, i);
     const isDone = Progress.done(p, step);
     const row = el("button", `step ${step.kind}${isDone ? " done" : ""}${i === next ? " next" : ""}`) as HTMLButtonElement;
     row.disabled = !open;
@@ -79,4 +90,19 @@ export function showChapter(root: HTMLElement, chapters: Chapter[], chapter: Cha
   const body = el("div", "chapter-body");
   body.append(left, right);
   root.append(back, body);
+}
+
+/** The offer at the door of chapter 3 (as on the iPhone, with an email link instead of the App Store's sign-in). */
+function unlockCard(act: ChapterActions): HTMLElement {
+  const card = el("div", "unlock-card");
+  card.append(el("p", "", "10 more chapters · 60+ original records · vinyl by ear, drum machine, B2B and a 60,000-person festival. One purchase, no ads, no subscription."));
+  const buy = el("button", "primary", `UNLOCK CAREER  ·  ${PRICE_TEXT}`);
+  buy.addEventListener("click", act.unlock);
+  card.append(buy);
+  const who = account();
+  if (who.signedIn) card.append(el("p", "who", `Signed in as ${who.email}`));
+  const have = el("button", "quiet", who.signedIn ? "ACCOUNT" : "ALREADY BOUGHT IT? SIGN IN");
+  have.addEventListener("click", act.signIn);
+  card.append(have);
+  return card;
 }

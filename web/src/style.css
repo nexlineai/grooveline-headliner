@@ -369,3 +369,22 @@ button.mini.on { border-color: var(--orange); color: var(--orange); }
 /* SETTINGS and FULLSCREEN carry a small picture that shows only when the bar is tight: then the words go. */
 #top .pill .ico { display: none; }
 
+
+/* The paywall (web only): the offer at chapter 3, the ACCOUNT sheet, the title's SIGN IN. */
+#title-account { position: absolute; top: 14px; right: 16px; font-size: 11px; letter-spacing: 0.15em; padding: 0.6em 1.2em; max-width: 60vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#title-account[hidden] { display: none; }
+#account { z-index: 9; top: 8vh; width: min(460px, 92vw); }
+#account-body p { color: var(--ink); font-size: 15px; line-height: 1.4; }
+#account-body .ok { color: var(--teal); font-weight: 700; }
+#account-body .who { color: var(--dim); font-size: 14px; overflow-wrap: anywhere; }
+#account-body .status { color: var(--orange); font-size: 14px; min-height: 1.4em; }
+#account-body form.signin { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+#account-body input[type=email] { width: 100%; box-sizing: border-box; padding: 11px 12px; border-radius: 10px; background: var(--slot); color: var(--ink); border: 1px solid var(--edge); font: 500 16px system-ui, sans-serif; }
+#account-body .primary { margin-top: 4px; padding: 12px 34px; font-size: 14px; letter-spacing: 0.25em; }
+#account-body .primary:disabled { opacity: 0.5; cursor: default; }
+#account-body .quiet { margin-top: 10px; }
+.unlock-card { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 8px; }
+.unlock-card p { margin: 0; color: rgba(255, 255, 255, 0.82); font: 500 14px/1.4 system-ui, sans-serif; }
+.unlock-card .who { color: var(--dim); font-size: 12px; overflow-wrap: anywhere; }
+.unlock-card .primary { margin-top: 4px; padding: 12px 24px; font-size: 14px; letter-spacing: 0.15em; }
+.chapter-left .dots button.locked:not(:disabled) { cursor: pointer; border-color: rgba(255, 255, 255, 0.3); color: rgba(255, 255, 255, 0.55); }

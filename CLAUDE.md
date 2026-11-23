@@ -446,6 +446,26 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
 - Booth: `src/booth/booth.ts` draws in SpriteKit's world (y up, CSS pixels), so `BoothScene`'s layout
   numbers, angles and touch arithmetic port unchanged; the room picture and its clips are DOM
   layers under the canvas. Labels use Barlow Condensed (OFL, `web/fonts/`), the same on every system.
+- **Paywall (web only, 23 Nov 2026; branch `web-paywall`, DARK until Zé sets `PAYWALL = "on"`).** Chapters 1-2 free, one payment ($4.99, Paddle as
+  merchant of record) opens 3-12, tied to an email address (sign-in by an emailed link, no password). The code and text stay public; the 298 MB of
+  media only the paid chapters use are withheld by the Worker: `tools/gating.ts` builds `dist/gated.json` FROM USAGE (referenced by a chapter 3-12
+  step and never by chapters 1-2, the menus or the code; NOT from `tracks.json`'s `chapter` field), `tools/app.js` (`createWorker(sizes, gated)`;
+  `tools/worker.js` only feeds it the two build-time tables) answers 403 for those (HEAD and Range too; the path is percent-decoded, slash-collapsed
+  and lower-cased before the comparison). Back end `tools/paywall/` (own D1 `headliner-db`, `migrations/`; separate from the radio's DJ `users`):
+  `login.js` (POST `/headliner/api/login` sends the link; GET `/headliner/login` shows a BUTTON, only the POST uses the link, so a mail scanner
+  cannot burn it), `session.js` (signed cookie `hl_s`, who only), `accounts.js` (ownership always from D1; only a YES is cached, 60 s, because Paddle's
+  success page beats its notification), `paddle.js` (signature `ts=..;h1=..` over `ts:rawBody`; `transaction.completed` grants by
+  `custom_data.player`, an approved full refund or a chargeback revokes), `index.js` (the router, `PAYWALL` and the `hl_pw` preview cookie: visit
+  `/headliner/api/preview?on=1` to get the paywall in ONE browser while it is off for everyone). The checkout is its own page `unlock/` (the game's
+  `require-corp` would block Paddle's iframe, so `app.js` strips the isolation headers the asset store adds from `_headers` and gives it its own CSP).
+  Page side: `src/account.ts` (state, the ACCOUNT sheet), lock dots and the offer in `src/menus.ts`, free play lists only owned records; with the
+  paywall off (or an answer that is not JSON, e.g. the dev server) nothing shows. Hold the logo 10 s = skips the chapter ORDER only (a test switch);
+  ownership is the server's. Zé's own and friends' access = `bash tools/paywall-grant.sh EMAIL` (a `grant` row). Zé's one-time setup:
+  `bash tools/paywall-setup.sh` (database, tables, secrets), then `... paddle`. Tests: `test/paywall.test.ts` (real SQL on node:sqlite via
+  `test/support/d1.ts`), `test/gating.test.ts`, `tools/pagetests/paywall-local.mjs` (the purchase path against a running `wrangler dev --config
+  wrangler.test.toml`), `tools/pagetests/paywall-e2e.sh` (a stranger plays chapters 1-2 against it; zero files refused; a chapter 3 night is the
+  control; about 12 minutes, not in `run.sh`). A new asset that only a paid chapter uses needs no list: the build finds it; a NEW free-chapter
+  asset loaded by CODE (not named in the chapters' data) must be added to `ALWAYS_FREE` in `tools/gating.ts`.
 
 ## Assets
 - `tools/music/make.mjs ID [ID ...]`: synthesizes the original tracks into `App/Tracks/` (+

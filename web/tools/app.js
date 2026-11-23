@@ -82,6 +82,8 @@ export function createWorker(sizes, gated) {
       const response = await env.ASSETS.fetch(plain);
       const headers = new Headers(response.headers);
       const checkout = assetPath === "/headliner/unlock" || assetPath.startsWith("/headliner/unlock/");
+      // The asset store adds dist/_headers (cross-origin isolation) to every file it serves: the checkout page must lose it.
+      if (checkout) for (const k of ["Cross-Origin-Opener-Policy", "Cross-Origin-Embedder-Policy", "Cross-Origin-Resource-Policy"]) headers.delete(k);
       for (const [k, v] of Object.entries(checkout ? UNLOCK_HEADERS : HEADERS)) headers.set(k, v);
       if (response.status === 200 && GATED.has(normalizePath(assetPath)) && paywall.paywallOn(request, env)) headers.set("Cache-Control", "private, max-age=3600"); // bought media: this browser only
       if (response.status === 200 && /\.(m4a|mp4|mp3)$/.test(assetPath)) {

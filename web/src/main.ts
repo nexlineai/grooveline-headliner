@@ -30,6 +30,7 @@ import { KEYS, attachKeys } from "./input/keys.ts";
 import { MidiInput, parseMidiConfig } from "./input/midi.ts";
 import type { Binding, TargetKind } from "./input/midi.ts";
 import { Credits } from "./game/credits.ts";
+import { account, fillAccount, goToCheckout, onAccountChange, paywalled, refreshAccount } from "./account.ts";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const engine = new DeckEngine();
@@ -134,6 +135,7 @@ function ensureStarted(): Promise<void> {
     try {
       await engine.start();
       content = await loadContent();
+      await refreshAccount(); // who is signed in and whether the career is unlocked (the chapter screen shows it)
       scenes = await loadScenes();
       tracks = content.tracks;
       booth.tracks = tracks;
@@ -235,7 +237,44 @@ function openChapter(n: number): void {
     play: (steps) => playSteps(chapter, steps),
     open: (m) => openChapter(m),
     back: () => showTitle(),
+    paywalled,
+    unlock: () => (account().signedIn ? goToCheckout() : openAccount("unlock")),
+    signIn: () => openAccount(""),
   });
+}
+
+// MARK: - The account (the paywall: chapters 3-12 need the career)
+
+const accountSheet = $("account"), accountBody = $("account-body"), titleAccount = $("title-account");
+function openAccount(then: "" | "unlock"): void {
+  for (const sheet of [crate, phonesPanel, $("controls")]) sheet.hidden = true;
+  fillAccount(accountBody, then, () => { accountSheet.hidden = true; });
+  accountSheet.hidden = false;
+}
+$("account-close").addEventListener("click", () => { accountSheet.hidden = true; });
+titleAccount.addEventListener("click", () => openAccount(""));
+/** The title's corner: SIGN IN, or the signed-in address. Nothing at all while the paywall is off. */
+function renderTitleAccount(): void {
+  const a = account();
+  titleAccount.hidden = !a.paywall;
+  titleAccount.textContent = a.signedIn ? (a.email ?? "ACCOUNT") : "SIGN IN";
+  if (!accountSheet.hidden) fillAccount(accountBody, "", () => { accountSheet.hidden = true; });
+}
+onAccountChange(renderTitleAccount);
+refreshAccount().catch(() => {});
+// Back from the checkout or the mail link with the page kept in the browser's history: ask again.
+window.addEventListener("pageshow", (e) => { if (e.persisted) refreshAccount().catch(() => {}); });
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshAccount().catch(() => {}); });
+{
+  // The link in the mail, or a finished payment, lands back here (/headliner/?signedin=1): say so once, and tidy the address.
+  const back = params.get("signedin");
+  if (back) {
+    history.replaceState(null, "", location.pathname);
+    const toast = $("title-toast");
+    toast.textContent = "SIGNED IN";
+    toast.hidden = false;
+    setTimeout(() => { toast.hidden = true; }, 2500);
+  }
 }
 
 $("title-play").addEventListener("click", () => {
@@ -283,7 +322,7 @@ function freePlay(): void {
   $("jingle-button").hidden = true;
   const open = content ? Progress.recordsOpen(progress, content.career.chapters) : new Set([1]);
   const meridian = (progress.stars["meridian"] ?? 0) > 0;
-  fillCrate([...newestFirst(tracks.filter((t) => open.has(t.chapter ?? 1) && (t.id !== "white-label" || meridian))),
+  fillCrate([...newestFirst(tracks.filter((t) => open.has(t.chapter ?? 1) && !paywalled(t.chapter ?? 1) && (t.id !== "white-label" || meridian))),
              ...(cutPattern ? [cutInfo()] : [])]);
 }
 
@@ -321,6 +360,7 @@ let sequence: { chapter: Chapter | null; steps: ChapterStep[]; screens: Screen[]
 
 function playSteps(chapter: Chapter, steps: ChapterStep[]): void {
   if (steps.length === 0) return;
+  if (paywalled(chapter.number)) { openChapter(chapter.number); return; } // the offer, not a screen that cannot load
   sequence = { chapter, steps, screens: withBag(steps[0].screens), at: -1 };
   nextScreen();
 }

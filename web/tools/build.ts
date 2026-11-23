@@ -52,6 +52,7 @@ code(path.join(WEB, "src"));
 writeFileSync(path.join(SITE, "index.html"), readFileSync(path.join(WEB, "index.html"), "utf8").replace('src="src/main.ts"', 'src="src/main.js"'));
 cpSync(path.join(WEB, "icon.svg"), path.join(SITE, "icon.svg"));
 cpSync(path.join(WEB, "fonts"), path.join(SITE, "fonts"), { recursive: true });
+cpSync(path.join(WEB, "unlock"), path.join(SITE, "unlock"), { recursive: true }); // the checkout page (a page of its own: tools/app.js gives it other headers)
 cpSync(path.join(WEB, "content"), path.join(SITE, "content"), { recursive: true, filter: (src) => !src.endsWith(".md") }); // notes stay in the repo
 files += 3;
 

@@ -7,6 +7,7 @@ The unit tests (`web/test`, `node --test`) cannot see the booth. These scripts d
 | Build the scripts | `./build.sh` (copies `bodies/` to `built/`) |
 | Run the whole suite (about 4 minutes) | `./run.sh` (dev server on :5174 must be running: `cd web && node tools/serve.ts --port 5174`) |
 | Run some | `./run.sh free-e2e:50:'?autostart' title-e2e:34:'?x=1'` |
+| The paywall (a stranger plays chapters 1-2 with the gate on; starts its own Worker, about 12 min) | `./paywall-e2e.sh [port]` (not in run.sh); the HTTP-level purchase path: `node paywall-local.mjs URL` against `wrangler dev --config wrangler.test.toml` |
 | Audio checks (a recorded tone through a loop) | `audio/` (needs a PipeWire null sink `Headliner-Radio` and `ffmpeg -f pulse`; an audible variant of shot.ts without `--mute-audio`) |
 
 URLs: `?autostart` = FREE PLAY (the game's booth), `?autostart&lesson=<id>` straight into a lesson, `?autostart&night=<id>&length=<s>` into a night.
