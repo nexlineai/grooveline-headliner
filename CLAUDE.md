@@ -488,3 +488,13 @@ Plan and log: vault `04_projects/grooveline/notes/headliner-other-platforms.md`.
   `google/veo-3.1-lite` refused our picture ("violates Vertex AI's usage guidelines").
 - `tools/voice/say.sh OUT.m4a VOICE "text"`: spoken lines without a picture. `voice/casting/` has every voice
   saying one line, for Zé to cast by ear.
+
+## v1.2.0 career pack on Cloudflare R2 (tooling 23 Nov 2026, branch `r2-media-pack`; the app side is NOT done)
+Chapters 3-12's media (437 files, 284 MiB) are to leave the IPA and be downloaded once after the unlock; the app keeps chapters 1-2 (110 files,
+61 MiB). Tooling (no `App/` change): `web/tools/media-pack.ts` + `tools/media-pack/make-manifest.mjs` make `pack-manifest.json` (per file: path,
+bytes, first chapter that needs it, sha256, bucket key `pack/<sha256>.<ext>`) and `bundle-excludes.txt` from the usage-based list
+`web/tools/gating.ts`; `tools/media-pack/upload.sh` is Zé's (bucket + upload). **Spec for the app side: vault
+`04_projects/grooveline/notes/headliner-v1.2-r2-pack-spec.md`** (extends the reviewed design in `2026-11-22-headliner-ios-review-and-v1.1-plan.md`).
+After changing chapter content (`career.json`) regenerate the manifest; a NEW asset that free chapters load only from Swift code must be named in
+`ALWAYS_FREE` in `web/tools/gating.ts`.
+
